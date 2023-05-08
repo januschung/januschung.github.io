@@ -5,7 +5,7 @@
 ![banner](./assets/dark_profile.png#only-dark){ align=right width="200" }
 I am a __Software Engineer__ with over 20 years of experiences in various fields (Developer, DevOps, QA, Support).
 
-Currently, I work as a __Senior Software Engineer DevOps__ for _Ad Hoc_, which is a digital services company that helps the federal government better serve people. My day to day work invovles setting up Kubernetes (EKS) and other AWS services as a plaform for various Veterans Affairs services.
+Currently, I work as a __Senior Software Engineer DevOps__ for _Ad Hoc_, which is a digital services company that helps the federal government better serve people. My day to day work involves setting up Kubernetes (EKS) and other AWS services as a plaform for various Veterans Affairs services.
 
 Before joining Ad Hoc, I had been working as a __Staff Software Engineer__ for over seven years with _Integral Ad Sciences_, which is a global leader in digital media quality. IAS makes every impression count, ensuring that ads are viewable by real people, in safe and suitable environments, activating contextual targeting, and driving supply path optimization.
 
@@ -55,11 +55,11 @@ Before joining Ad Hoc, I had been working as a __Staff Software Engineer__ for o
 ??? tip "Beer"
     :fontawesome-solid-beer-mug-empty: 
     
-    One of my life goals is to drink as many type of beer as possible. I might have tried over 500 different beers so far. Besides drinking, I am a beer glass collector.
+    One of my life goals is to drink as many type of beer as possible. I might have tried over 500 different beers so far. Besides drinking, I am also a beer glass collector.
 ??? tip "Photography"
     :material-camera: 
     
-    I used to take a lot of pictures with my Sony Alpha A900. During that period of time, people portrait and wedding documentary were my favorite. It was my honor to help two of my best friends and one of my primary classmate to capture their big moments. I will upload some of my work in the coming future.
+    I used to take a lot of pictures with my Sony Alpha A900. During that period of time, people portrait and wedding documentary were my favorite. It was my honor to help two of my best friends and one of my primary school classmate to capture their big moments. I will upload some of my work in the coming future.
 ??? tip "Hi-Fi"
     :material-speaker::material-speaker: 
     
