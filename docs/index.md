@@ -71,4 +71,4 @@ Before joining Ad Hoc, I had been working as a __Staff Software Engineer__ for o
 ??? tip "Woodworking"
     :material-hand-saw: 
     
-    I built couple furnitures for my home with the skills I learned from secondary school D&T class, as well as from a summer job in a double desk bus repairing factory. Working with wood always gives me a peaceful feeling.
+    I built couple furnitures for my home with the skills I learned from secondary school D&T class, as well as from a summer job in a double deck bus repairing factory. Working with wood always gives me a peaceful feeling.
