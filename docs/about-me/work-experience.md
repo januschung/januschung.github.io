@@ -1,6 +1,10 @@
 ??? success "AD HOC LLC :octicons-location-16: WASHINGTON, DC (Remotely Based)"
     #### AD HOC LLC
-    __SENIOR SOFTWARE ENGINEER DEVOPS - Feb 2023 - Present__
+    <div>
+        <div style="float:left">__SENIOR SOFTWARE ENGINEER DEVOPS__</div>
+        <div style="float:right">__:material-calendar-clock: Feb 2023 - Present__</div>
+    </div>
+    <div style="clear: both;"></div>
 
     - Built and maintained CI/CD pipelines using Github Actions, Argo CD, DataDog and Hashicorp Vault.
     - Built and deployed Infrastructure as Code using Terraform on AWS EKS.
@@ -8,7 +12,11 @@
 
 ??? success "INTEGRAL AD SCIENCE (IAS) :octicons-location-16: NEW YORK, NY (Remotely Based)"
     #### INTEGRAL AD SCIENCE
-    __STAFF SOFTWARE ENGINEER - Jun 2020 - Dec 2022__
+    <div>
+        <div style="float:left">__STAFF SOFTWARE ENGINEER__</div>
+        <div style="float:right">__:material-calendar-clock: Jun 2020 - Dec 2022__</div>
+    </div>
+    <div style="clear: both;"></div>
 
     - Built multiple microservices to migrate legacy monolith applications over to Kubernetes in AWS EKS which made feature updates faster and improved developer experience.
     - Designed and developed APIs for IAS pre-bid and post-bid platform using Spring boot with a MySQL backend running in Tomcat. This project enabled IAS’ clients to integrate with our targeting segments quickly.
@@ -21,7 +29,11 @@
     project won in the company hackathon.
     - Conducted bi-weekly Lunch and Learn sessions for the team to present and discuss new technologies, and brainstorm improvement for our current tech stack.
 
-    __STAFF QAA ENGINEER - Jun 2015 - May 2020__
+    <div>
+        <div style="float:left">__STAFF QAA ENGINEER__</div>
+        <div style="float:right">__:material-calendar-clock: Jun 2015 - May 2020__</div>
+    </div>
+    <div style="clear: both;"></div>
 
     - Created headless XVFB and Chrome/Firefox test framework to speed up testing time by 80%.
     - Created a reusable testing environment for different products using Puppet that spins up AWS EC2 environments on demand.
@@ -31,7 +43,11 @@
 
 ??? success "IV INTERACTIVE :octicons-location-16: JERERY CITY, NJ"
     #### IV INTERACTIVE
-    __FULL STACK SOFTWARE ENGINEER - Aug 2014 - Jun 2015__
+    <div>
+        <div style="float:left">__FULL STACK SOFTWARE ENGINEER__</div>
+        <div style="float:right">__:material-calendar-clock: Aug 2014 - Jun 2015__</div>
+    </div>
+    <div style="clear: both;"></div>
 
     - Designed and created a HIPPA compliant Web Application for IV Interactive using Laravel(PHP framework), MySQL, jQuery, Bootstrap, Skeleton, SASS/CSS3 and HTML5.
     - Created and maintained unit tests for the above using PHPUnit.
@@ -41,28 +57,44 @@
 
 ??? success "MEDIA THREE CORPORATION :octicons-location-16: NEW YORK, NY"
     #### MEDIA THREE CORPORATION
-    __FULL STACK SOFTWARE ENGINEER - Jun 2013 - Aug 2014__
+    <div>
+        <div style="float:left">__FULL STACK SOFTWARE ENGINEER__</div>
+        <div style="float:right">__:material-calendar-clock: Jun 2013 - Aug 2014__</div>
+    </div>
+    <div style="clear: both;"></div>
 
     - Implemented customer support system using CakePHP(PHP framework), MySQL, JQuery, CSS3. This was used to monitor customer complaints and inquiries.
 
 
 ??? success "L & L TRAVEL ENTERPRISE, INC :octicons-location-16: NEW YORK, NY"
     #### L & L TRAVEL ENTERPRISE, INC
-    __SENIOR SOFTWARE ENGINEER DEVOPS - Aug 2012 - Jun 2013__
+    <div>
+        <div style="float:left">__SENIOR SOFTWARE ENGINEER DEVOPS__</div>
+        <div style="float:right">__:material-calendar-clock: Aug 2012 - Jun 2013__</div>
+    </div>
+    <div style="clear: both;"></div>
 
     - Created and maintained the Online booking/tracking system for 500 travel agents using IIS, ASP, Javascript and SQL Server.
 
 
 ??? success "MERCK & CO., INC :octicons-location-16: MORRISTOWN, NJ"
     #### MERCK & CO., INC
-    __INFORMATICA DEVELOPER (Consultant) - Jun 2011 - Feb 2012__
+    <div>
+        <div style="float:left">__INFORMATICA DEVELOPER (Consultant)__</div>
+        <div style="float:right">__:material-calendar-clock: Jun Jun 2011 - Feb 2012__</div>
+    </div>
+    <div style="clear: both;"></div>
 
     - Worked on adding features and upgraded Informatica from version 4.2 to 5.3
 
 
 ??? success "DATASYNAPSE, INC :octicons-location-16: NEW YORK, NY"
     #### DATASYNAPSE, INC
-    __SENIOR SUPPORT ENGINEER - May 2007 - Nov 2009__
+    <div>
+        <div style="float:left">__SENIOR SUPPORT ENGINEER__</div>
+        <div style="float:right">__:material-calendar-clock: May 2007 - Nov 2009__</div>
+    </div>
+    <div style="clear: both;"></div>
 
     - Provided technical support for customers using DataSynapse software, a distributed computing application, on their mission-critical production systems in various platforms.
     - Developed sample code/examples of the DataSynapse API to make integrations for clients easier.
@@ -70,7 +102,11 @@
 
 ??? success "APPLIMATION, INC :octicons-location-16: NEW YORK, NY"
     #### APPLIMATION, INC
-    __INFORMIA SUPPORT CONSULTANT - May 2005 - Apr 2007__
+    <div>
+        <div style="float:left">__INFORMIA SUPPORT CONSULTANT__</div>
+        <div style="float:right">__:material-calendar-clock: May 2005 - Apr 2007__</div>
+    </div>
+    <div style="clear: both;"></div>
 
     - Provided technical support for customers using Applimation software.
     - Developed custom Oracle/PeopleSoft/Siebel SQL metadata for customers.
