@@ -1,6 +1,6 @@
 # About this Homepage
 
-While chatting with my ex-coworker and buddy about job hunting and project, we came up with an idea to build a personal webpage since a lot of job application is asking for it.
+While chatting with my ex-coworker and buddy about job hunting and project, we came up with an idea to build a *personal homepage* since a lot of job application is asking for it.
 
 I think it is a good idea since it is a good way to showcase not only the skillset and work experience in a more presentable way, compare to boring pdf/word document, but also provides more content about how we are outside of work.
 
@@ -8,7 +8,7 @@ I think it is a good idea since it is a good way to showcase not only the skills
 
 ![Mkdocs Material](../assets/about-me/mkdoc-material.png)
 
-From the new trick that I learned in my new job, I built this personal homepage once again (the last time was a school project using plain HTML and javascript). It uses Mkdocs and Material which provides a simple but yet professional theme that works well in any devices with built in responsiveness. It is easy to use without any coding skill whatsoever, as it just requires some light modification of a configuration yaml file and adding/editing markdown file(s) for your contents.
+From the new trick that I learned in my new job, I built this personal homepage once again (the last time was a school project using plain HTML and javascript). It uses Mkdocs Material which provides a simple but yet professional theme that works well in any devices with built in responsiveness. It is easy to use __without__ any coding skill whatsoever, as it just requires some light modification of a configuration yaml file and adding/editing markdown file(s) for your contents.
 
 ## Free Publishing and Hosting with Github Page
 
