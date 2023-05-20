@@ -31,11 +31,12 @@ Before joining Ad Hoc, I had been working as a __Staff Software Engineer__ for o
 
     - :simple-terraform: Terraform
     - :fontawesome-brands-aws: AWS
+        - CloudFormation, EKS, EC2, IAM, VPC, ECR, ECS, Fargate, MSK, KMS, Lambda, RDS, CloudWatch
     - :simple-jenkins: Jenkins
     - :simple-github: Github Actions
     - :simple-docker: Docker
     - :simple-kubernetes: Kubernetes
-    - :simple-argo: Argo CD
+    - :simple-argo: Argo CD, Argo Rollouts
     - :simple-datadog: DataDog
 
 ??? note "QA"
