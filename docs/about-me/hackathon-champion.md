@@ -1,6 +1,6 @@
 # Hackathon Champion
 
-It was one of my best achievement in career to win the company hackathon leading a team of five engineers from different team across the company.
+It was one of my best achievements in career to win the company hackathon leading a team of five engineers from different teams.
 
 ![Hackathon Winner](../assets/about-me/fdr.png)
 
@@ -9,7 +9,7 @@ It began with the time when I was bored working as a *QA Automation Engineer* in
 !!! info inline end "I was bored"
 
     Working as a QA Automation Engineer with day to day repetitive tasks was very boring. I was looking for new challenge.
-In a quarterly PI planning, when all of the engineers around the world came to the NYC office, I told my team lead that I wanted to install our flagship platform on my laptop as a local development environment so that I can learn more about how it worked. He pointed me to a Confluence page with instruction that took *20 scrolls* to reach the end.
+In a quarterly PI planning, when all of the engineers around the world came to the NYC office, I told my team lead that I wanted to install our flagship platform on my laptop as a local development environment so that I could learn more about how it worked. He pointed me to a Confluence page with instruction that took *20 scrolls* to reach to the bottom.
 
 #### Prerequisite
 1. Java
@@ -60,14 +60,14 @@ flowchart RL
   end
 ```
 
-Two years later, after I transferred into a development and devops role, the Hackathon came. While brainstorming with a devops buddy for potential team idea, he challenged me to Dockerize the monolith platform. That reignited my hidden burning desire and was a no brainer to give it another try.
+Two years later, after I transferred into a development and devops role, the Hackathon came. While brainstorming with a devops buddy for potential team idea, he challenged me to Dockerize the monolith platform. That reignited my hidden burning desire to give it another try.
 
 ## Easy First Draft
-At first, I thought it would be hard since I failed two years ago. However, it turned out to be a 2 hours easy work for the first working draft!
+At first, I thought it would be hard since I failed two years ago. However, it turned out to be a 2 hours easy work to build the first working draft!
 
 When I think back now, here were the reasons:
 
-1. The database, an important part had already been containerized in those two years. It was a team effort between another developer and me with our free time.
+1. The database had already been containerized in those two years. It was a team effort between another developer and me with our free time.
 
 1. I gained more domain knowledge of the monolith plaform. What didn't make sense from the server and application logs in the past became meaningful during the troubleshooting process.
 
@@ -78,15 +78,15 @@ When I think back now, here were the reasons:
 The first draft was working with the following setup:
 
 1. Database in a Docker
-1. Local cache server with warming up script ran manually
-1. The monolith Java war file in a Docker web container with required configuration files
-1. The monolith was setup to wire with the database in Docker and the local cache server
+1. Local cache server with warm up script ran manually
+1. Monolith Java war file in a Docker web container with required configuration files
+1. Monolith was setup to wire with the database in Docker and the local cache server
 
 It worked! Since I had one and half day left, I spent the rest of the time to automate everything together. My plan was to have the monolith be brought up with a single command.
 
 ## Final Draft
 
-I continuted to Dockerize other components, including the cache server and its cache warmup process. I also made the new repo as the single source of the truth for all the configuration files. Here is the final docker-compose file (with some naming modification):
+I continuted to Dockerize other components, including the cache server and its cache warm up process. I also made the new repo as the single source of the truth for all the configuration files. Here is the final docker-compose file (with some naming modification):
 
 ``` yaml
 version: '2.3'
@@ -158,14 +158,14 @@ For that, I made a bold move to call off a meeting with all the related party, p
 - Managers and Tech Leads from two teams
 - CTO, VP of Engineering
 
-In an hour of meeting, besides descring what the project has solved and the reason behind it, I brought up the following that the project could potentially solve:
+In an hour of meeting, besides descring what the project has solved and the reason behind it, I brought up the following that the project could potentially help:
 
 - To migrate the CICD process of the Dockerized monolith application to Kubernetes 
 - To run acceptance test and regression in parallel faster with horizontal scaling
-- To test web container, java and database update easily
+- To test web container, Java and database update easily
 
 Suprisingly, these were some of the problem which they would like to solve on their roadmap or backlog for the next two years. We ended up creating epics for respective team to further develop the project. It was a big success.
 
 ## Hackathon Result
 
-It still feel so surreal and overwhelming to win the hackathon for the company. The most valuable part was that I learned to step up and organize the meetings with the right people to drive cross team collaboratoin and further develop the project. I also gained the trust within the Engineering and Product teams and built great connection and friendship with my teammates and other team members.
+It still feel so surreal and overwhelming to win the hackathon for the company. The most valuable part was that I learned to step up and organized the meetings with the right people to drive cross team collaboratoin and further develop the project. I also gained the trust within the Engineering and Product teams and built great connection and friendship with the team members.
