@@ -2,11 +2,11 @@
 ![banner](../../assets/tech-blog/sql/auto-increment-with-postgres-and-jpa.avif)
 ## Background
 
-I want to have Postgres to auto generate ID for my Springboot application, using Liquibase setup.
+I want to have Postgres to auto generate ID for my Springboot application entity, using Liquibase.
 
 ## What did't work
 
-At first I had the following pair for the Java Entity Class and liquibase setup: 
+At first I had the following pair for the Java Entity Class and Liquibase setup: 
 
 ``` java
 @Id
@@ -28,7 +28,7 @@ which produced the following error:
 org.postgresql.util.PSQLException: ERROR: relation "support_system.ticket_seq" does not exist
 ```
 
-Since it was complainting about the missing sequence, I modified the liquibase setting to
+Since it was complainting about the missing sequence, I modified the Liquibase setting to
 
 ``` xml
 <createTable tableName="TICKET">
@@ -47,9 +47,9 @@ After some desperating debugging hours, I consulted my good friend Mark, the SQL
     You don’t generally need to reference the sequence object explicitly
 
 By doing so, I can just create a column using the standard SQL identity, for example, `id int generated always as identity`.
-That will create the sequence automatically and automatically call nextval to get a new id value when  a new row is inserted.
+That will create the sequence automatically and automatically call nextval to get a new id value when a new row is inserted.
 
-Afer listened to Mark, I am convinced that I actually do not need to setup a sequence. Therefore, I reverse my chance in liquibase and continue to try different thing on the JPA side. Here are the setting that finally works:
+Afer listened to Mark, I was convinced that I actually did not need to setup a sequence. Therefore, I reversed my chance in Liquibase and continued to try different thing on the JPA side. Here are the setting that finally works:
 
 ``` java
 @Id

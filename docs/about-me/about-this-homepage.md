@@ -12,7 +12,7 @@ From the new trick that I learned in my new job, I built this personal homepage 
 
 ## Free Publishing and Hosting with Github Page
 
-Another good thing is, not only the source code of the homepage can be hosted on Github, but also the web hosting is provided for free with [Github Pages](https://pages.github.com/). Powered with [Github Action](https://squidfunk.github.io/mkdocs-material/publishing-your-site/#with-github-actions), Github will build and deploy the homepage for you automatically. The process is fully automated so that the next time you when add or edit your homepage to your Github repo, the change will be deployed within a minute without further work required.
+Another good thing is, not only the source code of the homepage can be hosted on Github, but also the web hosting is provided for free with [Github Pages](https://pages.github.com/). Powered with [Github Action](https://squidfunk.github.io/mkdocs-material/publishing-your-site/#with-github-actions), Github will build and deploy the homepage automatically. The process is fully automated so that the next time you when add or edit your repo, the change will be deployed within a minute without further work required.
 
 I hope this can help my buddy to build a good porfolio, as well as to get a dream job soon in this troublesome tech job market. If anyone of you is interested in learning more, feel free to contact and I am happy to help.
 

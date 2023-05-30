@@ -1,6 +1,7 @@
 
 ![floppy disks](../../assets/tech-blog/shell-script/backup.avif)
-Here are the scripts which I have been using to generate backup for file and mysql database. They  can be run manually but preparbaly with cron jobs for automation.
+
+Here are the scripts which I have been using to generate backup for file and mysql database. They  can be run manually but preferably with cron jobs for automation.
 
 Note that for the mysql backup script, there is a setting for `rotation_day`. This is used to keep the number of copy of the database backup, which will be recyled in the final commnad:
 
@@ -33,7 +34,7 @@ gpgrcp="[CHANGE ME]"
 DATABASE="[CHANGE ME]"
 #set daily backup dir
 backup_path="[CHANGE ME]"
-prefix="p[CHANGE ME]"
+prefix="[CHANGE ME]"
 suffix="_"`date +%d"_"%m"_"%Y"__"%H`.sql.gz
 rotation_days=14;
 umask 177
