@@ -60,4 +60,8 @@ Everything is written in python in `run.py`. You can play with the font and grid
 I appreciate all suggestions or PRs which will help kids learn Asian language better. Feel free to fork the project and create a pull request with your idea.
 
 ## Special Thanks
-My lovely sons Tim and Hin. 
+My lovely sons Tim and Hin.
+
+## Github link
+
+[Asian Comprehension Worksheet Generator](https://github.com/januschung/asian-comprehension-worksheet-generator)
