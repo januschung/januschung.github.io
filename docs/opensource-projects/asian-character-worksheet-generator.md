@@ -1,6 +1,6 @@
-# Asian  Character Worksheet Generator
+# Asian Character Worksheet Generator
 
-![sample worksheet](../assets/asian-comprehension-worksheet-generator/sample.png)
+![sample worksheet](../assets/opensource-projects/asian-character-worksheet-generator/sample.png)
 
 ## Background
 As an immigrant and father of two boys living in America, I want my sons to learn my language so that they can have the chance to learn more about their culture origin. I want to share with them the novels that I have read; the music that I have listened to and the movies that I have watched. To make it happens, it is essential to teach them how to write in my language.
