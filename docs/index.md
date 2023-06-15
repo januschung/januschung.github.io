@@ -20,11 +20,20 @@ Before joining Ad Hoc, I had been working as a __Staff Software Engineer__ for o
 
 ??? note "Web/API Development"
 
-    - :fontawesome-brands-java: Java (Springboot, Reactive)
+    - :fontawesome-brands-java: Java 
+        - Springboot 
+        - Reactive
     - :fontawesome-brands-python: Python
-    - :simple-php: PHP (:simple-laravel: Laravel, :simple-cakephp: CakePHP)
-    - :fontawesome-brands-js: JavaScript (:fontawesome-brands-node-js: Node, :simple-react: React)
-    - :simple-mysql: MySQL, :simple-postgresql: Postgres
+        - :simple-fastapi: Fastapi
+        - :simple-flask: Flask
+    - :simple-php: PHP 
+        - :simple-laravel: Laravel
+        - :simple-cakephp: CakePHP
+    - :fontawesome-brands-js: JavaScript 
+        - :fontawesome-brands-node-js: Node
+        - :simple-react: React
+    - :fontawesome-brands-golang: Go
+    - :simple-mysql: MySQL, :simple-postgresql: Postgres, :simple-amazondynamodb: DynamoDB
     - REST, :simple-graphql: GraphQL
 
 ??? note "DevOps"
@@ -38,6 +47,8 @@ Before joining Ad Hoc, I had been working as a __Staff Software Engineer__ for o
     - :simple-kubernetes: Kubernetes
     - :simple-argo: Argo CD, Argo Rollouts
     - :simple-datadog: DataDog
+    - :simple-auth0: Auth0
+    - :simple-vault: Vault
 
 ??? note "QA"
 
