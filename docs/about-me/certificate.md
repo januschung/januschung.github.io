@@ -33,3 +33,10 @@
 - [Kafka basics from Conduktor.io](https://www.conduktor.io/kafka/kafka-fundamentals/)
 
 - [Sample Code](https://github.com/conduktor/kafka-beginners-course)
+
+### Web Developer Bootcamp with Flask and Python
+![Flask cert](../assets/about-me/certificate/flask.jpeg){ width="500" }
+
+- [Github repo for Habbit Tracker Project](https://github.com/tecladocode/web-dev-bootcamp/tree/master/curriculum/section10/lectures)
+- [Github repo for Profolio Project](https://github.com/tecladocode/web-dev-bootcamp/tree/master/curriculum/section12/lectures)
+- [Github repo for Movie Watchlist Project](https://github.com/tecladocode/web-dev-bootcamp/tree/master/curriculum/section14/lectures)
