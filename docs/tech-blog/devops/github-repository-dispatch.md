@@ -1,6 +1,6 @@
 ## Background
 
-I have to run a js script at repo B from repo A which has a python app. While I can spend the time to reinvent the wheel and fork the logic into python, it is best to keep thing simple by reusing what is already out there and proved to be working fine.
+I have to run a shell script at repo B from repo A which hosts a python app. While I can spend the time to reinvent the wheel and fork the logic into python, it is best to keep thing simple by reusing what is already out there and proved to be working fine.
 
 The js script in repo B is already wired up with a Github workflow. What if I can kick off that workflow remotely from repo A?
 
