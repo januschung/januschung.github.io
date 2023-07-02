@@ -49,7 +49,7 @@ After some desperating debugging hours, I consulted my good friend Mark, the SQL
 By doing so, I can just create a column using the standard SQL identity, for example, `id int generated always as identity`.
 That will create the sequence automatically and automatically call nextval to get a new id value when a new row is inserted.
 
-Afer listened to Mark, I was convinced that I actually did not need to setup a sequence. Therefore, I reversed my chance in Liquibase and continued to try different thing on the JPA side. Here are the setting that finally works:
+After listened to Mark, I was convinced that I actually did not need to setup a sequence. Therefore, I reversed my chance in Liquibase and continued to try different thing on the JPA side. Here are the setting that finally works:
 
 ``` java
 @Id

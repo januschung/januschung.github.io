@@ -64,17 +64,17 @@ REPO = "my-repo"
 TOKEN = "my-secret-token"
 
 def get_github_dispatch_response(team_name):
-        external_repo = f"https://api.github.com/repos/{ORG}/{REPO}/dispatches"
-        data = {"event_type": "my-type"}
-        message = {"message": f"Triggered by workflow dispatch"}
-        payload = {"client_payload": message}
-        data.update(payload)
-        headers = {"Authorization": f"Bearer {TOKEN}"}
-        response = requests.post(external_repo, data=json.dumps(data), headers=headers)
-        if response.status_code == 204:
-            return response
-        logger.error(f"Workflow dispatch failed. Error code and message: {response.status_code} - {response.text}")
-        response.raise_for_status()
+    external_repo = f"https://api.github.com/repos/{ORG}/{REPO}/dispatches"
+    data = {"event_type": "my-type"}
+    message = {"message": f"Triggered by workflow dispatch"}
+    payload = {"client_payload": message}
+    data.update(payload)
+    headers = {"Authorization": f"Bearer {TOKEN}"}
+    response = requests.post(external_repo, data=json.dumps(data), headers=headers)
+    if response.status_code == 204:
+        return response
+    logger.error(f"Workflow dispatch failed. Error code and message: {response.status_code} - {response.text}")
+    response.raise_for_status()
 ```
 
 ## Link
