@@ -62,14 +62,14 @@ git push --force origin feature-branch
 
 ### Checkout main and pull
 ``` bash
-function gm(){
+gm(){
   git checkout main && git pull
 }
 ```
 
 ### Commit with feature branch as the prefix
 ``` bash
-function gcm(){
+gcm(){
   if [[ $# -eq 0 ]] ; then
     echo "add a git comment"
   else
@@ -83,7 +83,7 @@ function gcm(){
 
 ### Push to feature branch without typing it out
 ``` bash
-function gp(){
+gp(){
   branch=$(git branch | grep '*' | awk '{print $2}')
   git push origin $branch
 }
