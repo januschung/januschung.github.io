@@ -60,24 +60,31 @@ git push --force origin feature-branch
 
 ## Bash helper
 
+### Checkout main and pull
+``` bash
+function gm(){
+  git checkout main && git pull
+}
+```
+
 ### Commit with feature branch as the prefix
 ``` bash
 function gcm(){
-    if [[ $# -eq 0 ]] ; then
-        echo "add a git comment"
-    else
-        branch=$(git branch | grep '*' | awk '{print $2}')
-        echo $branch
-        echo "$branch $*"
-        git commit -m "$branch $*"
-    fi    
+  if [[ $# -eq 0 ]] ; then
+    echo "add a git comment"
+  else
+    branch=$(git branch | grep '*' | awk '{print $2}')
+    echo $branch
+    echo "$branch $*"
+    git commit -m "$branch $*"
+  fi    
 }
 ``` 
 
 ### Push to feature branch without typing it out
 ``` bash
 function gp(){
-    branch=$(git branch | grep '*' | awk '{print $2}')
-    git push origin $branch
+  branch=$(git branch | grep '*' | awk '{print $2}')
+  git push origin $branch
 }
 ```
