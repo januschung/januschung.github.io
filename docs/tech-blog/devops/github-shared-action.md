@@ -36,7 +36,6 @@ do_something(){
     echo "Running Dependabot!"
 }
 
-echo "Response of dependabot alert:"
 get_response
 do_something
 ```
@@ -59,7 +58,6 @@ do_something(){
     echo "Running Secret Scanning!"
 }
 
-echo "Response of secret-scanning alert:"
 get_response
 do_something
 ```
@@ -83,7 +81,6 @@ do_something(){
     echo "Running CodeQL Scanning!"
 }
 
-echo "Response of CodeQL alert:"
 get_response
 do_something
 ```
@@ -125,7 +122,7 @@ Since all of the 10 repo will share the same logic, I converted the workflow int
 Here is one the shareable composite actions:
 
 ``` yaml
-name: 'Depandable Alert Check'
+name: 'Depandabot Alert Check'
 description: 'Run dependabot alert check'
 inputs:
   gh-token:
@@ -208,7 +205,6 @@ do_something_secret_scanning(){
     echo "Running Secret Scanning!"
 }
 
-echo "Response of dependabot alert:"
 get_response
 do_something
 ```
