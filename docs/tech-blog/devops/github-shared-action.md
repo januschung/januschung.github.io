@@ -125,6 +125,10 @@ Here is one the shareable composite actions:
 name: 'Depandabot Alert Check'
 description: 'Run dependabot alert check'
 inputs:
+  alert-type:
+    description: 'Alert type to run - codeql, dependabot or secret-scanning'
+    required: true
+    default: 'dependabot'
   gh-token:
     required: true
 
@@ -138,7 +142,7 @@ runs:
       run: echo "${{ github.action_path }}" >> $GITHUB_PATH
     - shell: bash
       run: |
-        run-dependabot-alert.sh ${{ inputs.gh-token }} ${{ github.event.repository.name }}
+        ${{ alert-type }}.sh ${{ inputs.gh-token }} ${{ github.event.repository.name }}
 ```
 
 Note that the bash scripts are now migrated from `scripts` folder into `.github/actions/alerts`
@@ -232,7 +236,7 @@ runs:
       run: echo "${{ github.action_path }}" >> $GITHUB_PATH
     - shell: bash
       run: |
-        ./scripts/${{ inputs.alert-type }}.sh ${{ inputs.gh-token }} ${{ github.event.repository.name }}
+        alert.sh ${{ inputs.gh-token }} ${{ github.event.repository.name }} {{ inputs.alert-type }}
 ```
 
 I do not want to create three separate workflows from the external repo either, so I use GitHub Matrix in a single workflow:
@@ -252,6 +256,7 @@ jobs:
       - uses: januschung/shared-action-repo/.github/actions/alerts@main
         with:
           gh-token: ${{ secrets.GH_TOKEN }}
+          alert-type: ${{ matrix.type }}
 ```
 
 That is it! I hope this helps if you are into similar situation in the coming future.
