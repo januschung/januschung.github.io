@@ -113,20 +113,20 @@ Can I do better? Sure!
 
 ## Second Trial - Create Shareable Composite Action
 
-Since all of the 10 repo will share the same logic, I converted the workflow into shareable composite actions in a dedicated repo. In so doing, the other repo can reference the same set of actions. Here are the benefits:
+Since all of the 10 repo will share the same logic, I converted the workflow into a shareable composite action in a dedicated repo. In so doing, the other repo can reference the same action. Here are the benefits:
 
 - a single source of truth
 - easier to maintain one set of bash scripts and action
 - easier to get the rest of the repo onboard
 
-Here is one the shareable composite actions:
+Here is the shareable composite action:
 
 ``` yaml
-name: 'Depandabot Alert Check'
-description: 'Run dependabot alert check'
+name: 'Alert Check'
+description: 'Run alert check'
 inputs:
   alert-type:
-    description: 'Alert type to run - codeql, dependabot or secret-scanning'
+    description: 'Alert type to run - code-scanning, dependabot or secret-scanning'
     required: true
     default: 'dependabot'
   gh-token:
@@ -161,6 +161,7 @@ jobs:
       - uses: januschung/shared-action-repo/.github/actions/alerts@main
         with:
           gh-token: ${{ secrets.GH_TOKEN }}
+          alert-type: ${{ matrix.type }}
 ```
 
 Looking way much better now. But, can I do even better?
@@ -220,7 +221,7 @@ name: 'Alert Check'
 description: 'Run alert check'
 inputs:
   alert-type:
-    description: 'Alert type to run - codeql, dependabot or secret-scanning'
+    description: 'Alert type to run - code-scanning, dependabot or secret-scanning'
     required: true
     default: 'dependabot'
   gh-token:
