@@ -37,7 +37,7 @@ MY_SCRIPT=$1
 REPO_ROOT="/Users/janus/workspace/"
 SOURCE_DIR="source"
 
-while read -r line; 
+while read -r line; do
     cd "$line"
     cp $SOURCE_DIR/* $REPO_ROOT/$1/
     cd $REPO_ROOT/$1/

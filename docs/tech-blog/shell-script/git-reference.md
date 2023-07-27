@@ -88,3 +88,18 @@ gp(){
   git push origin $branch
 }
 ```
+
+### auto tag and push a new minor build
+``` bash
+gt(){
+  git checkout main && git pull
+  LAST_TAG_SHA=$(git show-ref | tail -n 1 | awk '{print $1}')
+  LAST_TAG=$(git show-ref | tail -n 1 | awk '{print $2}' | cut -d '/' -f 3)
+  LAST_TAG_PATCH_VERSION=$(echo "${LAST_TAG%%-*}" | cut -d '.' -f 3)
+  NEW_TAG_PATCH_VERSION=$((LAST_TAG_PATCH_VERSION + 1))
+  NEW_TAG=$(echo "$LAST_TAG" | cut -d '.' -f 1,2).$NEW_TAG_PATCH_VERSION
+
+  git tag "$NEW_TAG" "$LAST_TAG_SHA"
+  git push origin "$NEW_TAG"
+}
+```
