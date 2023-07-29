@@ -16,7 +16,7 @@ source_path="[CHANGE ME]"
 destination_path="[CHANGE ME]"
  # prefix for log file, eg "photobackup-"
 prefix="[CHANGE ME]"
-logfile=$prefix"_"`date +%d"_"%m"_"%Y"__"%H`.log
+logfile=$prefix"_"$(date +%d_%m_%Y__%H).log
 
 umask 177
  
@@ -35,7 +35,7 @@ DATABASE="[CHANGE ME]"
 #set daily backup dir
 backup_path="[CHANGE ME]"
 prefix="[CHANGE ME]"
-suffix="_"`date +%d"_"%m"_"%Y"__"%H`.sql.gz
+suffix="_"$(date +%d_%m_%Y__%H).sql.gz
 rotation_days=14;
 umask 177
  
