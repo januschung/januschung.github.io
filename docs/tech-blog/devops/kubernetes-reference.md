@@ -37,3 +37,17 @@ k get dbinstance [instance-name] -n [namespace]
 k get dbinstance [instance-name] -n [namespace] -o json | jq -r '.status.endpoint.address'
 k get dbinstance [instance-name] -n [namespace] -o json | jq -r '.status.endpoint.port'
 ```
+
+## Helm
+
+``` bash
+# sample workflow to install prometheus from helm
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm search repo prometheus-community
+helm upgrade --install -n istio-system prometheus prometheus-community/prometheus
+
+# to install with customized value file and specific version
+helm upgrade --install -n istio-system prometheus prometheus-community/prometheus \
+  -f values.yaml \
+  --version 23.3.0
+```
