@@ -50,4 +50,7 @@ helm upgrade --install -n istio-system prometheus prometheus-community/prometheu
 helm upgrade --install -n istio-system prometheus prometheus-community/prometheus \
   -f values.yaml \
   --version 23.3.0
+
+# to uninstall
+helm uninstall prometheus
 ```
