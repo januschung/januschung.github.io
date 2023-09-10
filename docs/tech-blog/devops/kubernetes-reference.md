@@ -54,3 +54,51 @@ helm upgrade --install -n istio-system prometheus prometheus-community/prometheu
 # to uninstall
 helm uninstall prometheus
 ```
+
+## InitContainer
+
+Init containers are speicalized containers that run before app containers in the same pod. One usage of init container is to download file and share it with the app container via shared volume. To learn more, check out official [Kubernetes documentation](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/).
+
+``` yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myapp
+  labels:
+    app: myapp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mydb
+  template:
+    metadata:
+      labels:
+        app: mydb
+    spec:
+      containers:
+        - name: mydb
+          image: postgres
+          env:
+          - name: POSTGRES_PASSWORD
+            value: example
+          ports:
+          - containerPort: 5432
+            name: postgres
+          volumeMounts:
+            - name: data
+              mountPath: /docker-entrypoint-initdb.d
+      initContainers:
+        - name: curl-downloader
+          image: appropriate/curl
+          args:
+            - "-o"
+            - "/tmp/data/init.sql"
+            - "https://raw.githubusercontent.com/januschung/support-system-db/main/sql-scripts/create_tables.sql"
+          volumeMounts:
+            - name: data
+              mountPath: /tmp/data
+      volumes:
+        - name: data
+          emptyDir: {}
+```
