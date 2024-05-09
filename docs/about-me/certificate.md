@@ -40,3 +40,12 @@
 - [Github repo for Habbit Tracker Project](https://github.com/tecladocode/web-dev-bootcamp/tree/master/curriculum/section10/lectures)
 - [Github repo for Profolio Project](https://github.com/tecladocode/web-dev-bootcamp/tree/master/curriculum/section12/lectures)
 - [Github repo for Movie Watchlist Project](https://github.com/tecladocode/web-dev-bootcamp/tree/master/curriculum/section14/lectures)
+
+### Go: The Complete Developer's Guide (Golang)
+![Flask cert](../assets/about-me/certificate/go.jpeg){ width="500" }
+
+### The Complete Ruby on Rails Developer Course
+![Flask cert](../assets/about-me/certificate/ruby.jpeg){ width="500" }
+
+### Istio Hands-On for Kubernetes
+![Flask cert](../assets/about-me/certificate/istio.jpeg){ width="500" }
