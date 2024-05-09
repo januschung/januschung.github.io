@@ -33,14 +33,14 @@ My first thought was to implement a single bash script to do all the work:
 Here is the snippet for the original plan:
 
 ``` bash
-MY_SCRIPT=$1
+REPO=$1
 REPO_ROOT="/Users/janus/workspace/"
 SOURCE_DIR="source"
 
 while read -r line; do
     cd "$line"
-    cp $SOURCE_DIR/* $REPO_ROOT/$1/
-    cd $REPO_ROOT/$1/
+    cp $SOURCE_DIR/* $REPO_ROOT/$REPO/
+    cd $REPO_ROOT/$REPO/
     git checkout -b TEST-0000
     git add .
     git commit -m "TEST-0000 patching"
@@ -70,37 +70,36 @@ _`github-looping.sh`_
 #!/bin/sh
 
 MY_SCRIPT=$1
-REPO_ROOT="/Users/janus/workspace/"
 
 while read -r line; 
     do ./$MY_SCRIPT "$line"; 
 done < repos.txt
 ```
 
-_`TEST-0000.sh`_
+_`TEST-0000.sh`_ - while TEST-0000 is the jira ticket number
 ``` bash
 #!/bin/sh
 
 GH_BRANCH=$(basename -- $0 | cut -d. -f1)
-VAR=$1
+REPO=$1
 SOURCE_DIR="source"
 REPO_ROOT="/Users/janus/workspace/"
 COMMIT_MESSAGE="mass patching"
 
-echo "processing "$1" ..."
-cp $SOURCE_DIR/* $REPO_ROOT/$1/
-cd $REPO_ROOT/$1/
+echo "processing repo "$REPO" ..."
+cp $SOURCE_DIR/* $REPO_ROOT/$REPO/
+cd $REPO_ROOT/$REPO/
 git checkout -b $GH_BRANCH
 git add .
 git commit -m "$GH_BRANCH $COMMIT_MESSAGE"
 git push origin $GH_BRANCH
-echo "finish processing "$1" ..."
+echo "finish processing repo "$REPO" ..."
 ```
 
 To run the update across all the repos, simply run the following:
 `./github-looping.sh TEST-0000.sh`
 
-The idea is to have a seperate script being called by `github-loop.sh`. 
+The idea is to have a seperate script being called by `github-looping.sh`. 
 
 In so doing, I can versionize the TEST-XXXX.sh script and have an idea of what exactly was being run.
 
