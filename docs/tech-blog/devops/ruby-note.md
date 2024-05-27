@@ -32,3 +32,12 @@ Run the following if `bundle install` fails to work.
 ``` bash
 brew install postgresql
 ```
+
+## Seed db to create a user
+
+We can seed the database with plain sql 
+```
+connection = ActiveRecord::Base.connection()
+connection.execute("SQL GOES HERE")
+
+```
