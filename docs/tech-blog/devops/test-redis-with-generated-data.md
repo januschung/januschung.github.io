@@ -83,6 +83,7 @@ To keep it simple, I just want to get the value from the cache when the correspo
 
 Here is the sample implementation:
 
+
 ``` ruby
 # routes.rb
 
