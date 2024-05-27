@@ -1,5 +1,6 @@
 # Test Redis with Generated Data
 
+
 Recently I need to test out Redis integration with a Ruby on Rails application. I wanted to test how fast Redis is with 1GB of data. 
 
 Instead of manually generating dummy data, I recalled using the Faker library a couple of years ago during my time as a full-stack developer.
