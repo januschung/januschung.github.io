@@ -70,10 +70,10 @@ Here is the setup:
 # config/environments/development.rb
 $redis = Redis.new({host: 'localhost', port: 6379, db: 0})
 
-# config/environments/development.rb
+# config/environments/test.rb
 $redis = MockRedis.new
 
-# config/environments/development.rb
+# config/environments/production.rb
 $redis = Redis.new({host: ENV['REDIS_HOST'], port: ENV['REDIS_PORT'], password: ENV['REDIS_PASSWORD'], ssl:true})
 ```
 
@@ -129,3 +129,4 @@ class RedisControllerTest < ActionController::TestCase
   end
 
 end
+```
