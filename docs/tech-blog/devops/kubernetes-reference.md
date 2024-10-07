@@ -53,6 +53,9 @@ helm upgrade --install -n istio-system prometheus prometheus-community/prometheu
 
 # to uninstall
 helm uninstall prometheus
+
+# to check template to be generated
+helm template . -f values.yaml -f values2.yaml
 ```
 
 ## InitContainer
