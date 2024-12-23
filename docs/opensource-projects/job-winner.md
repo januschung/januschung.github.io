@@ -17,53 +17,68 @@ That's the reason for me to build something for myself, and potentially you, to 
 
 ## Benefit of Job Winner
 
-With Job Winner, you can keep track of how many job applications you want, for free, without paying for a fee and have your personal data being sold.
+Job Winner helps you keep track of all your job applications in one place—totally free! No hidden fees, and you won't have to worry about your personal data being sold.
 
-Another feature of Job Winner is the profile page. With that one can store useful information a job application usually asks for (eg. LinkedIn url) in a single section. Besides that, the profile page provides a handy feature to automatically copy the field that you click on to your clipboard.
+One of the handy features is the Profile Page. This is where you can store all the personal information that job applications often ask for (like your LinkedIn URL). Plus, it has a super handy feature that lets you copy any field to your clipboard with just a click.
 
 ## Features
 
-1. An Index page to list all the job applications
-![index](../assets/job-winner/index.png)
-1. A Create page to create new job application entry
-![new](../assets/job-winner/new.png)
-1. Create new job application
-![new](../assets/job-winner/add.png)
-1. Delete a job application
-1. Edit an existing job application
-![edit](../assets/job-winner/edit.png)
-1. A profile page to store personal information
-![profile](../assets/job-winner/profile.png)
+Key Functions:
 
-## Fields
+1. __Index Page:__
 
-Each job application has the following fields:
+    View a list of all your job applications in one place, with easy access to each application’s details and status.
+    ![index](../assets/job-winner/index.png)
 
-1. Company Name
-1. Job Title
-1. Salary Range
-1. Applied Date
-1. Description
-1. Job Link
-1. Status
+1. __Create New Job Application:__
 
-The personal page has the following fields:
+    Easily add new job applications to your list with a user-friendly form.
+    ![new](../assets/job-winner/add.png)
 
-1. First Name
-1. Last Name
-1. Address Street 1
-1. Address Street 2
-1. Address City
-1. Address State
-1. Address Zip
-1. Linkedin url
-1. Github url
-1. Personal Website url
+1. __Delete Job Application:__
+
+    Remove any applications you no longer need with a simple delete option.
+
+1. __Edit Job Application:__
+
+    Make updates to your existing job applications as the status of your applications change or new information becomes available.
+    ![edit](../assets/job-winner/edit.png)
+    - __Manage Interview:__
+
+      Keep track of your interviews with the ability to add and manage interview details.
+      ![edit](../assets/job-winner/interview.png)
+    - __Manage Offer:__
+
+      Track any job offers you’ve received, including details about the salary and offer date.
+      ![edit](../assets/job-winner/offer.png)
+
+1. __Profile Page:__
+    
+    Store and manage all your personal information in one spot
+    ![profile](../assets/job-winner/profile.png)
+
+1. __Interview List:__
+  
+    Keep track of all your interviews in one place, with easy-to-view details and statuses plus sortable headers.
+    ![profile](../assets/job-winner/interview-list.png)
+
+1. __Offer List:__
+    
+    Track all job offers you’ve received with sortable headers.
+    ![profile](../assets/job-winner/offer-list.png)
+
+1. __Search and Filter:__
+    
+    Quickly search for specific job applications based on keywords to help you stay organized. Whether it's the company name, job title, or description, finding the right job application is easy.
+    
+1. __Interview and Offer Count:__
+    
+    Stay on top of your job search with an overview of how many interviews and offers you currently have, making it easier to manage multiple opportunities.
 
 ## Stack
 
 1. Java 17
-1. Spring Boot 3.0.1
+1. Spring Boot 3.4.0
 1. Spring Reactive
 1. GraphQL
 1. Postgres DB
