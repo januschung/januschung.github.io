@@ -42,10 +42,20 @@
 - [Github repo for Movie Watchlist Project](https://github.com/tecladocode/web-dev-bootcamp/tree/master/curriculum/section14/lectures)
 
 ### Go: The Complete Developer's Guide (Golang)
-![Flask cert](../assets/about-me/certificate/go.jpeg){ width="500" }
+![Go](../assets/about-me/certificate/go.jpeg){ width="500" }
 
 ### The Complete Ruby on Rails Developer Course
-![Flask cert](../assets/about-me/certificate/ruby.jpeg){ width="500" }
+![Ruby on Rails](../assets/about-me/certificate/ruby.jpeg){ width="500" }
 
 ### Istio Hands-On for Kubernetes
-![Flask cert](../assets/about-me/certificate/istio.jpeg){ width="500" }
+![Istio](../assets/about-me/certificate/istio.jpeg){ width="500" }
+
+### Spring Security 6
+![Istio](../assets/about-me/certificate/spring-security.jpg){ width="500" }
+
+- [Github repo for Easy Bytes Spring Secutiry 6](https://github.com/eazybytes/springsecurity6)
+
+### RESTful Web Services, Java, Spring Boot, Spring MVC and JPA
+![Istio](../assets/about-me/certificate/restful-spring.jpeg){ width="500" }
+
+- [Github repo for the course](https://github.com/simplyi/springmvc-ws/tree/spring-boot-3.3.1)
