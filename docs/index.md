@@ -15,23 +15,18 @@ Before joining Ad Hoc, I had been working as a __Staff Software Engineer__ for o
 [:simple-biolink: Work Experience](./about-me/work-experience.md){ .md-button }
 [:material-file-download: Resume](./assets/januschung_resume.pdf){ .md-button }
 
+### Projects
+
+I love building stuffs and learning new technology. I build open source projects with what I learned from time to time. Checkout the [Opensource projects section](opensource-projects/asian-character-worksheet-generator).
 
 ### Professional Skills
 
 ??? note "Web/API Development"
 
     - :fontawesome-brands-java: Java 
-        - Springboot 
-        - Reactive
     - :fontawesome-brands-python: Python
-        - :simple-fastapi: Fastapi
-        - :simple-flask: Flask
     - :simple-php: PHP 
-        - :simple-laravel: Laravel
-        - :simple-cakephp: CakePHP
     - :fontawesome-brands-js: JavaScript 
-        - :fontawesome-brands-node-js: Node
-        - :simple-react: React
     - :fontawesome-brands-golang: Go
     - :simple-mysql: MySQL, :simple-postgresql: Postgres, :simple-amazondynamodb: DynamoDB
     - REST, :simple-graphql: GraphQL
@@ -40,7 +35,6 @@ Before joining Ad Hoc, I had been working as a __Staff Software Engineer__ for o
 
     - :simple-terraform: Terraform
     - :fontawesome-brands-aws: AWS
-        - CloudFormation, EKS, EC2, IAM, VPC, ECR, ECS, Fargate, MSK, KMS, Lambda, RDS, CloudWatch
     - :simple-jenkins: Jenkins
     - :simple-github: Github Actions
     - :simple-docker: Docker
@@ -60,14 +54,6 @@ Before joining Ad Hoc, I had been working as a __Staff Software Engineer__ for o
 
 ### What I like
 
-??? tip "Programming"
-    :fontawesome-brands-dev: 
-    
-    I love building stuffs and learning new technology. I build open source projects with what I learned from time to time. Checkout the [Opensource projects section](opensource-projects/asian-character-worksheet-generator).
-??? tip "Beer"
-    :fontawesome-solid-beer-mug-empty: 
-    
-    One of my life goals is to drink as many type of beer as possible. I might have tried over 500 different beers so far. Besides drinking, I am also a beer glass collector.
 ??? tip "Photography"
     :material-camera: 
     
@@ -79,7 +65,7 @@ Before joining Ad Hoc, I had been working as a __Staff Software Engineer__ for o
 ??? tip "Reading"
     :fontawesome-solid-book-open: 
     
-    Inspired by my secondary school class teacher, who told me his story about reading latest books from the bookstore when he could not afford it during his adolesencent age , I picked up reading as a hobby. My reading record is 52 books in a year.
+    Inspired by my secondary school class teacher, who told me his story about reading latest books from the bookstore when he could not afford it during his adolesencent age , I picked up reading as a hobby. My reading record is 54 books in a year.
 ??? tip "Woodworking"
     :material-hand-saw: 
     
