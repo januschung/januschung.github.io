@@ -23,10 +23,10 @@ I love building stuffs and learning new technology. I build open source projects
 
 ??? note "Web/API Development"
 
-    - :fontawesome-brands-java: Java 
+    - :fontawesome-brands-java: Java, Springboot, Spring Reactive
     - :fontawesome-brands-python: Python
     - :simple-php: PHP 
-    - :fontawesome-brands-js: JavaScript 
+    - :fontawesome-brands-js: JavaScript, React, Angular
     - :fontawesome-brands-golang: Go
     - :simple-mysql: MySQL, :simple-postgresql: Postgres, :simple-amazondynamodb: DynamoDB
     - REST, :simple-graphql: GraphQL
@@ -34,7 +34,7 @@ I love building stuffs and learning new technology. I build open source projects
 ??? note "DevOps"
 
     - :simple-terraform: Terraform
-    - :fontawesome-brands-aws: AWS
+    - :fontawesome-brands-aws: AWS, Oracle Cloud
     - :simple-jenkins: Jenkins
     - :simple-github: Github Actions
     - :simple-docker: Docker
