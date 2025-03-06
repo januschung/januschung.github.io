@@ -56,6 +56,9 @@ helm uninstall prometheus
 
 # to check template to be generated
 helm template . -f values.yaml -f values2.yaml
+
+# to check the output of a single template
+helm template . -f values.yaml -s PATH-TO-TEMPLATE-FILE/FILE-NAME.yaml
 ```
 
 ## InitContainer
