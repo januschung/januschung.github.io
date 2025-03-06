@@ -41,19 +41,7 @@ If `.Values.env` is not provided, the `env` section is omitted entirely.
 Instead of defining `env` in `values.yaml`, you can construct it dynamically using `dict`:
 
 ``` groovy
-{{- $env := dict "CYPRESS_APP_VERSION" .Values.global.app.version }}
-```
-
-Then, you can use it as follows:
-
-``` groovy
-{{- if $env }}
-env:
-  {{- range $k, $v := $env }}
-  - name: {{ $k }}
-    value: {{ $v }}
-  {{- end }}
-{{- end }}
+{{- $env := dict "NODE_ENV" .Values.global.node.version "API_VERSION" .Values.global.api.version }}
 ```
 
 ## Setting Default Values
