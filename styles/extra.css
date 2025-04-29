@@ -1,0 +1,153 @@
+:root, [data-md-color-scheme=default] {
+  --md-default-bg-color: #f3f3f3;
+  --md-default-bg-color--light: #ffffff;
+  --md-default-bg-color--lighter: #f0f2f5;
+}
+
+.hero-text {
+  opacity: 0;
+  transform: translateY(20px);
+  animation: slideIn 1.5s ease-out forwards;
+  padding-bottom: 16px;
+}
+
+@keyframes slideIn {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hero-text strong {
+  color: #68bb6c; /* A subtle green shade */
+  font-weight: bold;
+}
+
+.hero-section {
+  background: linear-gradient(to right, #f0f4f8, #d9e2ec);
+}
+
+.card-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1.5em;
+}
+
+.card {
+  flex: 1 1 calc(33.333% - 1em);
+  max-width: calc(33.333% - 1em);
+  display: flex;
+  flex-direction: column;
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: var(--md-default-bg-color);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.card:hover {
+  transform: scale(1.03);
+  box-shadow: 0 6px 16px rgba(29, 173, 82, 0.2);
+  background-color: rgba(104, 187, 108, 0.15); /* subtle highlight */
+}
+
+
+.card-media {
+  width: 100%;
+  max-width: 300;
+  height: auto;
+  max-height: 200;
+  object-fit: contain;
+  margin: 0 auto;
+  display: block;
+}
+
+.card-content {
+  padding: 1px 16px;
+}
+
+
+.card-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0 0 0.5em 0;
+}
+
+.card-text {
+  font-size: 0.95rem;
+  color: var(--md-default-fg-color--lighter);
+}
+
+/* Responsive: stack on smaller screens */
+@media (max-width: 960px) {
+  .card {
+    flex: 1 1 100%;
+    max-width: 100%;
+  }
+}
+
+.tooltip {
+  position: relative;
+  cursor: help;
+  color: #2a7f62;
+  font-weight: 500;
+}
+
+.tooltip .tooltip-text {
+  visibility: hidden;
+  opacity: 0;
+  width: max-content;
+  max-width: 200px;
+  background-color: #00bda4;
+  color: #fff;
+  text-align: left;
+  padding: 6px 10px;
+  border-radius: 6px;
+  position: absolute;
+  z-index: 10;
+  bottom: 125%; /* position above */
+  left: 50%;
+  transform: translateX(-50%);
+  transition: opacity 0.3s;
+  font-size: 0.85rem;
+  line-height: 1.2;
+  white-space: normal;
+}
+
+/* Tooltip arrow */
+.tooltip .tooltip-text::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -5px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: #00bda4 transparent transparent transparent;
+}
+
+/* Show on hover */
+.tooltip:hover .tooltip-text {
+  visibility: visible;
+  opacity: 1;
+}
+
+.skill-pill {
+  display: inline-block;
+  padding: 3px 10px;
+  margin: 4px 4px 4px 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: #ffffff;
+  background-color: #57a05a;
+  border: 1px solid #d0d7de;
+  border-radius: 2em;
+  font-family: system-ui, sans-serif;
+}
+
+
+.skill-pill:hover {
+  background-color: #d0ebdd;
+  color: #1e5f4a;
+}
