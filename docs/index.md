@@ -1,35 +1,92 @@
 ![banner](./assets/light_banner.png#only-light)
 ![banner](./assets/dark_banner.png#only-dark)
-# Hi, My Name is Janus Chung
+# Hello, I'm Janus Chung
 ![banner](./assets/light_profile.jpg#only-light){ align=right width="200" }
 ![banner](./assets/dark_profile.png#only-dark){ align=right width="200" }
-I am a __Software Engineer__ with over 20 years of experiences in various fields (Developer, DevOps, QA, Support).
 
-Currently, I work as a __Senior Software Engineer DevOps__ for _Ad Hoc_, which is a digital services company that helps the federal government better serve people. My day to day work involves setting up Kubernetes (EKS) and other AWS services as a plaform for various Veterans Affairs services.
+<div class="hero-text">
+I'm a <strong>Software Engineer</strong> with over 20 years of experience across DevOps, Developer, QA and Support.
+</div>
 
-Before joining Ad Hoc, I had been working as a __Staff Software Engineer__ for over seven years with _Integral Ad Sciences_, which is a global leader in digital media quality. IAS makes every impression count, ensuring that ads are viewable by real people, in safe and suitable environments, activating contextual targeting, and driving supply path optimization.
+<div class="hero-text">
+I’ve recently joined 
+  <span class="tooltip">Flagler Health 
+    <span class="tooltip-text">Flagler Health empowers providers by leveraging the power of AI to help provide clinical and back-office support</span>
+  </span>
+where I’m leading DevOps efforts and helping scale the infrastructure from the ground up.
+</div>
 
+
+<div class="hero-text">
+Previously, at  
+  <span class="tooltip">Ad Hoc.
+    <span class="tooltip-text">a digital services company that helps the federal government better serve people</span>
+  </span>
+ I worked on standing up Kubernetes (EKS) and other AWS infrastructure for the U.S. Department of Veterans Affairs applications, and collaborated with our government partners to implement GitHub Actions, Argo CD, and Argo Rollouts for continuous delivery and progressive deployment workflows.
+</div>
+
+<div class="hero-text">
+Before that, I spent over seven years with 
+  <span class="tooltip">
+    Integral Ad Sciences,
+    <span class="tooltip-text">a global leader in digital media quality. IAS makes every impression count, ensuring that ads are viewable by real people, in safe and suitable environments, activating contextual targeting, and driving supply path optimization.</span>
+  </span>
+leading efforts to migrate monoliths to AWS Cloud and modernize CI/CD pipeline.
+</div>
+
+### Projects
+
+I love building stuffs and learning new technology. I build open source projects with what I learned from time to time. Checkout the [Opensource projects section](opensource-projects/asian-character-worksheet-generator).
+
+<div class="card-grid">
+  
+  <div class="card">
+    <a class="card-link" href="./opensource-projects/job-winner/">
+      <img class="card-media" src="./assets/job-winner.png" alt="Job Winner">
+      <div class="card-content">
+        <h3 class="card-title">Job Winner</h3>
+        <span class="skill-pill">Java Reactive</span>
+        <span class="skill-pill">React</span>
+        <span class="skill-pill">Material UI</span>
+        <span class="skill-pill">PostgreSQL</span>
+        <span class="skill-pill">Graphql</span>
+        <span class="skill-pill">Docker</span>
+        <span class="skill-pill">Github Actions</span>
+      </div>
+    </a>
+  </div>
+  <div class="card">
+    <a class="card-link" href="./opensource-projects/math-worksheet-generator/">
+      <img class="card-media" src="./assets/math-worksheet-generator.png" alt="Math Worksheet Generator">
+      <div class="card-content">
+        <h3 class="card-title">Math Worksheet Generator</h3>
+        <span class="skill-pill">Python</span>
+        <span class="skill-pill">Pytest</span>
+        <span class="skill-pill">Github Actions</span>
+      </div>
+    </a>
+  </div>
+  <div class="card">
+    <a class="card-link" href="./opensource-projects/asian-character-worksheet-generator/">
+      <img class="card-media" src="./assets/asian-character-worksheet-generator.png" alt="Math Worksheet Generator">
+      <div class="card-content">
+        <h3 class="card-title">Asian Character Worksheet Generator</h3>
+        <p class="card-text">
+          <span class="skill-pill">Python</span>
+          <span class="skill-pill">Pytest</span>
+          <span class="skill-pill">Github Actions</span>
+        </p>
+      </div>
+    </a>
+  </div>
+</div>
 
 ### Resume
 
 [:simple-biolink: Work Experience](./about-me/work-experience.md){ .md-button }
 [:material-file-download: Resume](./assets/januschung_resume.pdf){ .md-button }
 
-### Projects
-
-I love building stuffs and learning new technology. I build open source projects with what I learned from time to time. Checkout the [Opensource projects section](opensource-projects/asian-character-worksheet-generator).
-
 ### Professional Skills
-
-??? note "Web/API Development"
-
-    - :fontawesome-brands-java: Java, Springboot, Spring Reactive
-    - :fontawesome-brands-python: Python
-    - :simple-php: PHP 
-    - :fontawesome-brands-js: JavaScript, React, Angular
-    - :fontawesome-brands-golang: Go
-    - :simple-mysql: MySQL, :simple-postgresql: Postgres, :simple-amazondynamodb: DynamoDB
-    - REST, :simple-graphql: GraphQL
 
 ??? note "DevOps"
 
@@ -43,6 +100,16 @@ I love building stuffs and learning new technology. I build open source projects
     - :simple-datadog: DataDog
     - :simple-auth0: Auth0
     - :simple-vault: Vault
+
+??? note "Development"
+
+    - :fontawesome-brands-java: Java, Springboot, Spring Reactive
+    - :fontawesome-brands-python: Python
+    - :simple-php: PHP 
+    - :fontawesome-brands-js: JavaScript, React, Angular
+    - :fontawesome-brands-golang: Go
+    - :simple-mysql: MySQL, :simple-postgresql: Postgres, :simple-amazondynamodb: DynamoDB
+    - REST, :simple-graphql: GraphQL
 
 ??? note "QA"
 

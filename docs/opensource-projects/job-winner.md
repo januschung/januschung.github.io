@@ -28,12 +28,12 @@ Key Functions:
 1. __Index Page:__
 
     View a list of all your job applications in one place, with easy access to each application’s details and status.
-    ![index](../assets/job-winner/index.png)
+    ![index](../assets/opensource-projects/job-winner/index.png)
 
 1. __Create New Job Application:__
 
     Easily add new job applications to your list with a user-friendly form.
-    ![new](../assets/job-winner/add.png)
+    ![new](../assets/opensource-projects/job-winner/add.png)
 
 1. __Delete Job Application:__
 
@@ -42,30 +42,30 @@ Key Functions:
 1. __Edit Job Application:__
 
     Make updates to your existing job applications as the status of your applications change or new information becomes available.
-    ![edit](../assets/job-winner/edit.png)
+    ![edit](../assets/opensource-projects/job-winner/edit.png)
     - __Manage Interview:__
 
       Keep track of your interviews with the ability to add and manage interview details.
-      ![edit](../assets/job-winner/interview.png)
+      ![edit](../assets/opensource-projects/job-winner/interview.png)
     - __Manage Offer:__
 
       Track any job offers you’ve received, including details about the salary and offer date.
-      ![edit](../assets/job-winner/offer.png)
+      ![edit](../assets/opensource-projects/job-winner/offer.png)
 
 1. __Profile Page:__
     
     Store and manage all your personal information in one spot
-    ![profile](../assets/job-winner/profile.png)
+    ![profile](../assets/opensource-projects/job-winner/profile.png)
 
 1. __Interview List:__
   
     Keep track of all your interviews in one place, with easy-to-view details and statuses plus sortable headers.
-    ![profile](../assets/job-winner/interview-list.png)
+    ![profile](../assets/opensource-projects/job-winner/interview-list.png)
 
 1. __Offer List:__
     
     Track all job offers you’ve received with sortable headers.
-    ![profile](../assets/job-winner/offer-list.png)
+    ![profile](../assets/opensource-projects/job-winner/offer-list.png)
 
 1. __Search and Filter:__
     

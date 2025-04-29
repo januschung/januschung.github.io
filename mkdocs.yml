@@ -53,3 +53,6 @@ extra:
       link: https://www.linkedin.com/in/janus/
     - icon: fontawesome/brands/github
       link: https://github.com/januschung
+
+extra_css:
+  - styles/extra.css

@@ -1,14 +1,29 @@
+??? success "Flagler Health :octicons-location-16: New York, NY (Remotely Based)"
+    #### Flagler Health
+    <div>
+        <div style="float:left">__SOFTWARE ENGINEER__</div>
+        <div style="float:right">__:material-calendar-clock: Apr 2025 - Present__</div>
+    </div>
+    <div style="clear: both;"></div>
+
+    - DevOps :)
+
 ??? success "AD HOC LLC :octicons-location-16: WASHINGTON, DC (Remotely Based)"
     #### AD HOC LLC
     <div>
         <div style="float:left">__SENIOR SOFTWARE ENGINEER DEVOPS__</div>
-        <div style="float:right">__:material-calendar-clock: Feb 2023 - Present__</div>
+        <div style="float:right">__:material-calendar-clock: Feb 2023 - Mar 2025__</div>
     </div>
     <div style="clear: both;"></div>
 
     - Built and maintained CI/CD pipelines using Github Actions, Argo CD, DataDog and Hashicorp Vault.
     - Built and deployed Infrastructure as Code using Terraform on AWS EKS.
+    - Leveraged blue green deployments with Argo Rollouts to improve release strategies and minimize downtime.
     - Created standardized platform EKS service to get Veterans Affairs API services onboard to AWS.
+    - Created sample Java, Python and Ruby app and helm charts as reference for tenant to get onboard easier.
+    - Built and managed Code VA, a catalog for discoverying software within Department of Veterans Affairs.
+    - Migrated cache and database components to Elasticache and RDS using Kubernetes CRD.
+    - Migrated integration tests from Github Actions to Argo Rollouts's pre and post analysis template.
 
 ??? success "INTEGRAL AD SCIENCE (IAS) :octicons-location-16: NEW YORK, NY (Remotely Based)"
     #### INTEGRAL AD SCIENCE
