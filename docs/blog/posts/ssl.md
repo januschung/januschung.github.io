@@ -1,8 +1,16 @@
+---
+date: 2024-11-30
+categories:
+  - ssl
+  - devops
+---
 # Let's Encrypt SSL Certificate with Certbot for GoDaddy
 
 Securing your website with HTTPS is a critical step in establishing trust and improving SEO. This guide will show how to generate and install a free Let's Encrypt SSL certificate on a GoDaddy-hosted site using Certbot, and set up automatic certificate renewal.
 
-![SSL Hero](../../assets/tech-blog/devops/ssl/banner.jpg)
+![SSL Hero](../../assets/blog/ssl/banner.jpg)
+
+<!-- more -->
 
 This guide will walk you through the steps to generate and install a Let's Encrypt SSL certificate on your GoDaddy-hosted website, including automating certificate renewal.
 

@@ -1,3 +1,12 @@
+---
+date: 2025-05-17
+categories:
+  - shell script
+  - sso
+  - kubernetes
+  - aws
+  - devops
+---
 # Automatically Renew AWS SSO Session and Refresh Kubeconfig for EKS Access
 
 Working with AWS EKS clusters via AWS SSO is secure but sometimes frustrating.  
@@ -5,7 +14,9 @@ If your session expires, `kubectl` commands will fail until you manually renew t
 
 Let's automate that with a small Bash script.
 
-![Auto Renew Kubeconfig](../../assets/tech-blog/devops/auto-renew-kubeconfig/banner.jpg)
+![Auto Renew Kubeconfig](../../assets/blog/auto-renew-kubeconfig/banner.jpg)
+
+<!-- more -->
 
 ## Problem
 

@@ -1,4 +1,11 @@
-![Servers](../../assets/tech-blog/devops/github-shared-action/roman-synkevych-wX2L8L-fGeA-unsplash.jpg)
+---
+date: 2023-07-07
+categories:
+  - shell script
+  - devops
+  - github
+---
+![Servers](../../assets/blog/github-shared-action/roman-synkevych-wX2L8L-fGeA-unsplash.jpg)
 
 ##### originally posted at [LinkedIn](https://www.linkedin.com/pulse/github-shareable-action-janus-chung) at July 7, 2023
 
@@ -14,6 +21,8 @@ On my first trial, I did the following:
 1. work on a single repo
 1. create three separate bash scripts
 1. create three separate workflows
+
+<!-- more -->
 
 Here are the three bash scripts:
 

@@ -1,6 +1,16 @@
+---
+date: 2024-06-03
+categories:
+  - redis
+  - java
+  - aws
+  - docker
+---
 # Using Redis with SpringBoot
 
 On my other [project](test-redis-with-generated-data.md), I use Redis as a caching layer. This time I would like to use it as a database in a SprintBoot project.
+
+<!-- more -->
 
 ## Bring up a local Redis with docker
 

@@ -1,8 +1,17 @@
+---
+date: 2025-05-15
+categories:
+  - aws
+  - kubernetes
+  - devops
+---
 # Bootstrapping My Linux Desktop and MacBook for Dev Work
 
 After transitioning through two new jobs recently, I had the opportunity (and challenge) to set up fresh dev environments on both a Linux desktop and a MacBook. Here’s my comprehensive checklist and setup notes, including tooling, config files, and references I found useful.
 
-![Set up new computer for dev work](../../assets/tech-blog/devops/computer-setup/banner.jpg)
+![Set up new computer for dev work](../../assets/blog/computer-setup/banner.jpg)
+
+<!-- more -->
 
 ## Software Setup
 

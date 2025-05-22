@@ -1,7 +1,16 @@
+---
+date: 2024-05-08
+categories:
+  - devops
+  - aws
+  - shell script
+  - kubernetes
+---
 Amazon ECR Public allows users to store and access public container images. While ECR Public repositories are open to the public, access to pull or download images from these repositories may still require authentication.
 
 While there are multiple reasons such as access control and security concern, the main benefit of getting an authentication token or login is to deal with rate limiting in my use case.
 
+<!-- more -->
 
 ## Get a ECR-Public Token
 

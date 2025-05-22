@@ -1,5 +1,5 @@
 
-![floppy disks](../../assets/tech-blog/shell-script/backup.avif)
+![floppy disks](../../assets/notes/shell-script/backup.avif)
 
 Here are the scripts which I have been using to generate backup for file and mysql database. They  can be run manually but preferably with cron jobs for automation.
 

@@ -1,3 +1,11 @@
+---
+date: 2024-05-08
+categories:
+  - react
+  - ruby
+  - docker
+  - devops
+---
 # React and Ruby Docker Development Environment
 
 ## Background
@@ -9,6 +17,7 @@ Lately I am working on a project to dockerize an e2e application with React as t
 1. it can be served as a testing environment for e2e test
 1. developers can run manual test in a local environment
 
+<!-- more -->
 
 ## React Dockerfile
 

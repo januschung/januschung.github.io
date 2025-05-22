@@ -1,3 +1,9 @@
+---
+date: 2023-07-02
+categories:
+  - devops
+  - docker
+---
 # Dev Container
 
 ## Background
@@ -8,6 +14,8 @@ Since my first job after college graduation, I have been looking for a way to se
 1. to share it among the team with teammates who doesn't have server/platform/os experience
 1. to standardize os, programming language and library version, etc
 1. to save myself the headache of rebuilding everything from scratch
+
+<!-- more -->
 
 All throught these years, I have been using the following to achieve this:
 
@@ -32,22 +40,22 @@ As an example, I am going to create a Python 3.9 Dev Container with Docker in Do
 
 1. Click on the lower left green icon at the VS Code IDE
 1. From the dropdown at the top portion of the VS Code, select `Create Dev Container`
-![create Dev Container](../../assets/tech-blog/devops/dev-container/create-dev-container.png)
+![create Dev Container](../../assets/blog/dev-container/create-dev-container.png)
 1. Search for Python 3 and select `Python 3 devcontainers`
-![Python 3](../../assets/tech-blog/devops/dev-container/python3-devcontainer.png)
+![Python 3](../../assets/blog/dev-container/python3-devcontainer.png)
 1. Select `Additional Options` and choose Python 3.9
-![Additional Options](../../assets/tech-blog/devops/dev-container/addition-options.png)
+![Additional Options](../../assets/blog/dev-container/addition-options.png)
 1. Search for `docker-in-docker` and check the checkbox
-![docker-in-docker](../../assets/tech-blog/devops/dev-container/docker-in-docker.png)
+![docker-in-docker](../../assets/blog/dev-container/docker-in-docker.png)
 1. Click OK
 
 At this point, VS Code will pop up an information box about the creation of the new Dev Container. After that VS Code will restart in the Dev Container mode.
 
-![building](../../assets/tech-blog/devops/dev-container/building.png)
+![building](../../assets/blog/dev-container/building.png)
 
 There you have it. You should be able to run your application inside the Dev Container with Python 3.9 now.
 
-![terminal](../../assets/tech-blog/devops/dev-container/dev-contianer-terminal.png)
+![terminal](../../assets/blog/dev-container/dev-contianer-terminal.png)
 
 ## Configuration file
 

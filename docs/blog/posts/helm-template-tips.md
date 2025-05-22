@@ -1,3 +1,10 @@
+---
+date: 2023-04-18
+categories:
+  - helm
+  - devops
+  - kubernetes
+---
 # Helm Template Tips
 
 Helm templates provide a powerful way to configure Kubernetes manifests dynamically. In this post, we’ll cover some useful tricks, including:
@@ -10,7 +17,9 @@ Helm templates provide a powerful way to configure Kubernetes manifests dynamica
 
 - Other useful Helm template functions
 
-![Helm Template Tips](../../assets/tech-blog/devops/helm-template-tips/banner.jpg)
+![Helm Template Tips](../../assets/blog/helm-template-tips/banner.jpg)
+
+<!-- more -->
 
 ## Handling Optional Maps
 

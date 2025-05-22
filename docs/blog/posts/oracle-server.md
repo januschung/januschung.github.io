@@ -1,8 +1,19 @@
+---
+date: 2025-02-26
+categories:
+  - devops
+  - shell script
+  - ssl
+  - docker
+  - oracle
+---
 # Setting Up Docker, SSL, and DuckDNS on Oracle Server
 
 This guide will walk you through the process of setting up Docker, configuring SSL certificates, and setting up DuckDNS on an Oracle server (Oracle Linux 9).
 
-![Oracle Server](../../assets/tech-blog/devops/oracle-server/banner.jpg)
+![Oracle Server](../../assets/blog/oracle-server/banner.jpg)
+
+<!-- more -->
 
 ## 1. Update and Install Docker
 

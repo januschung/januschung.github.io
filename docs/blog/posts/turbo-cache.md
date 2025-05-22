@@ -1,8 +1,19 @@
+---
+date: 2025-05-17
+categories:
+  - devops
+  - turborepo
+  - terraform
+  - aws
+  - github
+---
 # Setting Up Turborepo Remote Cache with S3 and GitHub Actions
 
 Setting up a production-grade remote cache for [Turborepo](https://turbo.build/) using self hosted remote cache with AWS S3 and Lambda helps improve monorepo performance, especially in CI/CD pipelines like GitHub Actions. Below is a modular and generic Terraform setup using variables for easy customization.
 
-![Turborepo Cache](../../assets/tech-blog/devops/turbo-cache/banner.jpg)
+![Turborepo Cache](../../assets/blog/turbo-cache/banner.jpg)
+
+<!-- more -->
 
 This guide walks you through setting up a secure and production-ready remote cache using:
 

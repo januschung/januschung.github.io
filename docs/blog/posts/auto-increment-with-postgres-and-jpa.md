@@ -1,5 +1,12 @@
+---
+date: 2023-04-28
+categories:
+  - sql
+  - postgres
+  - java
+---
 # Auto Increment with Postgres and JPA
-![banner](../../assets/tech-blog/sql/auto-increment-with-postgres-and-jpa.avif)
+![banner](../../assets/blog/auto-increment-with-postgres-and-jpa/banner.avif)
 ## Background
 
 I want to have Postgres to auto generate ID for my Springboot application entity, using Liquibase.
@@ -14,6 +21,8 @@ At first I had the following pair for the Java Entity Class and Liquibase setup:
 @Column(name = "ID")
 private Long id;
 ```
+
+<!-- more -->
 
 ``` xml
 <createTable tableName="TICKET">

@@ -1,4 +1,11 @@
-![Servers](../../assets/tech-blog/devops/github-multi-repo-update/pexels-alberlan-barros-16018144.jpg)
+---
+date: 2023-07-15
+categories:
+  - shell script
+  - github
+  - devops
+---
+![Servers](../../assets/blog/github-multi-repo-update/pexels-alberlan-barros-16018144.jpg)
 
 ##### originally posted at [LinkedIn](https://www.linkedin.com/pulse/github-multi-repos-update-janus-chung) at July 15, 2023
 
@@ -7,6 +14,8 @@
 This is related to the other blog post about [GitHub Shared Action](./github-shared-action.md).
 
 I want to make the same change to multiple GitHub repos and I want to limit manual steps as much as possible. As an example, I would like to push the the files of a source folder (source) to three of my repos. Here is one of the file:
+
+<!-- more -->
 
 _`source/somefile`_
 ``` yaml

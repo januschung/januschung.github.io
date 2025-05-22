@@ -6,7 +6,11 @@
     </div>
     <div style="clear: both;"></div>
 
-    - DevOps :)
+    - Implemented Sealed Secrets to securely manage sensitive Kubernetes configuration, enabling safe GitOps workflows across the team.
+    - Established Terraform S3 backend with DynamoDB state locking, providing a reliable and consistent infrastructure state management solution.
+    - Bootstrapped Terraform adoption, including importing and managing existing AWS resources to improve visibility and IaC control.
+    - Set up Turborepo remote caching using AWS Lambda and S3, reducing CI build times by over 80% and improving developer productivity.
+    - Defined GitOps as the source of truth using Argo CD, including decoupling Helm-based deployment logic from application code repositories for better modularity and scalability.
 
 ??? success "AD HOC LLC :octicons-location-16: WASHINGTON, DC (Remotely Based)"
     #### AD HOC LLC
