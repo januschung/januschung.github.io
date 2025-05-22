@@ -22,6 +22,10 @@ theme:
         icon: material/lightbulb-outline
         name: Switch to light mode
 
+plugins: 
+  - blog
+  - search
+
 markdown_extensions:
   - def_list
   - pymdownx.tasklist:
