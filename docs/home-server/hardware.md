@@ -33,9 +33,14 @@
 
 ??? info "Usages (TBD)"
 
-    - Kind
-    - ArgoCD
-    - Packer
+    - K3s
+    - Job Winner
+    - Math Worksheet Generator
+    - Snippet Box
+    - IT Tools
+    - Ghost Blog for the kids
+    - Stirling PDF
+    - Uptime Kuma
 
 ## :fontawesome-solid-server: Thin Clients
 
