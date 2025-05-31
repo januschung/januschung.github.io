@@ -11,6 +11,8 @@
     - Bootstrapped Terraform adoption, including importing and managing existing AWS resources to improve visibility and IaC control.
     - Set up Turborepo remote caching using AWS Lambda and S3, reducing CI build times by over 80% and improving developer productivity.
     - Defined GitOps as the source of truth using Argo CD, including decoupling Helm-based deployment logic from application code repositories for better modularity and scalability.
+    - Upgraded Argo CD from v2.12 to v3.0.2, ensuring continued support, access to new features, and security improvements with minimal disruption.
+    - Integrated Slack notifications with Argo CD, enabling real-time deployment alerts to improve team visibility and incident response.
 
 ??? success "AD HOC LLC :octicons-location-16: WASHINGTON, DC (Remotely Based)"
     #### AD HOC LLC
@@ -21,7 +23,7 @@
     <div style="clear: both;"></div>
 
     - Built and maintained CI/CD pipelines using Github Actions, Argo CD, DataDog and Hashicorp Vault.
-    - Built and deployed Infrastructure as Code using Terraform on AWS EKS.
+    - Built and deployed Infrastructure as Code using Terraform to manage AWS resources.
     - Leveraged blue green deployments with Argo Rollouts to improve release strategies and minimize downtime.
     - Created standardized platform EKS service to get Veterans Affairs API services onboard to AWS.
     - Created sample Java, Python and Ruby app and helm charts as reference for tenant to get onboard easier.
