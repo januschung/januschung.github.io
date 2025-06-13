@@ -22,6 +22,8 @@ For small setups or demos, it’s a powerful, drop-in Nginx replacement — with
 
 ![Traefik vs Nginx](../../assets/blog/traefik-vs-nginx/banner.jpg)
 
+<!-- more -->
+
 ## Old Way: Nginx + Certbot = Pain
 
 Let’s say you want to proxy a backend running on port 8080 and a frontend on port 3000 — both behind HTTPS. With **Nginx**, you’d need something like:
