@@ -13,6 +13,7 @@
     - Defined GitOps as the source of truth using Argo CD, including decoupling Helm-based deployment logic from application code repositories for better modularity and scalability.
     - Upgraded Argo CD from v2.12 to v3.0.2, ensuring continued support, access to new features, and security improvements with minimal disruption.
     - Integrated Slack notifications with Argo CD, enabling real-time deployment alerts to improve team visibility and incident response.
+    - Developed resuable Terraform modules for production static ssite delivery (S3 + CloudFront + ACM) and backend service storaeg (S3 + IAM), improvingg cloud infrastructure automation and consistency.
 
 ??? success "AD HOC LLC :octicons-location-16: WASHINGTON, DC (Remotely Based)"
     #### AD HOC LLC
