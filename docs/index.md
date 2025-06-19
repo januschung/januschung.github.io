@@ -1,8 +1,8 @@
 ![banner](./assets/light_banner.png#only-light)
 ![banner](./assets/dark_banner.png#only-dark)
 # Hello, I'm Janus Chung
-![banner](./assets/light_profile.jpg#only-light){ align=right width="200" }
-![banner](./assets/dark_profile.png#only-dark){ align=right width="200" }
+![banner](./assets/light_profile.webp#only-light){ align=right width="200" }
+![banner](./assets/dark_profile.webp#only-dark){ align=right width="200" }
 
 <div class="hero-text">
 I'm a <strong>Software Engineer</strong> with over 20 years of experience across DevOps, Developer, QA and Support.
