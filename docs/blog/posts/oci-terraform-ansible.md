@@ -1,7 +1,6 @@
 ---
-title: "The DevOps Odyssey: Fully Automating OCI App Deployment with Terraform, Ansible, and Docker"
 date: 2025-06-18
-tags:
+categories:
   - devops
   - oci
   - terraform
@@ -12,6 +11,7 @@ tags:
 summary: >
   Building a fully automated CI/CD pipeline on Oracle Cloud Infrastructure using Terraform, Ansible, Docker Compose, Traefik, DuckDNS, and GitHub Actions—all within the free tier.
 ---
+# The DevOps Odyssey: Fully Automating OCI App Deployment with Terraform, Ansible, and Docker
 
 ## Introduction: The Engineer's Drive for Automation
 
