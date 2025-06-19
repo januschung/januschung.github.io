@@ -5,7 +5,7 @@ categories:
   - shell script
   - ssl
   - docker
-  - oracle
+  - oci
 ---
 # Setting Up Docker, SSL, and DuckDNS on Oracle Server
 
