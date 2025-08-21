@@ -13,7 +13,18 @@
     - Defined GitOps as the source of truth using Argo CD, including decoupling Helm-based deployment logic from application code repositories for better modularity and scalability.
     - Upgraded Argo CD from v2.12 to v3.0.2, ensuring continued support, access to new features, and security improvements with minimal disruption.
     - Integrated Slack notifications with Argo CD, enabling real-time deployment alerts to improve team visibility and incident response.
-    - Developed resuable Terraform modules for production static ssite delivery (S3 + CloudFront + ACM) and backend service storaeg (S3 + IAM), improvingg cloud infrastructure automation and consistency.
+    - Developed reusable Terraform modules for:
+        - Production static site delivery (S3 + CloudFront + ACM)
+        - Backend service storage (S3 + IAM)
+        - Loki logging stack (S3 + IAM + IRSA)
+        - Airbyte data ingestion (S3 + IAM + KMS)
+        - Private ECR repositories with lifecycle policies
+        - Tailscale bastion host for subnet routing (EC2 + Tailscale)
+    - Migrated EKS networking from NordLayer to Tailscale, using a self-managed EC2 subnet router to provide secure, private access to internal services.
+    - Deployed Airbyte OSS on EKS with Helm, replacing a local setup with a scalable, production-grade architecture integrated with S3 and IAM.
+    - Set up Loki and Grafana in EKS for centralized logging and metrics, improving observability across services.
+    - Built an internal Slack bot using Python and the Slack Bolt SDK to automate infrastructure-related tasks like version reporting.
+    - Introduced Argo Rollouts for progressive delivery (canary and blue-green), enabling safer and more controlled Kubernetes deployments.
 
 ??? success "AD HOC LLC :octicons-location-16: WASHINGTON, DC (Remotely Based)"
     #### AD HOC LLC
