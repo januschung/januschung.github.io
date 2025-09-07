@@ -28,25 +28,25 @@ When someone greets the bot, it replies with a menu of its capabilities. It’s 
 
 ## What Doraemon Can Do
 
-1. Infrastructure Version Report
+### 1. Infrastructure Version Report
 
 __Purpose:__ Show what’s deployed versus what’s available for key infrastructure components—Argo CD, Sealed Secrets, Airbyte, Argo Rollouts, and more.
 
 __Impact:__ Doraemon queries live sources like GitHub Releases, Helm chart indices, and Kubernetes manifests, then shows the difference between current and available versions. No dashboards, no delays—just one straight answer in Slack. For me as a DevOps engineer, this means I can surface upgrade opportunities to the team without context switching, and for everyone else it means visibility they never had before.
 
-2. App Version Check
+### 2. App Version Check
 
 __Purpose:__ Answer the everyday question: “What version is deployed?”
 
 __Impact:__ Doraemon understands natural prompts—`app version?`, `what’s our app version?`—and replies with the deployed version number. It’s not flashy, but it saves time in standups and avoids unnecessary back‑and‑forth.
 
-3. Restaurant Recommendations
+### 3. Restaurant Recommendations
 
 __Purpose:__ Help teammates flying into the office and unfamiliar with the city feel at home.
 
 __Impact:__ Ask `what to eat?` and Doraemon suggests nearby restaurant options with a map. It may sound lighthearted, but it has real value—when someone lands in town for a sprint, they don’t waste time scrolling review apps. It shows that even a DevOps‑driven tool can make the human side of work smoother.
 
-4. Access Codes
+### 4. Access Codes
 
 __Purpose:__ Replace tedious, manual back‑and‑forth requests for access codes.
 
