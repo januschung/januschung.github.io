@@ -1,0 +1,115 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Journey of creating a new portfolio page by converting a MkDocs-based documentation site to Astro, focusing on creating dedicated sections for content series like DevOps Odyssey with custom layouts."><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v4.16.19"><title>Building a New Portfolio Page: Migrating from MkDocs to Astro - Janus</title><link rel="stylesheet" href="/_astro/about.Bu91W0ki.css"><script type="module" src="/_astro/hoisted.DmkqG5EQ.js"></script></head> <body class="min-h-screen flex flex-col"> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul> <div class="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false}"></div>  </div> </div> </nav> </header>  <main class="flex-1">  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">Building a New Portfolio Page: Migrating from MkDocs to Astro</h1> <div class="blog-post-meta"> <time>December 26, 2025</time> <span class="blog-post-meta-separator">•</span> <span>6 min read</span> </div> <div class="blog-post-tags"> <span class="blog-post-tag">astro</span><span class="blog-post-tag">mkdocs</span><span class="blog-post-tag">devops</span> </div> </header> <div class="blog-post-content prose"> <p>After years of using MkDocs for my personal site, I decided it was time for a fresh start. I wanted to build a new portfolio page that could showcase my work in a way that felt truly mine—with custom layouts, dedicated sections, and the flexibility to present content exactly how I envisioned it. The biggest motivation? Giving my DevOps Odyssey series its own dedicated space with a layout that properly highlights it as a cohesive series.</p>
+<p>This post walks through the entire migration journey—from why I chose Astro over MkDocs, to the challenges I faced, and how I finally achieved the content organization I was looking for. Whether you’re considering a similar migration or just curious about the process, I’ll share the insights and lessons learned along the way.</p>
+<p>#PortfolioRebuild #AstroMigration</p>
+<p><img src="/assets/blog/mkdocs-to-astro/banner.png" alt="New Portfolio Homepage Powered by Astro"></p>
+<!-- more -->
+<h2 id="why-migrate-from-mkdocs-to-astro">Why Migrate from MkDocs to Astro?</h2>
+<p>MkDocs served me well for documentation-focused sites, but I wanted more control over how different types of content were organized and displayed. Specifically, I wanted:</p>
+<ul>
+<li><strong>Custom content sections</strong>: Ability to create dedicated sections for different content series</li>
+<li><strong>Flexible layouts</strong>: Full control over how each section looks and feels</li>
+<li><strong>Better content organization</strong>: Structure content in a way that makes sense for my needs</li>
+<li><strong>Modern tooling</strong>: Better TypeScript support and component-based architecture</li>
+<li><strong>Content collections</strong>: Organize related content together logically</li>
+</ul>
+<h2 id="the-old-site-mkdocs">The Old Site: MkDocs</h2>
+<p>Here’s how the original MkDocs site looked:</p>
+<p><img src="/assets/blog/mkdocs-to-astro/mkdocs.png" alt="Old MkDocs Site"></p>
+<p>The MkDocs site had:</p>
+<ul>
+<li>Traditional documentation sidebar navigation</li>
+<li>Material theme styling</li>
+<li>Markdown-based content organization</li>
+<li>Limited customization options for different content types</li>
+</ul>
+<p>The main limitation was that all content was treated the same way. My DevOps Odyssey series was mixed in with regular blog posts, and I couldn’t give it a distinct presentation or its own dedicated section.</p>
+<h2 id="the-new-site-astro">The New Site: Astro</h2>
+<p>The new Astro site features:</p>
+<ul>
+<li>Custom design with Tailwind CSS</li>
+<li>Improved navigation and layout</li>
+<li>Better content organization with collections</li>
+<li>Dedicated section for DevOps Odyssey with custom layout</li>
+<li>Responsive design optimized for all devices</li>
+</ul>
+<h2 id="the-main-goal-devops-odyssey-section">The Main Goal: DevOps Odyssey Section</h2>
+<p>The primary reason for migrating was to create a dedicated section for my DevOps Odyssey series. In MkDocs, this series was just another set of markdown files in the same structure as everything else. I wanted it to have:</p>
+<ul>
+<li>Its own navigation section</li>
+<li>A custom layout that highlights the series nature</li>
+<li>Better visual presentation that distinguishes it from regular blog posts</li>
+<li>A structure that makes it easy to navigate between episodes</li>
+</ul>
+<p>With Astro’s content collections and flexible routing, I could create a completely custom layout for this section while keeping regular blog posts in their own collection with a different presentation.</p>
+<h2 id="migration-process">Migration Process</h2>
+<h3 id="1-content-collections">1. Content Collections</h3>
+<p>The first step was organizing content into logical collections. Astro’s content collections allowed me to separate:</p>
+<ul>
+<li>Regular blog posts</li>
+<li>DevOps Odyssey series</li>
+<li>Projects showcase</li>
+</ul>
+<p>Each collection could have its own schema, structure, and presentation logic.</p>
+<h3 id="2-custom-layouts">2. Custom Layouts</h3>
+<p>For the DevOps Odyssey section, I created a custom layout that:</p>
+<ul>
+<li>Highlights the series nature of the content</li>
+<li>Provides better navigation between episodes</li>
+<li>Uses a distinct visual style that sets it apart</li>
+<li>Makes it easy to see the progression through the series</li>
+</ul>
+<p>This level of customization wasn’t possible with MkDocs’ more rigid structure.</p>
+<h3 id="3-design-system">3. Design System</h3>
+<p>Created a custom design system using Tailwind CSS:</p>
+<ul>
+<li>Custom color palette</li>
+<li>Consistent typography and spacing</li>
+<li>Reusable component library</li>
+<li>Dark theme optimized for readability</li>
+</ul>
+<h3 id="4-navigation-structure">4. Navigation Structure</h3>
+<p>Rebuilt the navigation to work with Astro’s routing system, allowing for:</p>
+<ul>
+<li>Dedicated sections in the menu</li>
+<li>Custom landing pages for each collection</li>
+<li>Better organization of related content</li>
+</ul>
+<h2 id="key-improvements">Key Improvements</h2>
+<h3 id="content-organization">Content Organization</h3>
+<ul>
+<li><strong>Dedicated sections</strong>: Each content type has its own space with appropriate presentation</li>
+<li><strong>Custom layouts</strong>: DevOps Odyssey has a layout tailored to its needs</li>
+<li><strong>Better structure</strong>: Content is organized logically and intuitively</li>
+</ul>
+<h3 id="developer-experience">Developer Experience</h3>
+<ul>
+<li><strong>Type safety</strong>: Full TypeScript support for content</li>
+<li><strong>Hot reload</strong>: Instant feedback during development</li>
+<li><strong>Component architecture</strong>: Reusable components for consistency</li>
+<li><strong>Better tooling</strong>: Modern build system with pnpm package management</li>
+</ul>
+<h3 id="design--ux">Design &#x26; UX</h3>
+<ul>
+<li><strong>Custom design</strong>: Full control over styling and layout for each section</li>
+<li><strong>Better navigation</strong>: Improved menu structure that reflects content organization</li>
+<li><strong>Responsive design</strong>: Optimized for mobile and desktop</li>
+<li><strong>Accessibility</strong>: Better semantic HTML and ARIA labels</li>
+</ul>
+<h2 id="challenges-faced">Challenges Faced</h2>
+<h3 id="1-content-structure">1. Content Structure</h3>
+<p>MkDocs uses a flat file structure, while Astro benefits from collections. I had to rethink how content was organized and group related pieces together. This was especially important for the DevOps Odyssey series, which needed to be clearly separated from regular blog posts.</p>
+<h3 id="2-layout-design">2. Layout Design</h3>
+<p>Creating custom layouts for different sections required planning how each section should look and feel. The DevOps Odyssey section needed to feel cohesive as a series while still being visually distinct.</p>
+<h3 id="3-navigation">3. Navigation</h3>
+<p>Had to rebuild the navigation system to work with Astro’s routing instead of MkDocs’ automatic sidebar generation. This gave me more control but required more upfront work to structure it properly.</p>
+<h3 id="4-search-functionality">4. Search Functionality</h3>
+<p>Replaced MkDocs’ built-in search with Astro Pagefind for better customization and to ensure it worked well across all content collections.</p>
+<h2 id="lessons-learned">Lessons Learned</h2>
+<ol>
+<li><strong>Plan the content structure first</strong>: Understanding how content will be organized saves time later, especially when creating custom sections</li>
+<li><strong>Incremental migration</strong>: Migrate content in batches rather than all at once, starting with the most important sections</li>
+<li><strong>Test thoroughly</strong>: Verify all links, images, and functionality after migration, especially in custom layouts</li>
+</ol>
+<h2 id="conclusion">Conclusion</h2>
+<p>The migration from MkDocs to Astro was worth the effort. The new site offers the flexibility I needed to organize content the way I wanted, with dedicated sections and custom layouts. The DevOps Odyssey series now has its own space with a layout that properly showcases it as a cohesive series.</p>
+<p>While the migration required significant upfront work, the ability to structure and present content exactly how I envisioned makes it a solid investment. The site is now live at <a href="https://januschung.github.io">januschung.github.io</a> with improved organization and custom sections.</p> </div> <nav class="blog-post-navigation"> <a href="/blog/build-promote" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">Build Once. Promote Forward. Ship Daily.</div> </a>  </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Posts</h2> <div class="related-posts-grid"> <a href="/blog/build-promote" class="blog-card card-link"> <img src="/assets/blog/build-promote/banner.jpg" alt="Build Once. Promote Forward. Ship Daily." class="blog-card-image"> <h3 class="blog-card-title">Build Once. Promote Forward. Ship Daily.</h3> <p class="blog-card-description"> How we eliminated rebuild-per-environment pipelines and went from shipping every two weeks to shipping daily. A real-world story of building once, validating once, and promoting the same artifact through environments. </p> </a><a href="/blog/local-ai" class="blog-card card-link"> <img src="/assets/blog/local-ai/banner.png" alt="The &#34;Hybrid&#34; AI Stack: Enterprise Power at Work, Localhost Freedom at Home" class="blog-card-image"> <h3 class="blog-card-title">The &quot;Hybrid&quot; AI Stack: Enterprise Power at Work, Localhost Freedom at Home</h3> <p class="blog-card-description"> How I built a personal AI stack on my MacBook Pro M4 using Ollama, Open WebUI, and Draw Things—running entirely locally with zero privacy leaks and unlimited usage, while keeping enterprise cloud tools for work. </p> </a><a href="/blog/remote-secret-tunnel" class="blog-card card-link"> <img src="/assets/blog/remote-secret-tunnel/banner.jpg" alt="Developing and Testing K3s Apps Locally" class="blog-card-image"> <h3 class="blog-card-title">Developing and Testing K3s Apps Locally</h3> <p class="blog-card-description"> When building Kubernetes-aware tools — whether a CLI, dashboard, or internal Python service — you often need your local environment to talk directly to the cluster API. </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container"> <p class="footer-text">© 2025 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer> </body></html>
