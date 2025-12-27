@@ -1,0 +1,106 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Secrets, GitHub Auth, and Scaling"><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v4.16.19"><title>The DevOps Odyssey, Part 4: Secrets, GitHub Auth, and Scaling Out - Janus</title><link rel="stylesheet" href="/_astro/about.BqpiiRvk.css"><script type="module" src="/_astro/hoisted.DmkqG5EQ.js"></script></head> <body class="min-h-screen flex flex-col"> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul> <div class="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false}"></div>  </div> </div> </nav> </header>  <main class="flex-1">  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">The DevOps Odyssey, Part 4: Secrets, GitHub Auth, and Scaling Out</h1> <div class="blog-post-meta"> <time>August 30, 2025</time> <span class="blog-post-meta-separator">•</span> <span>6 min read</span> </div> <div class="blog-post-tags"> <span class="blog-post-tag">devops</span><span class="blog-post-tag">terraform</span><span class="blog-post-tag">argocd</span><span class="blog-post-tag">cicd</span><span class="blog-post-tag">github</span><span class="blog-post-tag">sealedsecret</span><span class="blog-post-tag">kubernetes</span><span class="blog-post-tag">dex</span><span class="blog-post-tag">scaling</span> </div> </header> <div class="blog-post-content prose"> <h1 id="the-devops-odyssey-part-4-secrets-github-auth-and-scaling-out">The DevOps Odyssey, Part 4: Secrets, GitHub Auth, and Scaling Out</h1>
+<h5 id="originally-posted-at-linkedin-at-aug-31-2025">originally posted at <a href="https://www.linkedin.com/pulse/devops-odyssey-part-4-secrets-github-auth-scaling-out-janus-chung-afzgc/">LinkedIn</a> at Aug 31, 2025</h5>
+<p>In <a href="./2025/06/18/the-devops-odyssey-fully-automating-oci-app-deployment-with-terraform-ansible-and-docker/">Part 1</a>, I bootstrapped a zero-click deployment pipeline on OCI with Terraform, Ansible, and Docker Compose — complete with HTTPS, DNS, and CI/CD.</p>
+<p><a href="./2025/06/29/the-devops-odyssey-continues-evolving-from-docker-to-k3s-with-ansible/">Part 2</a> evolved that into a Kubernetes-native architecture, replacing Docker with K3s for a declarative control plane.</p>
+<p><a href="./2025/07/31/the-devops-odyssey-part-3-gitops-on-k3s-with-argo-cd--self-managing-infrastructure-from-a-single-commit/">Part 3</a> brought in GitOps with Argo CD, letting the cluster manage itself from a single commit.</p>
+<p>Now, in <strong>Part 4</strong>, I pushed the setup toward something that looks and feels much closer to production. Three key steps made that happen:</p>
+<ol>
+<li><strong>Sealing secrets</strong> so I could finally commit them to Git safely.</li>
+<li><strong>Adding GitHub authentication with Dex</strong>, making the Argo CD UI open (read-only) to anyone with a GitHub account.</li>
+<li><strong>Expanding the cluster with a proper worker node</strong> — and replacing my ill-fated “master as NAT” shortcut with OCI’s managed NAT Gateway.</li>
+</ol>
+<p><img src="/assets/devops-odyssey/oci-k3s-worker/banner.jpg" alt="Autobot master cloned a worker self to prepare for the upcoming battle."></p>
+<!-- more -->
+<h2 id="1-sealed-secrets-unlocking-gitops-for-real">1. Sealed Secrets: Unlocking GitOps for Real</h2>
+<p>Everything in GitOps lives in Git. That’s the promise, but it’s also the challenge: Kubernetes <code>Secret</code> objects are just base64-encoded strings. Put them in Git as-is, and you’ve basically published your passwords.</p>
+<p>That’s why I started Part 4 by deploying <strong>Bitnami’s Sealed Secrets</strong> operator via Argo CD. Once it was running, I could safely commit sealed versions of my sensitive credentials:</p>
+<ul>
+<li><strong>My GitHub Container Registry pull secret</strong> (to pull images).</li>
+<li><strong>My GitHub OAuth client secret</strong> (to connect Argo CD to GitHub for login).</li>
+</ul>
+<p>Here’s what the sealed Dex secret looks like:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">bitnami.com/v1alpha1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">SealedSecret</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">dex-github-secret</span></span>
+<span class="line"><span style="color:#85E89D">  namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd</span></span>
+<span class="line"><span style="color:#85E89D">spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  encryptedData</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    dex.github.clientSecret</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">AgCBlxRncrOcJeIdZ8+8oCr...</span></span>
+<span class="line"><span style="color:#85E89D">  template</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      labels</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">        app.kubernetes.io/part-of</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd</span></span>
+<span class="line"><span style="color:#85E89D">      name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">dex-github-secret</span></span>
+<span class="line"><span style="color:#85E89D">      namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd</span></span>
+<span class="line"><span style="color:#85E89D">    type</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Opaque</span></span>
+<span class="line"></span></code></pre>
+<p>By sealing secrets first, I laid the foundation for the next step: GitHub authentication.</p>
+<h2 id="2-github-auth-via-dex-a-live-demo-for-everyone">2. GitHub Auth via Dex: A Live Demo for Everyone</h2>
+<p>With secrets secure, I moved on to <strong>authentication for Argo CD</strong>.</p>
+<p>Argo CD ships with a local admin account, but I wanted more than that. This cluster is both a hobby lab and a <strong>public demo of my DevOps skills</strong>. I wanted curious folks to experience GitOps first-hand, without me handing out cluster credentials.</p>
+<p>So I set up <strong>Dex with GitHub as the identity provider</strong>. My Argo CD installation is self-managed via Helm and Argo CD itself. In my <code>values.yaml</code>, I configured Dex and GitHub like this:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">argo-cd</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  configs</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    cm</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      url</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">https://janusc.duckdns.org/argocd</span></span>
+<span class="line"><span style="color:#85E89D">      dex.config</span><span style="color:#E1E4E8">: </span><span style="color:#F97583">|</span></span>
+<span class="line"><span style="color:#9ECBFF">        connectors:</span></span>
+<span class="line"><span style="color:#9ECBFF">        - type: github</span></span>
+<span class="line"><span style="color:#9ECBFF">          id: github</span></span>
+<span class="line"><span style="color:#9ECBFF">          name: GitHub</span></span>
+<span class="line"><span style="color:#9ECBFF">          config:</span></span>
+<span class="line"><span style="color:#9ECBFF">            clientID: &#x3C;my-client-id></span></span>
+<span class="line"><span style="color:#9ECBFF">            clientSecret: $dex-github-secret:dex.github.clientSecret</span></span>
+<span class="line"><span style="color:#9ECBFF">            redirectURI: https://janusc.duckdns.org/argocd/api/dex/callback</span></span>
+<span class="line"><span style="color:#9ECBFF">            scopes:</span></span>
+<span class="line"><span style="color:#9ECBFF">            - read:org</span></span>
+<span class="line"><span style="color:#9ECBFF">            - user:email</span></span>
+<span class="line"><span style="color:#9ECBFF">            useLoginAsID: true</span></span>
+<span class="line"><span style="color:#85E89D">    rbac</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      policy.csv</span><span style="color:#E1E4E8">: </span><span style="color:#F97583">|</span></span>
+<span class="line"><span style="color:#9ECBFF">        g, januschung, role:admin</span></span>
+<span class="line"><span style="color:#85E89D">      policy.default</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">role:readonly</span></span>
+<span class="line"><span style="color:#85E89D">      scopes</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">'[profile, email]'</span></span>
+<span class="line"></span></code></pre>
+<p>A few things to note here:</p>
+<ul>
+<li>The <code>clientSecret</code> points to the <strong>sealed secret</strong> I committed earlier, so it never appears in plaintext.</li>
+<li>RBAC is configured so my own GitHub user (<code>januschung</code>) is an admin.</li>
+<li>Everyone else defaults to <strong>role:readonly</strong>.</li>
+</ul>
+<p>That last part is the point: <strong>anyone with a GitHub account can log into my Argo CD UI, but only in read-only mode</strong>.</p>
+<p>Why? Because this project is my <strong>open DevOps showcase</strong>:</p>
+<ul>
+<li>Developers and tech enthusiasts can log in, click around, and see real GitOps in action.</li>
+<li>There’s no risk — the read-only role prevents anyone from changing deployments.</li>
+<li>It turns Argo CD into a live demo environment, always available for anyone curious about GitOps.</li>
+</ul>
+<h2 id="3-scaling-out-adding-a-worker-node">3. Scaling Out: Adding a Worker Node</h2>
+<p>The final step in this phase was <strong>adding a worker node</strong>. Until now, everything ran on my single K3s master. That was fine for testing, but not the kind of setup you’d take to production.</p>
+<p>Here’s the truth: I almost didn’t do it right. At first, I tried to let the master act as a <strong>NAT gateway</strong> so that my private worker could reach the internet. It felt clever, but it was actually a liability:</p>
+<ul>
+<li>The master is supposed to run the control plane, not forward traffic.</li>
+<li>If the master died, the entire cluster’s egress would go dark.</li>
+<li>My Terraform started looking like a spaghetti of conditional routing rules.</li>
+</ul>
+<p>Then I realized something obvious: <strong>OCI already provides a managed NAT Gateway — and it comes with a generous free monthly quota.</strong></p>
+<p>I tore out my DIY NAT setup, dropped in the managed gateway, and my network instantly became simpler and more reliable. The master node went back to doing what it does best, the worker had clean egress, and I had one less thing to babysit.</p>
+<h2 id="4-the-cluster-grows-up">4. The Cluster Grows Up</h2>
+<p>With these changes in place, my setup made a leap:</p>
+<ul>
+<li><strong>Sealed Secrets</strong> gave me safe, GitOps-friendly secret management.</li>
+<li><strong>Dex with GitHub</strong> made Argo CD a transparent demo portal — open to anyone with a GitHub account, but read-only by default.</li>
+<li><strong>Worker nodes + managed NAT</strong> gave me a scalable, production-grade topology.</li>
+</ul>
+<p>This is the moment where my hobby cluster stopped being a single-VM experiment and started looking like a real platform.</p>
+<h2 id="5-whats-next-running-real-apps">5. What’s Next: Running Real Apps</h2>
+<p>Infrastructure is great, but the real payoff comes from running apps that matter. That’s what’s next on this journey.</p>
+<ul>
+<li>First up: <strong>migrating Jobwinner</strong>, my existing app that’s been living in Docker Compose on a separate VM, into the Argo CD-managed K3s cluster. This consolidates everything into one pipeline and one platform.</li>
+<li>And then, something more personal: I want to build a <strong>photo album app</strong> — a kind of virtual bookshelf — to showcase my past life as a photographer. Over the years, I’ve taken portraits of the <strong>beautiful ladies I crossed paths with</strong>, and I want a polished gallery to present that work. This cluster gives me the perfect home for it.</li>
+</ul>
+<h2 id="wrapping-up">Wrapping Up</h2>
+<p>Part 4 was about <strong>responsibility and trust</strong>. I learned not to cut corners with networking, I locked down secrets properly, and I opened up my GitOps UI in a way that’s transparent but safe.</p>
+<p>Now, the cluster isn’t just a backend experiment — it’s becoming a <strong>stage</strong>. One that can run my real projects, show off my skills, and even host my photography.</p>
+<p>In <strong>Part 5</strong>, we’ll step onto that stage: deploying Jobwinner and my photo album app with Helm + Argo CD.</p> </div> <nav class="blog-post-navigation"> <a href="/devops-odyssey/oci-k3s-argocd" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">The DevOps Odyssey, Part 3: GitOps on K3s with Argo CD — Self-Managing Infrastructure from a Single Commit</div> </a> <a href="/devops-odyssey/oci-k3s-jobwinner-photoapp" class="blog-post-nav-link next"> <div class="blog-post-nav-label">Next Post</div> <div class="blog-post-nav-title">The DevOps Odyssey, Part 5: Migration of Job Winner and Release of the Photo App</div> </a> </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Posts</h2> <div class="related-posts-grid"> <a href="/devops-odyssey/oci-k3s-monitoring" class="blog-card card-link"> <img src="/assets/devops-odyssey/oci-k3s-monitoring/banner.webp" alt="The DevOps Odyssey, Part 7: Observability on a Budget — Grafana, Loki, and Prometheus on OCI Free Tier" class="blog-card-image"> <h3 class="blog-card-title">The DevOps Odyssey, Part 7: Observability on a Budget — Grafana, Loki, and Prometheus on OCI Free Tier</h3> <p class="blog-card-description"> Observability on a Budget </p> </a><a href="/devops-odyssey/oci-k3s-auto-tagging" class="blog-card card-link"> <img src="/assets/devops-odyssey/oci-k3s-auto-tagging/banner.jpg" alt="The DevOps Odyssey, Part 6 — Closing the Loop with GitHub Auto-Tagging" class="blog-card-image"> <h3 class="blog-card-title">The DevOps Odyssey, Part 6 — Closing the Loop with GitHub Auto-Tagging</h3> <p class="blog-card-description"> Closing the Loop with Auto-Tagging </p> </a><a href="/devops-odyssey/oci-k3s-jobwinner-photoapp" class="blog-card card-link"> <img src="/assets/devops-odyssey/oci-k3s-jobwinner-photoapp/banner.png" alt="The DevOps Odyssey, Part 5: Migration of Job Winner and Release of the Photo App" class="blog-card-image"> <h3 class="blog-card-title">The DevOps Odyssey, Part 5: Migration of Job Winner and Release of the Photo App</h3> <p class="blog-card-description"> Migration and Photo App Release </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container"> <p class="footer-text">© 2025 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer> </body></html>

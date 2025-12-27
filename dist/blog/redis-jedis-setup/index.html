@@ -1,0 +1,111 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="On my other [project](test-redis-with-generated-data.md), I use Redis as a caching layer. This time I would like to use it as a database in a SprintBoot project."><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v4.16.19"><title>Using Redis with SpringBoot - Janus</title><link rel="stylesheet" href="/_astro/about.BqpiiRvk.css"><script type="module" src="/_astro/hoisted.DmkqG5EQ.js"></script></head> <body class="min-h-screen flex flex-col"> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul> <div class="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false}"></div>  </div> </div> </nav> </header>  <main class="flex-1">  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">Using Redis with SpringBoot</h1> <div class="blog-post-meta"> <time>June 2, 2024</time> <span class="blog-post-meta-separator">•</span> <span>2 min read</span> </div> <div class="blog-post-tags"> <span class="blog-post-tag">redis</span><span class="blog-post-tag">java</span><span class="blog-post-tag">aws</span><span class="blog-post-tag">docker</span> </div> </header> <div class="blog-post-content prose"> <h1 id="using-redis-with-springboot">Using Redis with SpringBoot</h1>
+<p>On my other <a href="test-redis-with-generated-data.md">project</a>, I use Redis as a caching layer. This time I would like to use it as a database in a SprintBoot project.</p>
+<p><img src="/assets/blog/redis-jedis-setup/banner.png" alt="banner"></p>
+<!-- more -->
+<h2 id="bring-up-a-local-redis-with-docker">Bring up a local Redis with docker</h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">docker</span><span style="color:#9ECBFF"> run</span><span style="color:#79B8FF"> --name</span><span style="color:#9ECBFF"> my-redis</span><span style="color:#79B8FF"> -p</span><span style="color:#9ECBFF"> 6379:6379</span><span style="color:#79B8FF"> -d</span><span style="color:#9ECBFF"> redis</span></span>
+<span class="line"></span></code></pre>
+<h2 id="redis-client">Redis Client</h2>
+<p>There are two popular clients - <code>Lettuce</code> and <code>Jedis</code>. I picked Jedis this time.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="xml"><code><span class="line"><span style="color:#6A737D">&#x3C;!-- pom.xml --></span></span>
+<span class="line"><span style="color:#E1E4E8">&#x3C;</span><span style="color:#85E89D">dependency</span><span style="color:#E1E4E8">></span></span>
+<span class="line"><span style="color:#E1E4E8">  &#x3C;</span><span style="color:#85E89D">groupId</span><span style="color:#E1E4E8">>redis.clients&#x3C;/</span><span style="color:#85E89D">groupId</span><span style="color:#E1E4E8">></span></span>
+<span class="line"><span style="color:#E1E4E8">  &#x3C;</span><span style="color:#85E89D">artifactId</span><span style="color:#E1E4E8">>jedis&#x3C;/</span><span style="color:#85E89D">artifactId</span><span style="color:#E1E4E8">></span></span>
+<span class="line"><span style="color:#E1E4E8">&#x3C;/</span><span style="color:#85E89D">dependency</span><span style="color:#E1E4E8">></span></span>
+<span class="line"></span></code></pre>
+<p>Local development environment setup:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#6A737D"># application.properties</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">spring.redis.host</span><span style="color:#9ECBFF">=localhost</span></span>
+<span class="line"><span style="color:#B392F0">spring.redis.port</span><span style="color:#9ECBFF">=6379</span></span>
+<span class="line"></span></code></pre>
+<p>Sample configuration class</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="java"><code><span class="line"><span style="color:#6A737D">// configs/RedisConfig.java</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> org.springframework.context.annotation.Bean;</span></span>
+<span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> org.springframework.context.annotation.Configuration;</span></span>
+<span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> org.springframework.data.redis.connection.RedisConnectionFactory;</span></span>
+<span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> org.springframework.data.redis.connection.jedis.JedisConnectionFactory;</span></span>
+<span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> org.springframework.data.redis.core.RedisTemplate;</span></span>
+<span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> org.springframework.data.redis.serializer.GenericToStringSerializer;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">@</span><span style="color:#F97583">Configuration</span></span>
+<span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> class</span><span style="color:#B392F0"> RedisConfig</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">    @</span><span style="color:#F97583">Bean</span></span>
+<span class="line"><span style="color:#F97583">    public</span><span style="color:#E1E4E8"> RedisConnectionFactory </span><span style="color:#B392F0">redisConnectionFactory</span><span style="color:#E1E4E8">() {</span></span>
+<span class="line"><span style="color:#F97583">        return</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> JedisConnectionFactory</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">    @</span><span style="color:#F97583">Bean</span></span>
+<span class="line"><span style="color:#F97583">    public</span><span style="color:#E1E4E8"> RedisTemplate&#x3C;</span><span style="color:#F97583">String</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">Object</span><span style="color:#E1E4E8">> </span><span style="color:#B392F0">redisTemplate</span><span style="color:#E1E4E8">() {</span></span>
+<span class="line"><span style="color:#E1E4E8">        RedisTemplate&#x3C;</span><span style="color:#F97583">String</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">Object</span><span style="color:#E1E4E8">> template </span><span style="color:#F97583">=</span><span style="color:#F97583"> new</span><span style="color:#E1E4E8"> RedisTemplate&#x3C;>();</span></span>
+<span class="line"><span style="color:#E1E4E8">        template.</span><span style="color:#B392F0">setConnectionFactory</span><span style="color:#E1E4E8">(</span><span style="color:#B392F0">redisConnectionFactory</span><span style="color:#E1E4E8">());</span></span>
+<span class="line"><span style="color:#E1E4E8">        template.</span><span style="color:#B392F0">setValueSerializer</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">new</span><span style="color:#E1E4E8"> GenericToStringSerializer&#x3C;>(Object.class));</span></span>
+<span class="line"><span style="color:#F97583">        return</span><span style="color:#E1E4E8"> template;</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span></code></pre>
+<p>Sample model class</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="java"><code><span class="line"><span style="color:#F97583">package</span><span style="color:#E1E4E8"> com.tnite.redistest;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> lombok.Data;</span></span>
+<span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> org.springframework.data.annotation.Id;</span></span>
+<span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> org.springframework.data.redis.core.RedisHash;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> java.io.Serializable;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">@</span><span style="color:#F97583">Data</span></span>
+<span class="line"><span style="color:#E1E4E8">@</span><span style="color:#F97583">RedisHash</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"Employee"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> class</span><span style="color:#B392F0"> Employee</span><span style="color:#F97583"> implements</span><span style="color:#B392F0"> Serializable</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">    @</span><span style="color:#F97583">Id</span></span>
+<span class="line"><span style="color:#F97583">    private</span><span style="color:#E1E4E8"> Long id;</span></span>
+<span class="line"><span style="color:#F97583">    private</span><span style="color:#E1E4E8"> String name;</span></span>
+<span class="line"><span style="color:#F97583">    private</span><span style="color:#E1E4E8"> Double salary;</span></span>
+<span class="line"><span style="color:#E1E4E8">    ...</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span></code></pre>
+<p>Everything was going smoothly until I realized that the ElastiCache instance is SSL-enabled and password-protected.</p>
+<h2 id="make-it-works-with-elasticache">Make it works with Elasticache</h2>
+<p>I want to retrieve all configuration parameters from environment variables. To ensure compatibility with the local development setup, the following code can handle configurations without a password and with SSL disabled.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="java"><code><span class="line"><span style="color:#E1E4E8">@</span><span style="color:#F97583">Slf4j</span></span>
+<span class="line"><span style="color:#E1E4E8">@</span><span style="color:#F97583">Configuration</span></span>
+<span class="line"><span style="color:#F97583">public</span><span style="color:#F97583"> class</span><span style="color:#B392F0"> RedisConfig</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">    @</span><span style="color:#F97583">Value</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"${spring.redis.host:localhost}"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#F97583">    private</span><span style="color:#E1E4E8"> String host;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">    @</span><span style="color:#F97583">Value</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"${spring.redis.port:6379}"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#F97583">    private</span><span style="color:#E1E4E8"> Integer port;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">    @</span><span style="color:#F97583">Value</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"${spring.redis.password:@null}"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#F97583">    private</span><span style="color:#E1E4E8"> String password;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">    @</span><span style="color:#F97583">Value</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"${spring.redis.ssl.enabled:false}"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#F97583">    private</span><span style="color:#E1E4E8"> Boolean useSsl;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">    @</span><span style="color:#F97583">Bean</span></span>
+<span class="line"><span style="color:#E1E4E8">    RedisConnectionFactory </span><span style="color:#B392F0">redisConnectionFactory</span><span style="color:#E1E4E8">() {</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">        JedisConnectionFactory factory;</span></span>
+<span class="line"><span style="color:#E1E4E8">        JedisClientConfiguration config </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> JedisClientConfiguration.</span><span style="color:#B392F0">builder</span><span style="color:#E1E4E8">().</span><span style="color:#B392F0">build</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#E1E4E8"> (useSsl) {</span></span>
+<span class="line"><span style="color:#E1E4E8">            log.</span><span style="color:#B392F0">info</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"Redis with SSL enabled!"</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">            config </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> JedisClientConfiguration.</span><span style="color:#B392F0">builder</span><span style="color:#E1E4E8">().</span><span style="color:#B392F0">useSsl</span><span style="color:#E1E4E8">().</span><span style="color:#B392F0">build</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#E1E4E8">        }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">        RedisStandaloneConfiguration redisConfig </span><span style="color:#F97583">=</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> RedisStandaloneConfiguration</span><span style="color:#E1E4E8">(host, port);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#E1E4E8"> (password </span><span style="color:#F97583">!=</span><span style="color:#79B8FF"> null</span><span style="color:#F97583"> &#x26;&#x26;</span><span style="color:#F97583"> !</span><span style="color:#E1E4E8">password.</span><span style="color:#B392F0">isEmpty</span><span style="color:#E1E4E8">()) {</span></span>
+<span class="line"><span style="color:#E1E4E8">            log.</span><span style="color:#B392F0">info</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"Redis with password is used!"</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">            redisConfig.</span><span style="color:#B392F0">setPassword</span><span style="color:#E1E4E8">(password);</span></span>
+<span class="line"><span style="color:#E1E4E8">        }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">        factory </span><span style="color:#F97583">=</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> JedisConnectionFactory</span><span style="color:#E1E4E8">(redisConfig, config);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">        return</span><span style="color:#E1E4E8"> factory;</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span></code></pre> </div> <nav class="blog-post-navigation"> <a href="/blog/test-redis-with-generated-data" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">Test Redis with Generated Data</div> </a> <a href="/blog/ssl" class="blog-post-nav-link next"> <div class="blog-post-nav-label">Next Post</div> <div class="blog-post-nav-title">Let&#39;s Encrypt SSL Certificate with Certbot for GoDaddy</div> </a> </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Posts</h2> <div class="related-posts-grid"> <a href="/blog/build-promote" class="blog-card card-link"> <img src="/assets/blog/build-promote/banner.jpg" alt="Build Once. Promote Forward. Ship Daily." class="blog-card-image"> <h3 class="blog-card-title">Build Once. Promote Forward. Ship Daily.</h3> <p class="blog-card-description"> How we eliminated rebuild-per-environment pipelines and went from shipping every two weeks to shipping daily. A real-world story of building once, validating once, and promoting the same artifact through environments. </p> </a><a href="/blog/traefik-vs-nginx" class="blog-card card-link"> <img src="/assets/blog/traefik-vs-nginx/banner.jpg" alt="Goodbye Nginx, Hello Traefik! Effortless HTTPS with Let's Encrypt and Docker" class="blog-card-image"> <h3 class="blog-card-title">Goodbye Nginx, Hello Traefik! Effortless HTTPS with Let&#39;s Encrypt and Docker</h3> <p class="blog-card-description"> If you&#39;ve struggled with Nginx reverse proxy configs, certbot timers, and `nginx -s reload`, it&#39;s time to meet Traefik — a modern reverse proxy built for dynamic containerized environments. </p> </a><a href="/blog/static-site-module" class="blog-card card-link"> <img src="/assets/blog/static-site-module/banner.jpg" alt="Building a Reusable Terraform Static Site Module with CloudFront, S3, and Route 53" class="blog-card-image"> <h3 class="blog-card-title">Building a Reusable Terraform Static Site Module with CloudFront, S3, and Route 53</h3> <p class="blog-card-description"> A common need in modern cloud infrastructure is hosting static websites — whether it&#39;s marketing sites, documentation portals, or Single Page Applications (SPAs) built with React, Vue, or Svelte. </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container"> <p class="footer-text">© 2025 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer> </body></html>

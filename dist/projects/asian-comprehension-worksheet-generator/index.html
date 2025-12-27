@@ -1,0 +1,62 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="A Python tool to generate PDF worksheets for practicing Chinese and Japanese reading comprehension. Creates worksheets with empty columns for phonetic notes or writing practice."><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v4.16.19"><title>Asian Comprehension Worksheet Generator - Janus</title><link rel="stylesheet" href="/_astro/about.BqpiiRvk.css"><script type="module" src="/_astro/hoisted.DmkqG5EQ.js"></script></head> <body class="min-h-screen flex flex-col"> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul> <div class="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false}"></div>  </div> </div> </nav> </header>  <main class="flex-1">  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">Asian Comprehension Worksheet Generator</h1> <div class="blog-post-meta"> <span>2 min read</span>  <span class="blog-post-meta-separator">•</span> <a href="https://github.com/januschung/asian-comprehension-worksheet-generator" target="_blank" rel="noopener noreferrer" class="blog-post-github-link">
+View on GitHub →
+</a>  </div> <div class="blog-post-tags"> <span class="blog-post-tag">python</span><span class="blog-post-tag">education</span> </div> </header> <div class="blog-post-content prose"> <p><img src="/assets/projects/asian-comprehension-worksheet-generator/sample.png" alt="sample worksheet"></p>
+<h2 id="background">Background</h2>
+<p>This is a similar project to <a href="https://github.com/januschung/asian-character-worksheet-generator">Asian Character Worksheet Generator</a>.</p>
+<p>As an immigrant and father of two boys living in America, I want teach my sons comprehension and reading skills of my language. I want to pick my own material which fits their levels.</p>
+<h2 id="benefit-of-the-project">Benefit of the project</h2>
+<p>The worksheet comes with empty column next to each word column. You can add phonetic note besides the character or use it to practice writing.</p>
+<h2 id="requirements">Requirements</h2>
+<ol>
+<li><a href="https://www.python.org/downloads/">python3</a></li>
+<li><a href="https://pip.pypa.io/en/stable/installing/">pip</a></li>
+</ol>
+<p>Run the following to install required packages</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="shell"><code><span class="line"><span style="color:#B392F0">pip</span><span style="color:#9ECBFF"> install</span><span style="color:#79B8FF"> -r</span><span style="color:#9ECBFF"> requirements.txt</span></span>
+<span class="line"></span></code></pre>
+<h2 id="how-to-use">How to Use</h2>
+<ol>
+<li>Edit the file <code>text</code> with the content of your choice (or use the sample).</li>
+</ol>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#9ECBFF">光輝歲月</span></span>
+<span class="line"><span style="color:#9ECBFF">鐘聲響起歸家的信號，</span></span>
+<span class="line"><span style="color:#9ECBFF">在他生命裡，彷彿帶點唏噓。</span></span>
+<span class="line"><span style="color:#9ECBFF">黑色肌膚給他的意義，</span></span>
+<span class="line"><span style="color:#9ECBFF">是一生奉獻，膚色鬥爭中。</span></span>
+<span class="line"><span style="color:#9ECBFF">年月把擁有變做失去，</span></span>
+<span class="line"><span style="color:#9ECBFF">疲倦的雙眼帶著期望。</span></span>
+<span class="line"><span style="color:#9ECBFF">今天只有殘留的軀殼，</span></span>
+<span class="line"><span style="color:#9ECBFF">迎接光輝歲月，</span></span>
+<span class="line"><span style="color:#9ECBFF">風雨中抱緊自由。</span></span>
+<span class="line"><span style="color:#9ECBFF">一生經過傍徨的掙扎，</span></span>
+<span class="line"><span style="color:#9ECBFF">自信可改變未來，</span></span>
+<span class="line"><span style="color:#9ECBFF">問誰又能做到。</span></span>
+<span class="line"><span style="color:#9ECBFF">可否不分膚色的界限，</span></span>
+<span class="line"><span style="color:#9ECBFF">願這土地裡，不分你我高低。</span></span>
+<span class="line"><span style="color:#9ECBFF">繽紛色彩閃出的美麗，</span></span>
+<span class="line"><span style="color:#9ECBFF">是因它沒有，分開每種色彩。</span></span>
+<span class="line"></span></code></pre>
+<ol start="2">
+<li>Generate the worksheet in pdf format with the following command:</li>
+</ol>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="shell"><code><span class="line"><span style="color:#B392F0">python3</span><span style="color:#9ECBFF"> run.py</span></span>
+<span class="line"></span></code></pre>
+<ol start="3">
+<li>Print out the generated file <code>worksheet.pdf</code></li>
+</ol>
+<h2 id="language-supported">Language Supported</h2>
+<ol>
+<li>Chinese</li>
+<li>Japanese (Hiragana and Katagana)</li>
+<li>Korean</li>
+</ol>
+<h2 id="sample">Sample</h2>
+<p><a href="https://github.com/januschung/asian-comprehension-worksheet-generator/blob/master/sample-worksheet.pdf">sample worksheet</a></p>
+<h2 id="code-overview">Code Overview</h2>
+<p>Everything is written in python in <code>run.py</code>. You can play with the font and grid size with the variables under the <code># Basic settings</code> section.</p>
+<h2 id="contributing">Contributing</h2>
+<p>I appreciate all suggestions or PRs which will help kids learn Asian language better. Feel free to fork the project and create a pull request with your idea.</p>
+<h2 id="special-thanks">Special Thanks</h2>
+<p>My lovely sons Tim and Hin.</p>
+<h2 id="github-link">Github link</h2>
+<p><a href="https://github.com/januschung/asian-comprehension-worksheet-generator">Asian Comprehension Worksheet Generator</a></p> </div> <nav class="blog-post-navigation"> <a href="/projects/asian-character-worksheet-generator" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Project</div> <div class="blog-post-nav-title">Asian Character Worksheet Generator</div> </a> <a href="/projects/job-winner" class="blog-post-nav-link next"> <div class="blog-post-nav-label">Next Project</div> <div class="blog-post-nav-title">Job Winner</div> </a> </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Projects</h2> <div class="related-posts-grid"> <a href="/projects/asian-character-worksheet-generator" class="blog-card card-link"> <img src="/assets/projects/asian-character-worksheet-generator/chracter-ws.webp" alt="Asian Character Worksheet Generator" class="blog-card-image"> <h3 class="blog-card-title">Asian Character Worksheet Generator</h3> <p class="blog-card-description"> A Python tool to generate PDF worksheets for practicing Chinese and Japanese characters. Automatically creates grid-based worksheets with proper spacing and column widths. </p> </a><a href="/projects/math-worksheet-generator" class="blog-card card-link"> <img src="/assets/projects/math-worksheet-generator/math-ws.webp" alt="Math Worksheet Generator" class="blog-card-image"> <h3 class="blog-card-title">Math Worksheet Generator</h3> <p class="blog-card-description"> A Python tool to generate unlimited unique math worksheets in PDF format. Perfect for parents and teachers who want to give kids more practice without buying new materials. </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container"> <p class="footer-text">© 2025 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer> </body></html>

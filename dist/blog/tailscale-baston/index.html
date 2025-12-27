@@ -1,0 +1,89 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="In [my previous post](./2025/06/25/swapping-vpn-for-tailscale-a-five-day-internal-infra-upgrade/), I wrote about how we replaced a traditional VPN with Tailscale to connect engineers to Kubernetes ser"><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v4.16.19"><title>Extending Our Tailscale Setup with a Terraform-Managed Bastion - Janus</title><link rel="stylesheet" href="/_astro/about.BqpiiRvk.css"><script type="module" src="/_astro/hoisted.DmkqG5EQ.js"></script></head> <body class="min-h-screen flex flex-col"> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul> <div class="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false}"></div>  </div> </div> </nav> </header>  <main class="flex-1">  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">Extending Our Tailscale Setup with a Terraform-Managed Bastion</h1> <div class="blog-post-meta"> <time>September 5, 2025</time> <span class="blog-post-meta-separator">•</span> <span>4 min read</span> </div> <div class="blog-post-tags"> <span class="blog-post-tag">tailscale</span><span class="blog-post-tag">vpn</span><span class="blog-post-tag">kubernetes</span><span class="blog-post-tag">networking</span><span class="blog-post-tag">devops</span><span class="blog-post-tag">terraform</span> </div> </header> <div class="blog-post-content prose"> <h1 id="extending-our-tailscale-setup-with-a-terraform-managed-bastion">Extending Our Tailscale Setup with a Terraform-Managed Bastion</h1>
+<h5 id="originally-posted-at-linkedin-at-sept-06-2025">originally posted at <a href="https://www.linkedin.com/pulse/extending-our-tailscale-setup-terraform-managed-bastion-janus-chung-hxbqc">LinkedIn</a> at Sept 06, 2025</h5>
+<p>In <a href="./2025/06/25/swapping-vpn-for-tailscale-a-five-day-internal-infra-upgrade/">my previous post</a>, I wrote about how we replaced a traditional VPN with Tailscale to connect engineers to Kubernetes services. That solved a big piece of the puzzle: cluster access was now simple, secure, and reliable.</p>
+<p>But as always, not everything lives in Kubernetes. We still had private databases, legacy services, and tools running in our VPC that engineers needed to reach. That’s where a bastion came in.</p>
+<p><img src="/assets/blog/tailscale-bastion/banner.jpg" alt="Flying with Super Speed in the New Bastion Tunnel"></p>
+<!-- more -->
+<h2 id="why-not-run-the-bastion-in-eks">Why Not Run the Bastion in EKS?</h2>
+<p>The first idea was straightforward: just run the bastion inside the Kubernetes cluster. We already had the Tailscale Kubernetes controller working, so why not extend it?</p>
+<p>The catch is resilience. If the cluster itself is unavailable, the bastion inside it disappears too. That leaves no clear way back in when you need it most.</p>
+<p>So we decided to place the bastion outside the cluster, where it could act as an independent entry point.</p>
+<h2 id="a-simple-ec2-router">A Simple EC2 Router</h2>
+<p>The design is uncomplicated:</p>
+<ol>
+<li>Provision a small EC2 instance.</li>
+<li>Install Tailscale.</li>
+<li>Enable subnet routing with <code>--advertise-routes</code> so it can expose private ranges from the VPC.</li>
+<li>Approve the advertised routes in the Tailscale admin console (or via Terraform).</li>
+</ol>
+<p>With that, the Tailnet extends beyond Kubernetes and into the rest of our infrastructure. The bastion becomes a consistent path to reach internal resources, no matter where they live.</p>
+<h2 id="automating-with-terraform">Automating with Terraform</h2>
+<p>We didn’t want to maintain this manually. The entire setup — instance, networking, routing — is described in Terraform. A minimal example looks like this:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="hcl"><code><span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "aws_instance"</span><span style="color:#79B8FF"> "bastion"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  ami</span><span style="color:#F97583">           =</span><span style="color:#E1E4E8"> data</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">aws_ami</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">ubuntu</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">id</span></span>
+<span class="line"><span style="color:#E1E4E8">  instance_type</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "t3.micro"</span><span style="color:#6A737D"> # Free tier eligible</span></span>
+<span class="line"><span style="color:#E1E4E8">  subnet_id</span><span style="color:#F97583">     =</span><span style="color:#E1E4E8"> aws_subnet</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">private</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">id</span></span>
+<span class="line"><span style="color:#E1E4E8">  vpc_security_group_ids</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> [aws_security_group</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">bastion</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">id]</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">  user_data</span><span style="color:#F97583"> =</span><span style="color:#F97583"> &#x3C;&#x3C;-EOT</span></span>
+<span class="line"><span style="color:#9ECBFF">    #!/bin/bash</span></span>
+<span class="line"><span style="color:#9ECBFF">    curl -fsSL https://tailscale.com/install.sh | sh</span></span>
+<span class="line"><span style="color:#9ECBFF">    tailscale up \\</span></span>
+<span class="line"><span style="color:#9ECBFF">      --authkey=</span><span style="color:#F97583">${</span><span style="color:#E1E4E8">var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">tailscale_auth_key</span><span style="color:#F97583">}</span><span style="color:#9ECBFF"> \\</span></span>
+<span class="line"><span style="color:#9ECBFF">      --advertise-routes=10.0.0.0/16 \\</span></span>
+<span class="line"><span style="color:#9ECBFF">      --ssh</span></span>
+<span class="line"><span style="color:#F97583">  EOT</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">  tags</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    Name </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> "tailscale-bastion"</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span></code></pre>
+<p>If it ever needs to be replaced, we can rebuild it from code. No one is SSHing in to “fix” things by hand.</p>
+<h2 id="scaling-and-redundancy">Scaling and Redundancy</h2>
+<p>One of the pleasant surprises was how easy it is to scale this setup:</p>
+<ul>
+<li><strong>Horizontal scaling</strong>: We can deploy multiple bastion instances across availability zones, each advertising the same routes. Tailscale handles the routing logic automatically, so clients don’t need to care which router they connect to.</li>
+<li><strong>Failover support</strong>: If one EC2 router goes down, traffic shifts to another. No manual intervention is required.</li>
+<li><strong>Flexibility</strong>: If we need more throughput, we can scale up the instance size or add more routers. Terraform makes this a one-line change.</li>
+</ul>
+<p>This setup gives us a clear and resilient path back into our infrastructure, independent of Kubernetes.</p>
+<h2 id="the-architecture">The Architecture</h2>
+<p>Here’s a simplified view of how it all fits together:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>+-------------------+          +---------------------+</span></span>
+<span class="line"><span>|   Developers      |          |   Tailscale Admin   |</span></span>
+<span class="line"><span>| (Tailscale client)|--------->|   Coordination      |</span></span>
+<span class="line"><span>+-------------------+          +---------------------+</span></span>
+<span class="line"><span>              |                        </span></span>
+<span class="line"><span>              | Tailnet connection</span></span>
+<span class="line"><span>              v</span></span>
+<span class="line"><span>+-----------------------------------+</span></span>
+<span class="line"><span>|     EC2 Bastion (Tailscale)       |</span></span>
+<span class="line"><span>|   --advertise-routes=10.0.0.0/16  |</span></span>
+<span class="line"><span>+-----------------------------------+</span></span>
+<span class="line"><span>              |</span></span>
+<span class="line"><span>              v</span></span>
+<span class="line"><span>   +-------------------+      +-------------------+</span></span>
+<span class="line"><span>   |    VPC Subnets    |----->|  Kubernetes (EKS) |</span></span>
+<span class="line"><span>   | (private ranges)  |      +-------------------+</span></span>
+<span class="line"><span>   |                   |----->|  Databases        |</span></span>
+<span class="line"><span>   |                   |----->|  Legacy Services  |</span></span>
+<span class="line"><span>   +-------------------+.     +-------------------+</span></span>
+<span class="line"><span></span></span></code></pre>
+<h2 id="what-we-gained">What We Gained</h2>
+<ul>
+<li>A single, consistent way to reach Kubernetes and non-Kubernetes systems.</li>
+<li>Independence from the cluster itself — the bastion remains available even if EKS has issues.</li>
+<li>Everything defined in Terraform, so we can recreate or scale it quickly.</li>
+<li>Options to add redundancy without much overhead.</li>
+</ul>
+<h2 id="closing-thoughts">Closing Thoughts</h2>
+<p>Over the course of this series, we went from relying on a traditional VPN, to adopting Tailscale for Kubernetes access, and finally to extending that same approach with a Terraform-managed bastion. What we have now is a network model that:</p>
+<ul>
+<li>Works across both Kubernetes and non-Kubernetes resources.</li>
+<li>Gives us a reliable way back into our infrastructure, even when the cluster itself is unhealthy.</li>
+<li>Is fully expressed in code, so we can reproduce or extend it without guesswork.</li>
+<li>Scales naturally when we need to add capacity or redundancy.</li>
+</ul>
+<p>The outcome is not just a technical improvement — it’s a shift in how we think about connectivity. Instead of designing networks around hardware appliances and static tunnels, we treat secure access as something we can declare in code, roll out quickly, and evolve as our infrastructure changes.</p>
+<p>That foundation will serve us well as we continue to grow, and it’s one less operational burden we need to carry.</p> </div> <nav class="blog-post-navigation"> <a href="/blog/doraemon" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">Reviving Doraemon: A Slack Bot’s Second Life in Kubernetes</div> </a> <a href="/blog/migration-1password" class="blog-post-nav-link next"> <div class="blog-post-nav-label">Next Post</div> <div class="blog-post-nav-title">Migrating From dotenv.org to 1Password in Kubernetes Deployment</div> </a> </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Posts</h2> <div class="related-posts-grid"> <a href="/blog/build-promote" class="blog-card card-link"> <img src="/assets/blog/build-promote/banner.jpg" alt="Build Once. Promote Forward. Ship Daily." class="blog-card-image"> <h3 class="blog-card-title">Build Once. Promote Forward. Ship Daily.</h3> <p class="blog-card-description"> How we eliminated rebuild-per-environment pipelines and went from shipping every two weeks to shipping daily. A real-world story of building once, validating once, and promoting the same artifact through environments. </p> </a><a href="/blog/local-ai" class="blog-card card-link"> <img src="/assets/blog/local-ai/banner.png" alt="The &#34;Hybrid&#34; AI Stack: Enterprise Power at Work, Localhost Freedom at Home" class="blog-card-image"> <h3 class="blog-card-title">The &quot;Hybrid&quot; AI Stack: Enterprise Power at Work, Localhost Freedom at Home</h3> <p class="blog-card-description"> How I built a personal AI stack on my MacBook Pro M4 using Ollama, Open WebUI, and Draw Things—running entirely locally with zero privacy leaks and unlimited usage, while keeping enterprise cloud tools for work. </p> </a><a href="/blog/remote-secret-tunnel" class="blog-card card-link"> <img src="/assets/blog/remote-secret-tunnel/banner.jpg" alt="Developing and Testing K3s Apps Locally" class="blog-card-image"> <h3 class="blog-card-title">Developing and Testing K3s Apps Locally</h3> <p class="blog-card-description"> When building Kubernetes-aware tools — whether a CLI, dashboard, or internal Python service — you often need your local environment to talk directly to the cluster API. </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container"> <p class="footer-text">© 2025 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer> </body></html>

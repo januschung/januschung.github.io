@@ -1,0 +1,395 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Setting up a production-grade remote cache for [Turborepo](https://turbo.build/) using self hosted remote cache with AWS S3 and Lambda helps improve monorepo performance, especially in CI/CD pipelines"><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v4.16.19"><title>Setting Up Turborepo Remote Cache with S3 and GitHub Actions - Janus</title><link rel="stylesheet" href="/_astro/about.BqpiiRvk.css"><script type="module" src="/_astro/hoisted.DmkqG5EQ.js"></script></head> <body class="min-h-screen flex flex-col"> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul> <div class="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false}"></div>  </div> </div> </nav> </header>  <main class="flex-1">  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">Setting Up Turborepo Remote Cache with S3 and GitHub Actions</h1> <div class="blog-post-meta"> <time>May 16, 2025</time> <span class="blog-post-meta-separator">•</span> <span>6 min read</span> </div> <div class="blog-post-tags"> <span class="blog-post-tag">devops</span><span class="blog-post-tag">turborepo</span><span class="blog-post-tag">terraform</span><span class="blog-post-tag">aws</span><span class="blog-post-tag">github</span> </div> </header> <div class="blog-post-content prose"> <h1 id="setting-up-turborepo-remote-cache-with-s3-and-github-actions">Setting Up Turborepo Remote Cache with S3 and GitHub Actions</h1>
+<p>Setting up a production-grade remote cache for <a href="https://turbo.build/">Turborepo</a> using self hosted remote cache with AWS S3 and Lambda helps improve monorepo performance, especially in CI/CD pipelines like GitHub Actions. Below is a modular and generic Terraform setup using variables for easy customization.</p>
+<p><img src="/assets/blog/turbo-cache/banner.jpg" alt="Turborepo Cache"></p>
+<!-- more -->
+<p>This guide walks you through setting up a secure and production-ready remote cache using:</p>
+<ul>
+<li>AWS S3 (with default encryption)</li>
+<li>GitHub Actions with IAM AssumeRole via OIDC</li>
+<li>Infrastructure as Code using Terraform</li>
+</ul>
+<h2 id="s3-bucket-requirements">S3 Bucket Requirements</h2>
+<ul>
+<li><strong>Default encryption (AES-256)</strong>: Enabled</li>
+<li><strong>Versioning</strong>: Disabled (not needed for cache)</li>
+<li><strong>Public Access</strong>: Blocked</li>
+</ul>
+<h2 id="terraform-setup">Terraform Setup</h2>
+<h3 id="directory-structure">Directory Structure</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>infra/</span></span>
+<span class="line"><span>├── main.tf</span></span>
+<span class="line"><span>├── variables.tf</span></span>
+<span class="line"><span>├── outputs.tf</span></span>
+<span class="line"><span>└── lambda.zip  # Your compiled Turborepo cache handler</span></span>
+<span class="line"><span></span></span></code></pre>
+<h2 id="prepare-lambdazip">Prepare lambda.zip</h2>
+<p>Use the following commands to generate a lambda.zip file. For more information, checkout <a href="https://ducktors.github.io/turborepo-remote-cache/running-in-lambda.html#create-the-lambda-function">ducktors documentation</a>.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">npm</span><span style="color:#9ECBFF"> install</span><span style="color:#9ECBFF"> turborepo-remote-cache</span></span>
+<span class="line"><span style="color:#79B8FF">echo</span><span style="color:#9ECBFF"> "export { handler } from 'turborepo-remote-cache/aws-lambda';"</span><span style="color:#F97583"> ></span><span style="color:#9ECBFF"> index.js</span></span>
+<span class="line"><span style="color:#B392F0">esbuild</span><span style="color:#9ECBFF"> index.js</span><span style="color:#79B8FF"> --bundle</span><span style="color:#79B8FF"> --platform=node</span><span style="color:#79B8FF"> --outfile=dist/index.js</span></span>
+<span class="line"><span style="color:#79B8FF">cd</span><span style="color:#9ECBFF"> dist</span><span style="color:#E1E4E8"> &#x26;&#x26; </span><span style="color:#B392F0">zip</span><span style="color:#9ECBFF"> lambda.zip</span><span style="color:#9ECBFF"> index.js</span></span>
+<span class="line"><span style="color:#B392F0">mv</span><span style="color:#9ECBFF"> lambda.zip</span><span style="color:#9ECBFF"> ..</span></span>
+<span class="line"></span></code></pre>
+<h3 id="maintf"><code>main.tf</code></h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="hcl"><code><span class="line"><span style="color:#B392F0">variable</span><span style="color:#79B8FF"> "bucket_name"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  description</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "Name of the S3 bucket for Turborepo cache"</span></span>
+<span class="line"><span style="color:#E1E4E8">  type</span><span style="color:#F97583">        =</span><span style="color:#F97583"> string</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">variable</span><span style="color:#79B8FF"> "environment"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  description</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "Environment tag for resources"</span></span>
+<span class="line"><span style="color:#E1E4E8">  type</span><span style="color:#F97583">        =</span><span style="color:#F97583"> string</span></span>
+<span class="line"><span style="color:#E1E4E8">  default</span><span style="color:#F97583">     =</span><span style="color:#9ECBFF"> "Development"</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">variable</span><span style="color:#79B8FF"> "turbo_token"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  description</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "Turbo token used by the Lambda function"</span></span>
+<span class="line"><span style="color:#E1E4E8">  type</span><span style="color:#F97583">        =</span><span style="color:#F97583"> string</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">variable</span><span style="color:#79B8FF"> "github_oidc_provider_arn"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  description</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "GitHub OIDC provider ARN"</span></span>
+<span class="line"><span style="color:#E1E4E8">  type</span><span style="color:#F97583">        =</span><span style="color:#F97583"> string</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">variable</span><span style="color:#79B8FF"> "github_org_or_repo_pattern"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  description</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "GitHub OIDC subject pattern"</span></span>
+<span class="line"><span style="color:#E1E4E8">  type</span><span style="color:#F97583">        =</span><span style="color:#F97583"> string</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "aws_s3_bucket"</span><span style="color:#79B8FF"> "turbo_cache"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  bucket</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">bucket_name</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">  tags</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    Name        </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> "Turborepo Cache Bucket"</span></span>
+<span class="line"><span style="color:#E1E4E8">    Environment </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> var.environment</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "aws_s3_bucket_ownership_controls"</span><span style="color:#79B8FF"> "turbo_cache"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  bucket</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> aws_s3_bucket</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">turbo_cache</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">id</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">  rule</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    object_ownership</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "BucketOwnerPreferred"</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "aws_s3_bucket_server_side_encryption_configuration"</span><span style="color:#79B8FF"> "turbo_cache"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  bucket</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> aws_s3_bucket</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">turbo_cache</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">id</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">  rule</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#B392F0">    apply_server_side_encryption_by_default</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">      sse_algorithm</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "AES256"</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "aws_s3_bucket_lifecycle_configuration"</span><span style="color:#79B8FF"> "turbo_cache"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  bucket</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> aws_s3_bucket</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">turbo_cache</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">id</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">  rule</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    id</span><span style="color:#F97583">     =</span><span style="color:#9ECBFF"> "cleanup-old-cache"</span></span>
+<span class="line"><span style="color:#E1E4E8">    status</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "Enabled"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">    filter</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">      prefix</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "logs/"</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">    expiration</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">      days</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> 30</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "aws_s3_bucket_public_access_block"</span><span style="color:#79B8FF"> "turbo_cache"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  bucket</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> aws_s3_bucket</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">turbo_cache</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">id</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">  block_public_acls</span><span style="color:#F97583">       =</span><span style="color:#79B8FF"> true</span></span>
+<span class="line"><span style="color:#E1E4E8">  ignore_public_acls</span><span style="color:#F97583">      =</span><span style="color:#79B8FF"> true</span></span>
+<span class="line"><span style="color:#E1E4E8">  restrict_public_buckets</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> true</span></span>
+<span class="line"><span style="color:#E1E4E8">  block_public_policy</span><span style="color:#F97583">     =</span><span style="color:#79B8FF"> true</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "aws_s3_bucket_policy"</span><span style="color:#79B8FF"> "turbo_cache"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  bucket</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> aws_s3_bucket</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">turbo_cache</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">id</span></span>
+<span class="line"><span style="color:#E1E4E8">  policy</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> data</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">aws_iam_policy_document</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">s3_secure_transport_deny</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">json</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "aws_iam_role"</span><span style="color:#79B8FF"> "github_actions_role"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  name</span><span style="color:#F97583">               =</span><span style="color:#9ECBFF"> "github-actions-turborepo-cache-role"</span></span>
+<span class="line"><span style="color:#E1E4E8">  assume_role_policy</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> data</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">aws_iam_policy_document</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">github_actions_assume_role</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">json</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "aws_iam_role"</span><span style="color:#79B8FF"> "turbo_cache_lambda_role"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  name</span><span style="color:#F97583">               =</span><span style="color:#9ECBFF"> "turborepo-cache-lambda-role"</span></span>
+<span class="line"><span style="color:#E1E4E8">  assume_role_policy</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> data</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">aws_iam_policy_document</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">lambda_assume_role</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">json</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "aws_iam_policy"</span><span style="color:#79B8FF"> "turbo_cache_lambda_policy"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  name</span><span style="color:#F97583">   =</span><span style="color:#9ECBFF"> "turborepo-cache-lambda-policy"</span></span>
+<span class="line"><span style="color:#E1E4E8">  policy</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> data</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">aws_iam_policy_document</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">lambda_policy</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">json</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "aws_iam_role_policy_attachment"</span><span style="color:#79B8FF"> "turbo_cache_lambda_attach"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  role</span><span style="color:#F97583">       =</span><span style="color:#E1E4E8"> aws_iam_role</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">turbo_cache_lambda_role</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">name</span></span>
+<span class="line"><span style="color:#E1E4E8">  policy_arn</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> aws_iam_policy</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">turbo_cache_lambda_policy</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">arn</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "aws_lambda_function"</span><span style="color:#79B8FF"> "turbo_cache"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  function_name</span><span style="color:#F97583">    =</span><span style="color:#9ECBFF"> "turborepo-remote-cache"</span></span>
+<span class="line"><span style="color:#E1E4E8">  role</span><span style="color:#F97583">             =</span><span style="color:#E1E4E8"> aws_iam_role</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">turbo_cache_lambda_role</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">arn</span></span>
+<span class="line"><span style="color:#E1E4E8">  handler</span><span style="color:#F97583">          =</span><span style="color:#9ECBFF"> "index.handler"</span></span>
+<span class="line"><span style="color:#E1E4E8">  runtime</span><span style="color:#F97583">          =</span><span style="color:#9ECBFF"> "nodejs22.x"</span></span>
+<span class="line"><span style="color:#E1E4E8">  filename</span><span style="color:#F97583">         =</span><span style="color:#9ECBFF"> "</span><span style="color:#F97583">${</span><span style="color:#E1E4E8">path</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">module</span><span style="color:#F97583">}</span><span style="color:#9ECBFF">/lambda.zip"</span></span>
+<span class="line"><span style="color:#E1E4E8">  source_code_hash</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> filebase64sha256</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"</span><span style="color:#F97583">${</span><span style="color:#E1E4E8">path</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">module</span><span style="color:#F97583">}</span><span style="color:#9ECBFF">/lambda.zip"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">  environment</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    variables</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">      STORAGE_PATH     </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> aws_s3_bucket.turbo_cache.bucket</span></span>
+<span class="line"><span style="color:#E1E4E8">      STORAGE_PROVIDER </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> "s3"</span></span>
+<span class="line"><span style="color:#E1E4E8">      TURBO_TOKEN      </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> var.turbo_token</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "aws_lambda_function_url"</span><span style="color:#79B8FF"> "turbo_cache_lambda_url"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  function_name</span><span style="color:#F97583">      =</span><span style="color:#E1E4E8"> aws_lambda_function</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">turbo_cache</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">function_name</span></span>
+<span class="line"><span style="color:#E1E4E8">  authorization_type</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "NONE"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">  cors</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    allow_origins</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> [</span><span style="color:#9ECBFF">"*"</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#E1E4E8">    allow_methods</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> [</span><span style="color:#9ECBFF">"*"</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#E1E4E8">    allow_headers</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> [</span><span style="color:#9ECBFF">"*"</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">data</span><span style="color:#79B8FF"> "aws_iam_policy_document"</span><span style="color:#79B8FF"> "github_actions_assume_role"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#B392F0">  statement</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    effect</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "Allow"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">    actions</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> [</span><span style="color:#9ECBFF">"sts:AssumeRoleWithWebIdentity"</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">    principals</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">      type</span><span style="color:#F97583">        =</span><span style="color:#9ECBFF"> "Federated"</span></span>
+<span class="line"><span style="color:#E1E4E8">      identifiers</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> [var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">github_oidc_provider_arn]</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">    condition</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">      test</span><span style="color:#F97583">     =</span><span style="color:#9ECBFF"> "StringEquals"</span></span>
+<span class="line"><span style="color:#E1E4E8">      variable</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "token.actions.githubusercontent.com:aud"</span></span>
+<span class="line"><span style="color:#E1E4E8">      values</span><span style="color:#F97583">   =</span><span style="color:#E1E4E8"> [</span><span style="color:#9ECBFF">"sts.amazonaws.com"</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">    condition</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">      test</span><span style="color:#F97583">     =</span><span style="color:#9ECBFF"> "StringLike"</span></span>
+<span class="line"><span style="color:#E1E4E8">      variable</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "token.actions.githubusercontent.com:sub"</span></span>
+<span class="line"><span style="color:#E1E4E8">      values</span><span style="color:#F97583">   =</span><span style="color:#E1E4E8"> [var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">github_org_or_repo_pattern]</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">data</span><span style="color:#79B8FF"> "aws_iam_policy_document"</span><span style="color:#79B8FF"> "lambda_assume_role"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#B392F0">  statement</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    effect</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "Allow"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">    principals</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">      type</span><span style="color:#F97583">        =</span><span style="color:#9ECBFF"> "Service"</span></span>
+<span class="line"><span style="color:#E1E4E8">      identifiers</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> [</span><span style="color:#9ECBFF">"lambda.amazonaws.com"</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">    actions</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> [</span><span style="color:#9ECBFF">"sts:AssumeRole"</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">data</span><span style="color:#79B8FF"> "aws_iam_policy_document"</span><span style="color:#79B8FF"> "lambda_policy"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#B392F0">  statement</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    effect</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "Allow"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">    actions</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> [</span></span>
+<span class="line"><span style="color:#9ECBFF">      "s3:GetObject"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">      "s3:PutObject"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">      "s3:HeadObject"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">      "logs:CreateLogGroup"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">      "logs:CreateLogStream"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">      "logs:PutLogEvents"</span></span>
+<span class="line"><span style="color:#E1E4E8">    ]</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">    resources</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> [</span></span>
+<span class="line"><span style="color:#E1E4E8">      aws_s3_bucket</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">turbo_cache</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">arn,</span></span>
+<span class="line"><span style="color:#9ECBFF">      "</span><span style="color:#F97583">${</span><span style="color:#E1E4E8">aws_s3_bucket</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">turbo_cache</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">arn</span><span style="color:#F97583">}</span><span style="color:#9ECBFF">/*"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">      "arn:aws:logs:*:*:*"</span></span>
+<span class="line"><span style="color:#E1E4E8">    ]</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">data</span><span style="color:#79B8FF"> "aws_iam_policy_document"</span><span style="color:#79B8FF"> "s3_secure_transport_deny"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#B392F0">  statement</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    sid</span><span style="color:#F97583">     =</span><span style="color:#9ECBFF"> "DenyInsecureTransport"</span></span>
+<span class="line"><span style="color:#E1E4E8">    effect</span><span style="color:#F97583">  =</span><span style="color:#9ECBFF"> "Deny"</span></span>
+<span class="line"><span style="color:#E1E4E8">    actions</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> [</span><span style="color:#9ECBFF">"s3:*"</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">    principals</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">      type</span><span style="color:#F97583">        =</span><span style="color:#9ECBFF"> "*"</span></span>
+<span class="line"><span style="color:#E1E4E8">      identifiers</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> [</span><span style="color:#9ECBFF">"*"</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">    resources</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> [</span></span>
+<span class="line"><span style="color:#E1E4E8">      aws_s3_bucket</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">turbo_cache</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">arn,</span></span>
+<span class="line"><span style="color:#9ECBFF">      "</span><span style="color:#F97583">${</span><span style="color:#E1E4E8">aws_s3_bucket</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">turbo_cache</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">arn</span><span style="color:#F97583">}</span><span style="color:#9ECBFF">/*"</span></span>
+<span class="line"><span style="color:#E1E4E8">    ]</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">    condition</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">      test</span><span style="color:#F97583">     =</span><span style="color:#9ECBFF"> "Bool"</span></span>
+<span class="line"><span style="color:#E1E4E8">      variable</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "aws:SecureTransport"</span></span>
+<span class="line"><span style="color:#E1E4E8">      values</span><span style="color:#F97583">   =</span><span style="color:#E1E4E8"> [</span><span style="color:#9ECBFF">"false"</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"></span></code></pre>
+<h3 id="variablestf"><code>variables.tf</code></h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="hcl"><code><span class="line"><span style="color:#B392F0">variable</span><span style="color:#79B8FF"> "bucket_name"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  description</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "Name of the S3 bucket for Turborepo cache"</span></span>
+<span class="line"><span style="color:#E1E4E8">  type</span><span style="color:#F97583">        =</span><span style="color:#F97583"> string</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">variable</span><span style="color:#79B8FF"> "environment"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  description</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "Deployment environment tag (e.g., Development, Staging, Production)"</span></span>
+<span class="line"><span style="color:#E1E4E8">  type</span><span style="color:#F97583">        =</span><span style="color:#F97583"> string</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">variable</span><span style="color:#79B8FF"> "github_org_or_repo_pattern"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  description</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "GitHub OIDC repo pattern for role assumption"</span></span>
+<span class="line"><span style="color:#E1E4E8">  type</span><span style="color:#F97583">        =</span><span style="color:#F97583"> string</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">variable</span><span style="color:#79B8FF"> "github_oidc_provider_arn"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  description</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "ARN of the GitHub OIDC provider"</span></span>
+<span class="line"><span style="color:#E1E4E8">  type</span><span style="color:#F97583">        =</span><span style="color:#F97583"> string</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">variable</span><span style="color:#79B8FF"> "turbo_token"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  description</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "Turborepo access token"</span></span>
+<span class="line"><span style="color:#E1E4E8">  type</span><span style="color:#F97583">        =</span><span style="color:#F97583"> string</span></span>
+<span class="line"><span style="color:#E1E4E8">  sensitive</span><span style="color:#F97583">   =</span><span style="color:#79B8FF"> true</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"></span></code></pre>
+<h3 id="outputstf"><code>outputs.tf</code></h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="hcl"><code><span class="line"><span style="color:#B392F0">output</span><span style="color:#79B8FF"> "s3_bucket_name"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  value</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> aws_s3_bucket</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">turbo_cache</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">id</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">output</span><span style="color:#79B8FF"> "github_role_arn"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  value</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> aws_iam_role</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">github_actions</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">arn</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">output</span><span style="color:#79B8FF"> "lambda_url"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  value</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> aws_lambda_function_url</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">turbo_cache_lambda_url</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">function_url</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span></code></pre>
+<h2 id="terraformtfvars-sample">terraform.tfvars Sample</h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="hcl"><code><span class="line"><span style="color:#E1E4E8">bucket_name</span><span style="color:#F97583">                =</span><span style="color:#9ECBFF"> "my-turbo-cache-bucket"</span></span>
+<span class="line"><span style="color:#E1E4E8">environment</span><span style="color:#F97583">                =</span><span style="color:#9ECBFF"> "Development"</span></span>
+<span class="line"><span style="color:#E1E4E8">github_oidc_provider_arn</span><span style="color:#F97583">   =</span><span style="color:#9ECBFF"> "arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com"</span></span>
+<span class="line"><span style="color:#E1E4E8">github_org_or_repo_pattern</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "repo:my-org/*"</span></span>
+<span class="line"><span style="color:#E1E4E8">turbo_token</span><span style="color:#F97583">                =</span><span style="color:#9ECBFF"> "your-turborepo-token"</span></span>
+<span class="line"></span></code></pre>
+<h2 id="github-actions-workflow">GitHub Actions Workflow</h2>
+<p><code>.github/workflows/build.yml</code></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Build with Turborepo Cache (S3)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF">on</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  push</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    branches</span><span style="color:#E1E4E8">: [</span><span style="color:#9ECBFF">main</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">permissions</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  id-token</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">write</span></span>
+<span class="line"><span style="color:#85E89D">  contents</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">read</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">jobs</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  build</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    runs-on</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">ubuntu-latest</span></span>
+<span class="line"><span style="color:#85E89D">    env</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      TURBO_TEAM</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">your-team</span></span>
+<span class="line"><span style="color:#85E89D">      TURBO_TOKEN</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">${{ secrets.TF_VAR_TURBO_TOKEN }}</span></span>
+<span class="line"><span style="color:#85E89D">      TURBO_API</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">replace-with-lambda_url-out</span></span>
+<span class="line"></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">    steps</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Checkout repo</span></span>
+<span class="line"><span style="color:#85E89D">        uses</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">actions/checkout@v4</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Configure AWS credentials (OIDC)</span></span>
+<span class="line"><span style="color:#85E89D">        uses</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">aws-actions/configure-aws-credentials@v4</span></span>
+<span class="line"><span style="color:#85E89D">        with</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">          role-to-assume</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">arn:aws:iam::123456789012:role/github-actions-turbo-role</span></span>
+<span class="line"><span style="color:#85E89D">          role-session-name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">GitHubActionsTurboCacheSession</span></span>
+<span class="line"><span style="color:#85E89D">          aws-region</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">us-east-1</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Setup pnpm</span></span>
+<span class="line"><span style="color:#85E89D">        uses</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">pnpm/action-setup@v3</span></span>
+<span class="line"><span style="color:#85E89D">        with</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">          version</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">8</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Install dependencies</span></span>
+<span class="line"><span style="color:#85E89D">        run</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">pnpm install</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Build with Turbo cache</span></span>
+<span class="line"><span style="color:#85E89D">        run</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">pnpm turbo run build --team="your-team" --token=${{ secrets.TF_VAR_TURBO_TOKEN }}</span></span>
+<span class="line"></span></code></pre>
+<hr>
+<h2 id="turbojson-sample">turbo.json Sample</h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="json"><code><span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#79B8FF">  "$schema"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"https://turbo.build/schema.json"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  "tasks"</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#79B8FF">    "dev"</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#79B8FF">      "cache"</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">false</span></span>
+<span class="line"><span style="color:#E1E4E8">    },</span></span>
+<span class="line"><span style="color:#79B8FF">    "build"</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#79B8FF">      "dependsOn"</span><span style="color:#E1E4E8">: [</span><span style="color:#9ECBFF">"^build"</span><span style="color:#E1E4E8">],</span></span>
+<span class="line"><span style="color:#79B8FF">      "outputs"</span><span style="color:#E1E4E8">: [</span><span style="color:#9ECBFF">"dist/**"</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span></code></pre>
+<h2 id="result">Result:</h2>
+<h3 id="without-cache">Without cache</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span> Tasks:    1 successful, 1 total</span></span>
+<span class="line"><span>Cached:    0 cached, 1 total</span></span>
+<span class="line"><span>  Time:    4.648s </span></span>
+<span class="line"><span></span></span></code></pre>
+<h3 id="with-cache">With cache</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span> Tasks:    1 successful, 1 total</span></span>
+<span class="line"><span>Cached:    1 cached, 1 total</span></span>
+<span class="line"><span>  Time:    721ms >>> FULL TURBO</span></span>
+<span class="line"><span></span></span></code></pre>
+<h2 id="summary">Summary</h2>
+<p>This Terraform-based setup provisions a secure and production-ready Turborepo remote cache using:</p>
+<ul>
+<li>
+<p>S3 for storage (with AES-256 encryption and lifecycle rules)</p>
+</li>
+<li>
+<p>Lambda to serve the cache API</p>
+</li>
+<li>
+<p>IAM/OIDC Integration with GitHub Actions for secure, short-lived access</p>
+</li>
+<li>
+<p>GitHub Actions workflow pre-wired to leverage the remote cache</p>
+</li>
+</ul>
+<h3 id="key-benefits">Key Benefits:</h3>
+<p>Significant speed-up in CI pipelines using cached builds
+Modular and environment-agnostic Terraform for reusable infra
+Security best practices enforced (e.g., S3 bucket policies, IAM roles)
+Easy-to-integrate GitHub Actions support with OIDC</p>
+<h3 id="performance-gain">Performance Gain</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>Build Time Comparison</span></span>
+<span class="line"><span>|</span></span>
+<span class="line"><span>|    ██████████████████  4.648s (No Cache)</span></span>
+<span class="line"><span>|    ██                  0.721s (With Cache)</span></span>
+<span class="line"><span>|</span></span>
+<span class="line"><span></span></span></code></pre>
+<p>~84.5% time saved per build with the remote cache!</p> </div> <nav class="blog-post-navigation"> <a href="/blog/computer-setup" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">Bootstrapping My Linux Desktop and MacBook for Dev Work</div> </a> <a href="/blog/auto-renew-kubeconfig" class="blog-post-nav-link next"> <div class="blog-post-nav-label">Next Post</div> <div class="blog-post-nav-title">Automatically Renew AWS SSO Session and Refresh Kubeconfig for EKS Access</div> </a> </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Posts</h2> <div class="related-posts-grid"> <a href="/blog/build-promote" class="blog-card card-link"> <img src="/assets/blog/build-promote/banner.jpg" alt="Build Once. Promote Forward. Ship Daily." class="blog-card-image"> <h3 class="blog-card-title">Build Once. Promote Forward. Ship Daily.</h3> <p class="blog-card-description"> How we eliminated rebuild-per-environment pipelines and went from shipping every two weeks to shipping daily. A real-world story of building once, validating once, and promoting the same artifact through environments. </p> </a><a href="/blog/local-ai" class="blog-card card-link"> <img src="/assets/blog/local-ai/banner.png" alt="The &#34;Hybrid&#34; AI Stack: Enterprise Power at Work, Localhost Freedom at Home" class="blog-card-image"> <h3 class="blog-card-title">The &quot;Hybrid&quot; AI Stack: Enterprise Power at Work, Localhost Freedom at Home</h3> <p class="blog-card-description"> How I built a personal AI stack on my MacBook Pro M4 using Ollama, Open WebUI, and Draw Things—running entirely locally with zero privacy leaks and unlimited usage, while keeping enterprise cloud tools for work. </p> </a><a href="/blog/remote-secret-tunnel" class="blog-card card-link"> <img src="/assets/blog/remote-secret-tunnel/banner.jpg" alt="Developing and Testing K3s Apps Locally" class="blog-card-image"> <h3 class="blog-card-title">Developing and Testing K3s Apps Locally</h3> <p class="blog-card-description"> When building Kubernetes-aware tools — whether a CLI, dashboard, or internal Python service — you often need your local environment to talk directly to the cluster API. </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container"> <p class="footer-text">© 2025 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer> </body></html>

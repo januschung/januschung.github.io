@@ -1,0 +1,283 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Fully Automating OCI Deployment"><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v4.16.19"><title>The DevOps Odyssey: Fully Automating OCI App Deployment with Terraform, Ansible, and Docker - Janus</title><link rel="stylesheet" href="/_astro/about.BqpiiRvk.css"><script type="module" src="/_astro/hoisted.DmkqG5EQ.js"></script></head> <body class="min-h-screen flex flex-col"> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul> <div class="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false}"></div>  </div> </div> </nav> </header>  <main class="flex-1">  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">The DevOps Odyssey: Fully Automating OCI App Deployment with Terraform, Ansible, and Docker</h1> <div class="blog-post-meta"> <time>June 17, 2025</time> <span class="blog-post-meta-separator">•</span> <span>9 min read</span> </div> <div class="blog-post-tags"> <span class="blog-post-tag">devops</span><span class="blog-post-tag">terraform</span><span class="blog-post-tag">ansible</span><span class="blog-post-tag">docker</span><span class="blog-post-tag">cicd</span><span class="blog-post-tag">github</span> </div> </header> <div class="blog-post-content prose"> <h1 id="the-devops-odyssey-fully-automating-oci-app-deployment-with-terraform-ansible-and-docker">The DevOps Odyssey: Fully Automating OCI App Deployment with Terraform, Ansible, and Docker</h1>
+<h2 id="introduction-the-engineers-drive-for-automation">Introduction: The Engineer’s Drive for Automation</h2>
+<p>As a DevOps engineer, I thrive on full‑stack automation—turning repetitive, error‑prone deployments into push‑button, ultra‑reliable workflows.<br>
+I recently challenged myself to get <strong>Job Winner</strong>, an opensource full‑stack app (Spring Boot + React), live on <strong>Oracle Cloud Infrastructure (OCI)</strong> in less than <strong>15 minutes</strong> from a cold start.<br>
+But the real goal wasn’t speed alone—it was <strong>idempotence</strong>: every run of the pipeline should converge the system to the exact same, secure, HTTPS‑enabled state without manual touch‑points.</p>
+<p><img src="/assets/devops-odyssey/oci-terraform-ansible/banner.jpg" alt="OCI, Terraform, Ansible"></p>
+<!-- more -->
+<p>In this post you’ll travel the entire odyssey—from a blank OCI account to a humming, production‑grade CI/CD pipeline. Expect:</p>
+<ul>
+<li>Detailed Terraform modules for free‑tier compute, networking, and remote state.</li>
+<li>Ansible roles that turn a vanilla Oracle Linux VM into a hardened Docker host.</li>
+<li>Traefik 3 as a smart edge router with automatic Let’s Encrypt certificates.</li>
+<li>GitHub Actions tying it all together in a <strong>single commit → live site</strong> workflow.</li>
+<li>Hard‑won lessons, cost analysis, and future‑proofing tips.</li>
+</ul>
+<p><strong>TL;DR</strong>: Free cloud, real domain, zero click deploys. Grab a coffee—this is a long read.</p>
+<hr>
+<h2 id="why-oracle-cloud-free-tier">Why Oracle Cloud Free Tier?</h2>
+<p>OCI’s Always‑Free resources give you an ARM‑based VM (4 OCPU, 24 GB RAM) <em>or</em> an AMD VM (1 OCPU, 1 GB RAM) <strong>plus 10 TB egress</strong>—an unbeatable budget playground.<br>
+Compared to AWS or GCP free tiers, outbound bandwidth alone makes OCI ideal for side‑projects with media assets or heavy API traffic.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Cloud</th><th>Monthly Free Egress</th><th>Notes</th></tr></thead><tbody><tr><td><strong>OCI</strong></td><td><strong>10 TB</strong></td><td>Always Free</td></tr><tr><td>AWS</td><td>100 GB</td><td>Free tier year one</td></tr><tr><td>GCP</td><td>1 GB</td><td>Always Free</td></tr></tbody></table>
+<p>Beyond cost, OCI integrates cleanly with HashiCorp Terraform through an official provider and supports <strong>Object Storage buckets</strong> that double as free Terraform remote state back‑ends.</p>
+<hr>
+<h2 id="architecture-at-10000feet">Architecture at 10,000 Feet</h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>┌───────────────┐     GitHub Actions   ┌────────────────────────┐</span></span>
+<span class="line"><span>│  GitHub Repo  │ ───────────────────▶ │ OCI: Object Storage    │</span></span>
+<span class="line"><span>└───────────────┘  stores tfstate      └────────────────────────┘</span></span>
+<span class="line"><span>       │ Push/Pull Requests                   ▲</span></span>
+<span class="line"><span>       ▼                                      │</span></span>
+<span class="line"><span>┌────────────────┐  terraform apply           │</span></span>
+<span class="line"><span>│ Terraform      │ ───────────────────────────┘</span></span>
+<span class="line"><span>│ (Infrastructure│</span></span>
+<span class="line"><span>│  as Code)      │ ──▶ VCN, Subnet, Rules</span></span>
+<span class="line"><span>└────────────────┘         │</span></span>
+<span class="line"><span>                            ▼</span></span>
+<span class="line"><span>                       ┌───────────────┐  ansible-playbook</span></span>
+<span class="line"><span>                       │  OCI VM       │ ◀───────────────────── GitHub Runner</span></span>
+<span class="line"><span>                       └───────────────┘</span></span>
+<span class="line"><span>                         │  docker compose up</span></span>
+<span class="line"><span>                         ▼</span></span>
+<span class="line"><span>                  ┌────────────────────┐</span></span>
+<span class="line"><span>                  │ Traefik Reverse    │</span></span>
+<span class="line"><span>                  │ Proxy (HTTPS)      │</span></span>
+<span class="line"><span>                  └────────────────────┘</span></span>
+<span class="line"><span>                         │</span></span>
+<span class="line"><span>                         ▼</span></span>
+<span class="line"><span>                  ┌────────────────────┐</span></span>
+<span class="line"><span>                  │ React Frontend     │</span></span>
+<span class="line"><span>                  │ Spring Boot API    │</span></span>
+<span class="line"><span>                  └────────────────────┘</span></span>
+<span class="line"><span></span></span></code></pre>
+<hr>
+<h2 id="phase1-terraformlaying-down-the-runway">Phase 1: Terraform—Laying Down the Runway</h2>
+<h3 id="module-design">Module Design</h3>
+<p>For this project, I crafted a single, comprehensive Terraform module that provisions everything needed for the deployment. This module takes care of spinning up the Virtual Cloud Network (VCN), public subnet, Internet Gateway, security lists, and the free-tier Oracle Linux VM—all in one go. By bundling the infrastructure logic together, setup becomes straightforward and easy to reuse for future experiments or side projects.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="hcl"><code><span class="line"><span style="color:#B392F0">module</span><span style="color:#79B8FF"> "web_server"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  source</span><span style="color:#F97583">                =</span><span style="color:#9ECBFF"> "./modules/web-server"</span></span>
+<span class="line"><span style="color:#E1E4E8">  compartment_ocid</span><span style="color:#F97583">      =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">compartment_ocid</span></span>
+<span class="line"><span style="color:#E1E4E8">  availability_domain</span><span style="color:#F97583">   =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">availability_domain</span></span>
+<span class="line"><span style="color:#E1E4E8">  shape</span><span style="color:#F97583">                 =</span><span style="color:#9ECBFF"> "VM.Standard.A1.Flex"</span></span>
+<span class="line"><span style="color:#E1E4E8">  vm_ocpus</span><span style="color:#F97583">              =</span><span style="color:#79B8FF"> 1</span></span>
+<span class="line"><span style="color:#E1E4E8">  vm_memory</span><span style="color:#F97583">             =</span><span style="color:#79B8FF"> 6</span></span>
+<span class="line"><span style="color:#E1E4E8">  ssh_public_key</span><span style="color:#F97583">        =</span><span style="color:#79B8FF"> file</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"~/.ssh/id_rsa.pub"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#6A737D">  # ...other variables...</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span></code></pre>
+<h3 id="remote-state-backend">Remote State Back‑End</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="hcl"><code><span class="line"><span style="color:#B392F0">terraform</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#B392F0">  backend</span><span style="color:#79B8FF"> "oci"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    bucket</span><span style="color:#F97583">    =</span><span style="color:#9ECBFF"> "your-state-bucket"</span></span>
+<span class="line"><span style="color:#E1E4E8">    namespace</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "your-namespace"</span></span>
+<span class="line"><span style="color:#E1E4E8">    region</span><span style="color:#F97583">    =</span><span style="color:#9ECBFF"> "your-region"</span></span>
+<span class="line"><span style="color:#E1E4E8">    key</span><span style="color:#F97583">       =</span><span style="color:#9ECBFF"> "terraform.tfstate"</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span></code></pre>
+<p>Remote state unlocks <code>terraform plan</code> diffs inside GitHub Actions so pull‑request reviewers can preview infra changes before merging.</p>
+<hr>
+<h2 id="phase-2--ansible-turning-vms-into-cattle">Phase 2 – Ansible: Turning VMs into Cattle</h2>
+<h3 id="cloud-init-the-initial-approach">Cloud-Init: The Initial Approach</h3>
+<p>When I first attempted to automate post-provisioning on my OCI VM, I turned to <strong>Cloud-Init</strong>. It’s a native mechanism that Oracle Cloud Infrastructure supports out of the box, letting you pass a shell script through the <code>user_data</code> field in Terraform:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="hcl"><code><span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "oci_core_instance"</span><span style="color:#79B8FF"> "jobwinner"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#6A737D">  # ... other config ...</span></span>
+<span class="line"><span style="color:#E1E4E8">  metadata</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    ssh_authorized_keys </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> file</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"~/.ssh/id_rsa.pub"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">    user_data           </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> base64encode</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">file</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"cloud-init/jobwinner-init.sh"</span><span style="color:#E1E4E8">))</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span></code></pre>
+<p>This script (<code>jobwinner-init.sh</code>) aimed to bootstrap the whole stack—installing Docker, creating the network, pulling images, writing configs, and launching containers. It was a decent first shot.</p>
+<p>But the problems were immediate:</p>
+<ul>
+<li>No visibility into when or if the script failed.</li>
+<li>Troubleshooting meant SSHing into the VM and running:
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">sudo</span><span style="color:#9ECBFF"> tail</span><span style="color:#79B8FF"> -n</span><span style="color:#79B8FF"> 50</span><span style="color:#9ECBFF"> /var/log/cloud-init.log</span></span>
+<span class="line"></span></code></pre>
+</li>
+<li>Debugging Bash templates is like diffing spaghetti—hard to maintain, fragile to extend.</li>
+</ul>
+<p>I needed a better approach. One with structure. One with feedback. One that was <em>actually fun to use</em>.</p>
+<h3 id="switching-to-ansible-structure-idempotence-sanity">Switching to Ansible: Structure, Idempotence, Sanity</h3>
+<p>That’s when I pivoted to <strong>Ansible</strong>—and it completely changed the game.</p>
+<p>Instead of wrestling with cloud-init logs, I now have a clean split between <strong>infrastructure provisioning (Terraform)</strong> and <strong>configuration management (Ansible)</strong>.</p>
+<p>The Ansible setup revolves around <strong>two focused roles</strong>:</p>
+<h4 id="1-common--system-setup">1. <code>common</code> – System Setup</h4>
+<p>This role handles the core VM preparation:</p>
+<ul>
+<li>Updates all packages using <code>dnf</code></li>
+<li>Installs <code>epel-release</code>, <code>firewalld</code>, and <code>docker</code></li>
+<li>Starts and enables <code>firewalld</code></li>
+<li>Opens ports <strong>80</strong> and <strong>443</strong></li>
+</ul>
+<p>These steps are run through the <code>setup-docker.yml</code> playbook, making the VM Docker-ready with a secure firewall configuration.</p>
+<h4 id="2-deploy-jobwinner--application-stack--dns">2. <code>deploy-jobwinner</code> – Application Stack &#x26; DNS</h4>
+<p>Once the VM is ready, this role takes over. Here’s what it does:</p>
+<ul>
+<li><strong>Updates DuckDNS</strong> with the VM’s current IP via an HTTP call</li>
+<li><strong>Creates a secured <code>acme.json</code> file</strong> for Traefik to use with Let’s Encrypt</li>
+<li><strong>Templates out <code>traefik.yml</code></strong> from a Jinja2 file</li>
+<li><strong>Bootstraps Docker networks</strong> using a simple shell command</li>
+<li><strong>Spins up Traefik and the app stack</strong> using <code>docker-compose</code></li>
+</ul>
+<p>All of this happens in a structured, readable, and repeatable manner. No surprises.</p>
+<h3 id="jinja2-templating-one-config-to-rule-them-all">Jinja2 Templating: One Config to Rule Them All</h3>
+<p>Instead of hardcoded configs, everything lives as a template:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="jinja"><code><span class="line"><span style="color:#E1E4E8"># docker-compose.yml.j2</span></span>
+<span class="line"><span style="color:#E1E4E8">version: "3.9"</span></span>
+<span class="line"><span style="color:#E1E4E8">services:</span></span>
+<span class="line"><span style="color:#E1E4E8">  frontend:</span></span>
+<span class="line"><span style="color:#E1E4E8">    image: "</span><span style="color:#FFAB70">{{ </span><span style="color:#E1E4E8">frontend_image</span><span style="color:#FFAB70"> }}</span><span style="color:#E1E4E8">"</span></span>
+<span class="line"><span style="color:#E1E4E8">    labels:</span></span>
+<span class="line"><span style="color:#E1E4E8">      - "traefik.http.routers.frontend.rule=Host(`</span><span style="color:#FFAB70">{{ </span><span style="color:#E1E4E8">traefik_host_domain</span><span style="color:#FFAB70"> }}</span><span style="color:#E1E4E8">`)"</span></span>
+<span class="line"></span></code></pre>
+<p>All variables are centralized in <code>group_vars/all.yml</code>, meaning I can swap images, update domains, or add ports with a single change. It’s clean, version-controlled, and predictable.</p>
+<h3 id="reusable-compose-logic">Reusable Compose Logic</h3>
+<p>One of my favorite touches is the shared <code>setup-compose-app.yml</code> task file. Both the app and Traefik use it. It performs three simple tasks:</p>
+<ol>
+<li>Ensures the target directory exists (<code>/opt/jobwinner</code>, <code>/opt/traefik</code>, etc.)</li>
+<li>Templates the appropriate <code>docker-compose.yml</code></li>
+<li>Runs <code>docker compose up -d</code> to launch the service</li>
+</ol>
+<p>This small abstraction keeps things <strong>DRY</strong> and easy to extend.</p>
+<h3 id="wait-for-readiness">Wait for Readiness</h3>
+<p>Before deploying the app stack, Ansible waits for Traefik to be up using a simple health check:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#E1E4E8">- </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Wait for Traefik to be ready</span></span>
+<span class="line"><span style="color:#85E89D">  uri</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    url</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">http://localhost:80</span></span>
+<span class="line"><span style="color:#85E89D">    status_code</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">404</span></span>
+<span class="line"><span style="color:#85E89D">    retries</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">10</span></span>
+<span class="line"><span style="color:#85E89D">    delay</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">5</span></span>
+<span class="line"><span style="color:#85E89D">    until</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">traefik_check is succeeded</span></span>
+<span class="line"></span></code></pre>
+<p>This ensures we don’t start routing app traffic before Traefik is ready to accept connections.</p>
+<h3 id="traefik-duckdns-and-httpsall-baked-in">Traefik, DuckDNS, and HTTPS—All Baked In</h3>
+<p>Once Traefik is live:</p>
+<ul>
+<li>It listens on <strong>port 80 and 443</strong></li>
+<li>It pulls <strong>Let’s Encrypt certs</strong> using DuckDNS DNS validation</li>
+<li>It binds the ACME data to a secured <code>acme.json</code> file</li>
+<li>It dynamically routes frontend and backend containers based on Docker labels</li>
+</ul>
+<p>And thanks to Ansible, all of this happens automatically—no need to SSH into the machine, touch configs, or run manual cert renewals.</p>
+<blockquote>
+<p><strong>Pro-Tip</strong>: Don’t forget to bind-mount <code>acme.json</code> with <code>0600</code> permissions. Traefik won’t start if it’s too permissive.</p>
+</blockquote>
+<h2 id="phase3-githubactionscicdreality-edition">Phase 3 – GitHub Actions CI/CD (Reality Edition)</h2>
+<p>My pipeline is split into <strong>three purpose‑built workflows</strong>, each with a single job.<br>
+This keeps logs short and lets me re‑run only the layer I need.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Workflow</th><th>What it Does</th></tr></thead><tbody><tr><td><strong>terraform.yml</strong></td><td>Provisions or updates all OCI resources—VCN, subnet, free‑tier VM, and Object Storage state bucket</td></tr><tr><td><strong>setup-docker.yml</strong></td><td>Runs the <strong>common</strong> Ansible role to update packages, install <code>docker</code>, enable firewalld, and open ports 80/443</td></tr><tr><td><strong>deploy-jobwinner.yml</strong></td><td>Runs the <strong>deploy‑jobwinner</strong> role to refresh DuckDNS, start Traefik, wait for it, and launch the app stack</td></tr></tbody></table>
+<h3 id="workflow-1-provision-with-terraform">Workflow 1: Provision with Terraform</h3>
+<p>Triggered on every push or PR to main, this workflow initializes Terraform, runs plan on PRs, and apply on merges.
+It handles OCI creds from secrets and writes the backend config for remote state.</p>
+<h3 id="workflow-2-make-the-vm-docker-ready">Workflow 2: Make the VM Docker-Ready</h3>
+<p>Manually triggered once the VM is up. It SSHes into the instance and runs the common Ansible role:</p>
+<ul>
+<li>Updates packages</li>
+<li>Installs Docker</li>
+<li>Enables firewalld and opens ports 80/443</li>
+</ul>
+<p>This takes only couple minutes and gets the system production-ready.</p>
+<h3 id="workflow-3-deploy-job-winner">Workflow 3: Deploy Job Winner</h3>
+<p>Also manually triggered, this one runs the deploy-jobwinner Ansible role:</p>
+<ul>
+<li>Updates DuckDNS with the current public IP</li>
+<li>Templates and boots Traefik</li>
+<li>Waits for Traefik to come online</li>
+<li>Starts the Job Winner frontend and backend using Docker Compose</li>
+</ul>
+<h3 id="why-this-split">Why This Split?</h3>
+<p>Keeping infra, setup, and deploy separate gives me:</p>
+<p>🔄 Faster app iteration</p>
+<p>🛡️ Safer infra changes</p>
+<p>📋 Cleaner logs and simpler debugging</p>
+<p>Push code for infra, run two workflows for software, and your HTTPS app is live—no hand-holding needed.</p>
+<h2 id="cost-breakdown">Cost Breakdown</h2>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Component</th><th>Monthly Cost</th></tr></thead><tbody><tr><td>OCI VM (Free Tier)</td><td>$0</td></tr><tr><td>Object Storage ≤ 20 GB</td><td>$0</td></tr><tr><td>DuckDNS Domain</td><td>$0</td></tr><tr><td>Let’s Encrypt Certs</td><td>$0</td></tr><tr><td><em>Total</em></td><td><strong>$0.00</strong></td></tr></tbody></table>
+<h2 id="lessons-learned--final-thoughts">Lessons Learned &#x26; Final Thoughts</h2>
+<ul>
+<li>Avoid using cloud-init for multi-step app bootstrapping—debugging is painful.</li>
+<li>Ansible + templates + modular playbooks = power and clarity.</li>
+<li>Keep each component loosely coupled.</li>
+<li>Use retries and until in Ansible to ensure readiness (e.g., waiting for Traefik).</li>
+<li>Remote Terraform state on OCI Free Tier is fully achievable and highly recommended.</li>
+<li>Integrating GitHub Actions for CI/CD transforms deployment speed and reliability.</li>
+<li>Even free-tier cloud resources are enough for a clean, HTTPS-protected, full-stack app, deployed in minutes.</li>
+</ul>
+<h2 id="conclusion">Conclusion</h2>
+<p>With a strategic mix of Terraform, Ansible, Docker Compose, and GitHub Actions, it’s possible to reach <strong>enterprise‑grade DevOps</strong> on a <strong>coffee‑budget</strong>.</p> </div> <nav class="blog-post-navigation">  <a href="/devops-odyssey/oci-k3s-ansible" class="blog-post-nav-link next"> <div class="blog-post-nav-label">Next Post</div> <div class="blog-post-nav-title">The DevOps Odyssey Continues: Evolving from Docker to K3s with Ansible</div> </a> </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Posts</h2> <div class="related-posts-grid"> <a href="/devops-odyssey/oci-k3s-monitoring" class="blog-card card-link"> <img src="/assets/devops-odyssey/oci-k3s-monitoring/banner.webp" alt="The DevOps Odyssey, Part 7: Observability on a Budget — Grafana, Loki, and Prometheus on OCI Free Tier" class="blog-card-image"> <h3 class="blog-card-title">The DevOps Odyssey, Part 7: Observability on a Budget — Grafana, Loki, and Prometheus on OCI Free Tier</h3> <p class="blog-card-description"> Observability on a Budget </p> </a><a href="/devops-odyssey/oci-k3s-auto-tagging" class="blog-card card-link"> <img src="/assets/devops-odyssey/oci-k3s-auto-tagging/banner.jpg" alt="The DevOps Odyssey, Part 6 — Closing the Loop with GitHub Auto-Tagging" class="blog-card-image"> <h3 class="blog-card-title">The DevOps Odyssey, Part 6 — Closing the Loop with GitHub Auto-Tagging</h3> <p class="blog-card-description"> Closing the Loop with Auto-Tagging </p> </a><a href="/devops-odyssey/oci-k3s-jobwinner-photoapp" class="blog-card card-link"> <img src="/assets/devops-odyssey/oci-k3s-jobwinner-photoapp/banner.png" alt="The DevOps Odyssey, Part 5: Migration of Job Winner and Release of the Photo App" class="blog-card-image"> <h3 class="blog-card-title">The DevOps Odyssey, Part 5: Migration of Job Winner and Release of the Photo App</h3> <p class="blog-card-description"> Migration and Photo App Release </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container"> <p class="footer-text">© 2025 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer> </body></html>

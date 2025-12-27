@@ -1,0 +1,130 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="How I built a personal AI stack on my MacBook Pro M4 using Ollama, Open WebUI, and Draw Things—running entirely locally with zero privacy leaks and unlimited usage, while keeping enterprise cloud tools for work."><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v4.16.19"><title>The &quot;Hybrid&quot; AI Stack: Enterprise Power at Work, Localhost Freedom at Home - Janus</title><link rel="stylesheet" href="/_astro/about.BqpiiRvk.css"><script type="module" src="/_astro/hoisted.DmkqG5EQ.js"></script></head> <body class="min-h-screen flex flex-col"> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul> <div class="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false}"></div>  </div> </div> </nav> </header>  <main class="flex-1">  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">The &quot;Hybrid&quot; AI Stack: Enterprise Power at Work, Localhost Freedom at Home</h1> <div class="blog-post-meta"> <time>November 25, 2025</time> <span class="blog-post-meta-separator">•</span> <span>5 min read</span> </div> <div class="blog-post-tags"> <span class="blog-post-tag">ai</span><span class="blog-post-tag">ollama</span><span class="blog-post-tag">local-ai</span><span class="blog-post-tag">devops</span><span class="blog-post-tag">self-hosted</span><span class="blog-post-tag">privacy</span> </div> </header> <div class="blog-post-content prose"> <h1 id="the-hybrid-ai-stack-enterprise-power-at-work-localhost-freedom-at-home">The “Hybrid” AI Stack: Enterprise Power at Work, Localhost Freedom at Home 🌗</h1>
+<h5 id="originally-posted-at-linkedin-at-november-26-2025">originally posted at <a href="https://www.linkedin.com/pulse/hybrid-ai-stack-enterprise-power-work-localhost-freedom-janus-chung-pdmfc">LinkedIn</a> at November 26, 2025</h5>
+<h2 id="why-i-stopped-using-free-cloud-tiers-and-moved-my-personal-ai-stack-to-the-m4-pro">Why I stopped using free cloud tiers and moved my personal AI stack to the M4 Pro</h2>
+<p>As a DevOps engineer, I live in two worlds.</p>
+<p>During the workday, I rely on my company-provided subscription to Cursor. It’s incredible—context-aware, deeply integrated into our enterprise codebase, and fast. When I’m collaborating with a team on a massive repo, I need that <strong>Cloud Context</strong>. It indexes thousands of files and understands our specific enterprise architecture. It is worth every penny my company pays.</p>
+<p><img src="/assets/blog/local-ai/banner.png" alt="Care Bears Unlock Unlimited Possibilities With the Power of Self-hosted AI"></p>
+<p>But for my personal projects, experiments, and technical blogging, I wanted something different.</p>
+<p>I was tired of the <em>freemium</em> trap of online AI tools:</p>
+<ul>
+<li>“You have 2 credits remaining today.”</li>
+<li>“Upgrade to Pro to upload large PDFs.”</li>
+<li>“Your data may be used to train our models.”</li>
+</ul>
+<p>So, I built a secondary <strong>Personal AI Stack</strong> on my MacBook Pro M4 (24GB). It costs $0, has zero privacy leaks, and runs entirely on my own metal.</p>
+<p>Here is exactly how I separate the two worlds—and why the local stack beats the “free tier” cloud every time.</p>
+<hr>
+<h2 id="1-the-engine-ollama">1. The Engine: Ollama 🦙</h2>
+<p><strong>The Problem:</strong> Running raw models locally used to require Python hell.</p>
+<p><strong>The Fix:</strong> I use <a href="https://ollama.com/">Ollama</a> to turn my Mac into a private inference server.</p>
+<p>My “weekend” command:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">ollama</span><span style="color:#9ECBFF"> run</span><span style="color:#9ECBFF"> qwen2.5-coder:14b</span></span>
+<span class="line"></span></code></pre>
+<p><strong>Benefit:</strong> I can hammer the API with 500 requests an hour while debugging a script, and it costs me nothing. No rate limits. No “Plus” subscription required.</p>
+<hr>
+<h2 id="2-the-interface-open-webui-️">2. The Interface: Open WebUI 🖥️</h2>
+<p><strong>The Problem:</strong> Most local AI tools are just a command line. I missed the “ChatGPT” experience (history, formatting, file uploads).</p>
+<p><strong>The Fix:</strong> I run <a href="https://github.com/open-webui/open-webui">Open WebUI</a> (via Docker). It is effectively a clone of ChatGPT Enterprise, but I own the server.</p>
+<p>It unlocks three “Pro” features that usually cost $20/month in the cloud:</p>
+<ul>
+<li><strong>Local RAG (Retrieval):</strong> I can drop a 50-page PDF of my bank statement or health records into the chat. The model analyzes it locally without the file ever leaving my LAN.</li>
+<li><strong>Web Search:</strong> By toggling “Web Search” on, my local models can browse the internet (via DuckDuckGo or Google) to get real-time data, fixing the “knowledge cutoff” problem of offline models.</li>
+<li><strong>Data Privacy:</strong> My chat history is stored in a Docker volume on my Mac, not on OpenAI’s servers.</li>
+</ul>
+<hr>
+<h2 id="3-the-studio-draw-things--the-real-game-changer">3. The Studio: Draw Things 🎨 (The Real Game Changer)</h2>
+<p>This is where the difference between “Cloud Free” and “Local Power” is most obvious.</p>
+<p>For my blog headers and UI mockups, I use <strong>Draw Things</strong>, an optimized iOS/macOS app that runs Flux.1 models locally.</p>
+<h3 id="why-local-crushes-the-free-online-generators">Why “Local” crushes the “Free Online” generators</h3>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Feature</th><th>Typical Free Online Generator (DeepAI, etc.)</th><th>Draw Things on M4 Pro</th></tr></thead><tbody><tr><td><strong>Daily Limit</strong></td><td>~5–10 images/day (then you pay)</td><td>Infinite. Run it 24/7 if you want.</td></tr><tr><td><strong>Resolution</strong></td><td>Low (512px). HD requires subscription.</td><td>Unlimited. Generate 4K images (limited only by RAM).</td></tr><tr><td><strong>Privacy</strong></td><td>Public. Your prompts are often visible to the community.</td><td>Private. Offline. Zero data leaves your Mac.</td></tr><tr><td><strong>Speed</strong></td><td>Queue times. “Waiting for server…”</td><td>~15 s per image (Flux Schnell).</td></tr><tr><td><strong>Censorship</strong></td><td>Strict. “Prompt blocked due to safety filters.”</td><td>None. You control the model.</td></tr></tbody></table>
+<hr>
+<h2 id="the-hardware-reality-check-24gb-ram">The “Hardware Reality” Check (24GB RAM) 📊</h2>
+<p>Since my personal machine has 24GB of RAM, I have to be strategic. I can’t run the 405B models I use at work. Here is my “Personal Lab” tier list to maximize performance without crashing the system:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Model</th><th>Use Case</th><th>RAM Usage (Est.)</th><th>Speed on M4 Pro</th><th>Verdict</th></tr></thead><tbody><tr><td><strong>Qwen 2.5 Coder (14B)</strong></td><td>Coding / Scripting</td><td>~9 GB</td><td>Blazing Fast ⚡</td><td>The perfect balance. Smart enough for React/Java side projects, small enough to run alongside Docker.</td></tr><tr><td><strong>Llama 3.1 (8B)</strong></td><td>Drafting / Email</td><td>~5 GB</td><td>Instant 🚀</td><td>My go-to for drafting LinkedIn posts or brainstorming ideas quickly.</td></tr><tr><td><strong>Qwen 3 Coder (30B)</strong></td><td>Complex Architecture</td><td>~19 GB</td><td>Heavy 🐢</td><td>The “Danger Zone.” It fits, but I have to close Chrome tabs. I only use this for deeply complex problems.</td></tr><tr><td><strong>Flux.1 Schnell (8-bit)</strong></td><td>Mockups / Images</td><td>~12 GB</td><td>~15 sec/img</td><td>Fast and efficient. I use this for 90% of my blog assets.</td></tr><tr><td><strong>Flux.1 Dev (4-bit)</strong></td><td>Photorealism</td><td>~16 GB</td><td>~45 sec/img</td><td>Slower, but produces “Midjourney-level” skin texture and lighting.</td></tr></tbody></table>
+<hr>
+<h2 id="the-verdict">The Verdict</h2>
+<p>I don’t see local AI as a replacement for my professional enterprise tools; I see it as the ultimate <strong>Developer Sandbox</strong>.</p>
+<p>At work, I want the power of the cloud. At home, I want the privacy, freedom, and unlimited tokens of localhost.</p>
+<p>Does anyone else run a “Hybrid Stack”? What models are you running on your Mac?</p> </div> <nav class="blog-post-navigation"> <a href="/blog/remote-secret-tunnel" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">Developing and Testing K3s Apps Locally</div> </a> <a href="/blog/build-promote" class="blog-post-nav-link next"> <div class="blog-post-nav-label">Next Post</div> <div class="blog-post-nav-title">Build Once. Promote Forward. Ship Daily.</div> </a> </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Posts</h2> <div class="related-posts-grid"> <a href="/blog/build-promote" class="blog-card card-link"> <img src="/assets/blog/build-promote/banner.jpg" alt="Build Once. Promote Forward. Ship Daily." class="blog-card-image"> <h3 class="blog-card-title">Build Once. Promote Forward. Ship Daily.</h3> <p class="blog-card-description"> How we eliminated rebuild-per-environment pipelines and went from shipping every two weeks to shipping daily. A real-world story of building once, validating once, and promoting the same artifact through environments. </p> </a><a href="/blog/remote-secret-tunnel" class="blog-card card-link"> <img src="/assets/blog/remote-secret-tunnel/banner.jpg" alt="Developing and Testing K3s Apps Locally" class="blog-card-image"> <h3 class="blog-card-title">Developing and Testing K3s Apps Locally</h3> <p class="blog-card-description"> When building Kubernetes-aware tools — whether a CLI, dashboard, or internal Python service — you often need your local environment to talk directly to the cluster API. </p> </a><a href="/blog/migration-1password" class="blog-card card-link"> <img src="/assets/blog/migration-1password/banner.png" alt="Migrating From dotenv.org to 1Password in Kubernetes Deployment" class="blog-card-image"> <h3 class="blog-card-title">Migrating From dotenv.org to 1Password in Kubernetes Deployment</h3> <p class="blog-card-description"> dotenv.org recently increased its pricing, and at the same time our organization was already consolidating secrets into **1Password** for engineering, operations, and automation workflows. Maintaining </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container"> <p class="footer-text">© 2025 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer> </body></html>

@@ -1,0 +1,163 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="If you've struggled with Nginx reverse proxy configs, certbot timers, and `nginx -s reload`, it's time to meet Traefik — a modern reverse proxy built for dynamic containerized environments."><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v4.16.19"><title>Goodbye Nginx, Hello Traefik! Effortless HTTPS with Let&#39;s Encrypt and Docker - Janus</title><link rel="stylesheet" href="/_astro/about.BqpiiRvk.css"><script type="module" src="/_astro/hoisted.DmkqG5EQ.js"></script></head> <body class="min-h-screen flex flex-col"> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul> <div class="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false}"></div>  </div> </div> </nav> </header>  <main class="flex-1">  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">Goodbye Nginx, Hello Traefik! Effortless HTTPS with Let&#39;s Encrypt and Docker</h1> <div class="blog-post-meta"> <time>June 11, 2025</time> <span class="blog-post-meta-separator">•</span> <span>3 min read</span> </div> <div class="blog-post-tags"> <span class="blog-post-tag">traefik</span><span class="blog-post-tag">ssl</span><span class="blog-post-tag">docker</span><span class="blog-post-tag">devops</span> </div> </header> <div class="blog-post-content prose"> <h1 id="goodbye-nginx-hello-traefik-effortless-https-with-lets-encrypt-and-docker">Goodbye Nginx, Hello Traefik! Effortless HTTPS with Let’s Encrypt and Docker</h1>
+<p>If you’ve struggled with Nginx reverse proxy configs, certbot timers, and <code>nginx -s reload</code>, it’s time to meet Traefik — a modern reverse proxy built for dynamic containerized environments.</p>
+<h2 id="why-traefik-over-nginx">Why Traefik over Nginx?</h2>
+<p>Unlike Nginx, which requires manual configuration updates and reloads, <strong>Traefik auto-discovers services via Docker labels</strong>, keeping your proxy config in sync with running containers. It also:</p>
+<ul>
+<li>Automatically obtains and renews <strong>Let’s Encrypt certificates</strong></li>
+<li>Handles <strong>HTTP/HTTPS routing</strong>, path-based rules, load balancing, and more</li>
+<li>Supports <strong>metrics, tracing</strong>, and even <strong>canary deployments</strong> with Traefik Enterprise</li>
+</ul>
+<p>For small setups or demos, it’s a powerful, drop-in Nginx replacement — with less boilerplate.</p>
+<p><img src="/assets/blog/traefik-vs-nginx/banner.jpg" alt="Traefik vs Nginx"></p>
+<!-- more -->
+<h2 id="old-way-nginx--certbot--pain">Old Way: Nginx + Certbot = Pain</h2>
+<p>Let’s say you want to proxy a backend running on port 8080 and a frontend on port 3000 — both behind HTTPS. With <strong>Nginx</strong>, you’d need something like:</p>
+<h3 id="nginx-config-static-and-fragile">Nginx Config (static and fragile)</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="nginx"><code><span class="line"><span style="color:#F97583">server</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  listen </span><span style="color:#79B8FF">80</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">  server_name </span><span style="color:#E1E4E8">example.com;</span></span>
+<span class="line"><span style="color:#F97583">  location</span><span style="color:#B392F0"> / </span><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#79B8FF"> 301</span><span style="color:#E1E4E8"> https://$host$request_uri;</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">server</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  listen </span><span style="color:#79B8FF">443</span><span style="color:#E1E4E8"> ssl;</span></span>
+<span class="line"><span style="color:#F97583">  server_name </span><span style="color:#E1E4E8">example.com;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">  ssl_certificate </span><span style="color:#E1E4E8">/etc/letsencrypt/live/example.com/fullchain.pem;</span></span>
+<span class="line"><span style="color:#F97583">  ssl_certificate_key </span><span style="color:#E1E4E8">/etc/letsencrypt/live/example.com/privkey.pem;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">  location</span><span style="color:#B392F0"> / </span><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#F97583">    proxy_pass </span><span style="color:#E1E4E8">http://frontend:3000;</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">  location</span><span style="color:#B392F0"> /graphql </span><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#F97583">    proxy_pass </span><span style="color:#E1E4E8">http://backend:8080;</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span></code></pre>
+<p>Then you need to:</p>
+<ul>
+<li>Install Certbot</li>
+<li>Run it to issue the cert (possibly with a temporary port 80 server)</li>
+<li>Configure a cronjob for renewals</li>
+<li>Manually reload Nginx on changes</li>
+<li>Map all cert and config files into your container (if containerized)</li>
+</ul>
+<p>It works — but it’s manual, brittle, and not fun to maintain in Docker-land.</p>
+<h2 id="the-new-way-traefik--docker-labels">The New Way: Traefik + Docker Labels</h2>
+<p>Let’s walk through setting up Traefik to:</p>
+<ul>
+<li>Automatically detect frontend and backend services</li>
+<li>Use Let’s Encrypt for HTTPS</li>
+<li>Route traffic using Docker labels</li>
+<li>Auto-renew certificates</li>
+</ul>
+<h3 id="folder-structure">Folder structure</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>project-root/</span></span>
+<span class="line"><span>├── docker-compose.yml</span></span>
+<span class="line"><span>├── traefik.yml</span></span>
+<span class="line"><span>└── acme.json</span></span>
+<span class="line"><span></span></span></code></pre>
+<h3 id="traefikyml"><code>traefik.yml</code></h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">log</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  level</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">INFO</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">accessLog</span><span style="color:#E1E4E8">: {}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">api</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  dashboard</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">false</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">entryPoints</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  web</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    address</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">":80"</span></span>
+<span class="line"><span style="color:#85E89D">    http</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      redirections</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">        entryPoint</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">          to</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">websecure</span></span>
+<span class="line"><span style="color:#85E89D">          scheme</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">https</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">  websecure</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    address</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">":443"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">certificatesResolvers</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  letsencrypt</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    acme</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      email</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">your-email@example.com</span></span>
+<span class="line"><span style="color:#85E89D">      storage</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">/acme.json</span></span>
+<span class="line"><span style="color:#85E89D">      httpChallenge</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">        entryPoint</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">web</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">providers</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  docker</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    exposedByDefault</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">false</span></span>
+<span class="line"></span></code></pre>
+<h3 id="docker-composeyml"><code>docker-compose.yml</code></h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">version</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"3.9"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">services</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  traefik</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    image</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">traefik:v2.11</span></span>
+<span class="line"><span style="color:#85E89D">    container_name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">traefik</span></span>
+<span class="line"><span style="color:#85E89D">    command</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">"--configFile=/traefik.yml"</span></span>
+<span class="line"><span style="color:#85E89D">    ports</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">"80:80"</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">"443:443"</span></span>
+<span class="line"><span style="color:#85E89D">    volumes</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">./traefik.yml:/traefik.yml:ro</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">./acme.json:/acme.json</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">/var/run/docker.sock:/var/run/docker.sock:ro</span></span>
+<span class="line"><span style="color:#85E89D">    networks</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">app_network</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">  frontend</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    image</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">your-frontend-image</span></span>
+<span class="line"><span style="color:#85E89D">    labels</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">"traefik.enable=true"</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">"traefik.http.routers.frontend.rule=Host(`example.com`)"</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">"traefik.http.routers.frontend.entrypoints=websecure"</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">"traefik.http.routers.frontend.tls.certresolver=letsencrypt"</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">"traefik.http.services.frontend.loadbalancer.server.port=80"</span></span>
+<span class="line"><span style="color:#85E89D">    networks</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">app_network</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">  backend</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    image</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">your-backend-image</span></span>
+<span class="line"><span style="color:#85E89D">    labels</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">"traefik.enable=true"</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">"traefik.http.routers.backend.rule=Host(`example.com`) &#x26;&#x26; PathPrefix(`/graphql`)"</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">"traefik.http.routers.backend.entrypoints=websecure"</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">"traefik.http.routers.backend.tls.certresolver=letsencrypt"</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">"traefik.http.services.backend.loadbalancer.server.port=8080"</span></span>
+<span class="line"><span style="color:#85E89D">    networks</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">app_network</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">networks</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  app_network</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    driver</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">bridge</span></span>
+<span class="line"></span></code></pre>
+<h3 id="setup-notes">Setup Notes</h3>
+<ul>
+<li>
+<p>Create <code>acme.json</code> file and set permissions:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">touch</span><span style="color:#9ECBFF"> acme.json</span></span>
+<span class="line"><span style="color:#B392F0">chmod</span><span style="color:#79B8FF"> 600</span><span style="color:#9ECBFF"> acme.json</span></span>
+<span class="line"></span></code></pre>
+</li>
+<li>
+<p>Replace <code>example.com</code> with your domain.</p>
+</li>
+<li>
+<p>Replace image names with your real images.</p>
+</li>
+</ul>
+<h2 id="result">Result</h2>
+<p>Traefik discovers containers via Docker labels.
+It fetches valid SSL certs from Let’s Encrypt automatically.
+You can view the status and routes on https://<your-domain>:8080.
+No more writing separate Nginx conf files or restarting on config changes.</your-domain></p>
+<h2 id="final-thoughts">Final Thoughts</h2>
+<p>Traefik makes it <em>dead simple</em> to get up and running with HTTPS in Docker. You get automatic discovery, dynamic config reloads, and zero-downtime cert renewal — with one clean configuration file.</p>
+<p>It’s time to say goodbye to nginx.conf and embrace a modern, container-native proxy.</p> </div> <nav class="blog-post-navigation"> <a href="/blog/static-site-module" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">Building a Reusable Terraform Static Site Module with CloudFront, S3, and Route 53</div> </a> <a href="/blog/tailscale" class="blog-post-nav-link next"> <div class="blog-post-nav-label">Next Post</div> <div class="blog-post-nav-title">Swapping VPN for Tailscale: A Five-Day Internal Infra Upgrade</div> </a> </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Posts</h2> <div class="related-posts-grid"> <a href="/blog/build-promote" class="blog-card card-link"> <img src="/assets/blog/build-promote/banner.jpg" alt="Build Once. Promote Forward. Ship Daily." class="blog-card-image"> <h3 class="blog-card-title">Build Once. Promote Forward. Ship Daily.</h3> <p class="blog-card-description"> How we eliminated rebuild-per-environment pipelines and went from shipping every two weeks to shipping daily. A real-world story of building once, validating once, and promoting the same artifact through environments. </p> </a><a href="/blog/local-ai" class="blog-card card-link"> <img src="/assets/blog/local-ai/banner.png" alt="The &#34;Hybrid&#34; AI Stack: Enterprise Power at Work, Localhost Freedom at Home" class="blog-card-image"> <h3 class="blog-card-title">The &quot;Hybrid&quot; AI Stack: Enterprise Power at Work, Localhost Freedom at Home</h3> <p class="blog-card-description"> How I built a personal AI stack on my MacBook Pro M4 using Ollama, Open WebUI, and Draw Things—running entirely locally with zero privacy leaks and unlimited usage, while keeping enterprise cloud tools for work. </p> </a><a href="/blog/remote-secret-tunnel" class="blog-card card-link"> <img src="/assets/blog/remote-secret-tunnel/banner.jpg" alt="Developing and Testing K3s Apps Locally" class="blog-card-image"> <h3 class="blog-card-title">Developing and Testing K3s Apps Locally</h3> <p class="blog-card-description"> When building Kubernetes-aware tools — whether a CLI, dashboard, or internal Python service — you often need your local environment to talk directly to the cluster API. </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container"> <p class="footer-text">© 2025 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer> </body></html>

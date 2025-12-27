@@ -1,0 +1,46 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="A Python tool to generate PDF worksheets for practicing Chinese and Japanese characters. Automatically creates grid-based worksheets with proper spacing and column widths."><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v4.16.19"><title>Asian Character Worksheet Generator - Janus</title><link rel="stylesheet" href="/_astro/about.BqpiiRvk.css"><script type="module" src="/_astro/hoisted.DmkqG5EQ.js"></script></head> <body class="min-h-screen flex flex-col"> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul> <div class="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false}"></div>  </div> </div> </nav> </header>  <main class="flex-1">  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">Asian Character Worksheet Generator</h1> <div class="blog-post-meta"> <span>2 min read</span>  <span class="blog-post-meta-separator">•</span> <a href="https://github.com/januschung/asian-character-worksheet-generator" target="_blank" rel="noopener noreferrer" class="blog-post-github-link">
+View on GitHub →
+</a>  </div> <div class="blog-post-tags"> <span class="blog-post-tag">python</span><span class="blog-post-tag">education</span> </div> </header> <div class="blog-post-content prose"> <p><img src="/assets/projects/asian-character-worksheet-generator/sample.png" alt="sample worksheet"></p>
+<h2 id="background">Background</h2>
+<p>As an immigrant and father of two boys living in America, I want my sons to learn my language so that they can have the chance to learn more about their culture origin. I want to share with them the novels that I have read; the music that I have listened to and the movies that I have watched. To make it happens, it is essential to teach them how to write in my language.</p>
+<p>At first I started making worksheet by using Google Doc. I had to create the layout manually (in grid format) and adjust the spacing. Then I had to type in character by character to each cell and readjust the spacing one by one. This project saves you time from the tedious manual effort of doing a copy and paste of a new worksheet. Also, this project automatically does all the work to adjust the column widths which is frankly not that enjoyable to do manually (Hey I want my beer time).</p>
+<p>That’s the reason for me to look into an automate way to get the job done.</p>
+<h2 id="benefits-of-grid-system">Benefits of Grid System</h2>
+<p>The grid system helps someone learning the language to write the characters in the proper size and orientation. The grid system gives a worksheet for the new learner to practice writing the characters.</p>
+<h2 id="requirements">Requirements</h2>
+<ol>
+<li><a href="https://www.python.org/downloads/">python3</a></li>
+<li><a href="https://pypi.org/project/fpdf/">fpdf</a></li>
+</ol>
+<h2 id="how-to-use">How to Use</h2>
+<ol>
+<li>Edit the file <code>text</code> with the list of characters of your choice (or use the sample). Note that you need to supply 14 characters on each line.</li>
+</ol>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#9ECBFF">一二三四五六七八九十百千左右</span></span>
+<span class="line"><span style="color:#9ECBFF">上大人孔乙己化三千七十士女小</span></span>
+<span class="line"><span style="color:#9ECBFF">生八九子佳作仁可知禮也你我他</span></span>
+<span class="line"><span style="color:#9ECBFF">父母兄弟上中下東南西北君親師</span></span>
+<span class="line"><span style="color:#9ECBFF">日月金木水火土天地海宇宙星宿</span></span>
+<span class="line"><span style="color:#9ECBFF">目耳鼻口眉手足舌皮心肌肝肺腸</span></span>
+<span class="line"><span style="color:#9ECBFF">あいうえおかきくけこアイウエ</span></span>
+<span class="line"></span></code></pre>
+<ol start="2">
+<li>Generate the worksheet in pdf format with the following command:</li>
+</ol>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="shell"><code><span class="line"><span style="color:#B392F0">python3</span><span style="color:#9ECBFF"> run.py</span></span>
+<span class="line"></span></code></pre>
+<ol start="3">
+<li>Print out the generated file <code>worksheet.pdf</code></li>
+</ol>
+<h2 id="language-supported">Language Supported</h2>
+<ol>
+<li>Chinese</li>
+<li>Japanese (Hiragana and Katagana)</li>
+<li>Korean</li>
+</ol>
+<h2 id="sample">Sample</h2>
+<p><a href="https://github.com/januschung/asian-character-worksheet-generator/blob/master/sample-worksheet.pdf">sample worksheet</a></p>
+<h2 id="special-thanks">Special Thanks</h2>
+<p>My lovely sons Tim and Hin. Also thanks TC Dan for giving valuable feedback to this README file.</p>
+<h2 id="github-link">Github link</h2>
+<p><a href="https://github.com/januschung/asian-character-worksheet-generator">Asian Character Worksheet Generator</a></p> </div> <nav class="blog-post-navigation"> <a href="/projects/math-worksheet-generator" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Project</div> <div class="blog-post-nav-title">Math Worksheet Generator</div> </a> <a href="/projects/asian-comprehension-worksheet-generator" class="blog-post-nav-link next"> <div class="blog-post-nav-label">Next Project</div> <div class="blog-post-nav-title">Asian Comprehension Worksheet Generator</div> </a> </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Projects</h2> <div class="related-posts-grid"> <a href="/projects/asian-comprehension-worksheet-generator" class="blog-card card-link"> <img src="/assets/projects/asian-comprehension-worksheet-generator/comprehension-ws.webp" alt="Asian Comprehension Worksheet Generator" class="blog-card-image"> <h3 class="blog-card-title">Asian Comprehension Worksheet Generator</h3> <p class="blog-card-description"> A Python tool to generate PDF worksheets for practicing Chinese and Japanese reading comprehension. Creates worksheets with empty columns for phonetic notes or writing practice. </p> </a><a href="/projects/math-worksheet-generator" class="blog-card card-link"> <img src="/assets/projects/math-worksheet-generator/math-ws.webp" alt="Math Worksheet Generator" class="blog-card-image"> <h3 class="blog-card-title">Math Worksheet Generator</h3> <p class="blog-card-description"> A Python tool to generate unlimited unique math worksheets in PDF format. Perfect for parents and teachers who want to give kids more practice without buying new materials. </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container"> <p class="footer-text">© 2025 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer> </body></html>

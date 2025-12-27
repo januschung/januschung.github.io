@@ -1,0 +1,96 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Infrastructure-as-code project that provisions Oracle Cloud Infrastructure (OCI) compute instances using Terraform and configures them with Ansible. Includes automated K3s Kubernetes cluster deployment with master and worker nodes."><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v4.16.19"><title>OCI Compute Provisioning with Terraform + Ansible - Janus</title><link rel="stylesheet" href="/_astro/about.BqpiiRvk.css"><script type="module" src="/_astro/hoisted.DmkqG5EQ.js"></script></head> <body class="min-h-screen flex flex-col"> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul> <div class="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false}"></div>  </div> </div> </nav> </header>  <main class="flex-1">  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">OCI Compute Provisioning with Terraform + Ansible</h1> <div class="blog-post-meta"> <span>3 min read</span>  <span class="blog-post-meta-separator">•</span> <a href="https://github.com/januschung/terraform-oci" target="_blank" rel="noopener noreferrer" class="blog-post-github-link">
+View on GitHub →
+</a>  </div> <div class="blog-post-tags"> <span class="blog-post-tag">terraform</span><span class="blog-post-tag">ansible</span><span class="blog-post-tag">kubernetes</span><span class="blog-post-tag">k3s</span><span class="blog-post-tag">oci</span><span class="blog-post-tag">infrastructure-as-code</span><span class="blog-post-tag">devops</span> </div> </header> <div class="blog-post-content prose"> <h1 id="oci-compute-provisioning-with-terraform--ansible-automation">OCI Compute Provisioning with Terraform + Ansible Automation</h1>
+<p>This project provisions Oracle Cloud Infrastructure (OCI) compute instances using Terraform, and configures them with Ansible. It provides a reproducible infrastructure-as-code setup for deploying and preparing lightweight OCI hosts, including K3s Kubernetes clusters.</p>
+<hr>
+<h2 id="what-this-project-does">What This Project Does</h2>
+<ul>
+<li><strong>Creates virtual machines (VMs) on OCI</strong></li>
+<li><strong>Provisions related OCI networking components</strong></li>
+<li><strong>Bootstraps instances using Ansible or cloud-init</strong></li>
+<li><strong>Deploys K3s Kubernetes clusters with master and worker nodes</strong></li>
+</ul>
+<hr>
+<h2 id="-project-structure">📁 Project Structure</h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>├── ansible</span></span>
+<span class="line"><span>│   ├── playbooks</span></span>
+<span class="line"><span>│   │   ├── deploy-jobwinner.yml</span></span>
+<span class="line"><span>│   │   ├── setup-docker.yml</span></span>
+<span class="line"><span>│   │   └── setup-k3s.yml</span></span>
+<span class="line"><span>│   └── roles</span></span>
+<span class="line"><span>│       ├── common</span></span>
+<span class="line"><span>│       ├── deploy-jobwinner</span></span>
+<span class="line"><span>│       ├── docker</span></span>
+<span class="line"><span>│       └── k3s</span></span>
+<span class="line"><span>├── modules</span></span>
+<span class="line"><span>│   ├── k3s-worker</span></span>
+<span class="line"><span>│   │   ├── cloud-init.sh.tftpl</span></span>
+<span class="line"><span>│   │   ├── main.tf</span></span>
+<span class="line"><span>│   │   ├── output.tf</span></span>
+<span class="line"><span>│   │   ├── README.md</span></span>
+<span class="line"><span>│   │   └── variables.tf</span></span>
+<span class="line"><span>│   ├── lb</span></span>
+<span class="line"><span>│   └── web-server</span></span>
+<span class="line"><span>│       ├── cloud-init.sh.tftpl</span></span>
+<span class="line"><span>│       ├── main.tf</span></span>
+<span class="line"><span>│       ├── output.tf</span></span>
+<span class="line"><span>│       ├── README.md</span></span>
+<span class="line"><span>│       └── variables.tf</span></span>
+<span class="line"><span>├── k3s-master.tf</span></span>
+<span class="line"><span>├── k3s-workers.tf</span></span>
+<span class="line"><span>├── lb-for-k3s.tf</span></span>
+<span class="line"><span>├── job-winner.tf</span></span>
+<span class="line"><span>└── README.md</span></span>
+<span class="line"><span></span></span></code></pre>
+<h2 id="prerequisites">Prerequisites</h2>
+<ul>
+<li><a href="https://www.terraform.io/downloads.html">Terraform</a> >= 1.5.0</li>
+<li><a href="https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html">Ansible</a> (for master node setup)</li>
+<li>OCI storage bucket to store terraform state</li>
+</ul>
+<hr>
+<h2 id="how-to-use">How to Use</h2>
+<h3 id="1-provision-oci-compute-with-terraform">1. Provision OCI Compute with Terraform</h3>
+<p>From the project root:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">terraform</span><span style="color:#9ECBFF"> init</span></span>
+<span class="line"><span style="color:#B392F0">terraform</span><span style="color:#9ECBFF"> apply</span></span>
+<span class="line"></span></code></pre>
+<h3 id="2-configure-the-host">2. Configure the Host</h3>
+<ul>
+<li><a href="./docker.md">Set up Docker with Ansible</a></li>
+<li><a href="./k3s.md">Set up K3s master node with Ansible</a></li>
+<li>Deploy K3s worker nodes automatically with cloud-init</li>
+</ul>
+<hr>
+<h2 id="current-capabilities">Current Capabilities</h2>
+<ul>
+<li>Terraform module to create OCI compute with public IP</li>
+<li>Automatically configure firewall and SSH access</li>
+<li>Ansible workflow to install Docker and dependencies</li>
+<li>Ansible workflow to install K3s and configure a Kubernetes master node</li>
+<li>Automated K3s worker node deployment using cloud-init</li>
+<li>Dedicated K3s worker module</li>
+<li>Automatic cluster joining without manual intervention</li>
+<li>Cleanly organized roles for reusability</li>
+</ul>
+<h2 id="k3s-cluster-setup">K3s Cluster Setup</h2>
+<h3 id="master-node">Master Node</h3>
+<ul>
+<li>Deployed using <code>k3s-master.tf</code></li>
+<li>Configured with Ansible for full K3s server setup</li>
+<li>Public IP for external access and management</li>
+</ul>
+<h3 id="worker-nodes">Worker Nodes</h3>
+<ul>
+<li>Deployed using <code>k3s-workers.tf</code></li>
+<li>Use cloud-init for automated setup (no Ansible required)</li>
+<li>No public IPs for enhanced security</li>
+<li>Automatically join the cluster by retrieving node token from master</li>
+<li>Shared network infrastructure with master node</li>
+</ul>
+<h3 id="load-balancer">Load Balancer</h3>
+<ul>
+<li>Optional load balancer configuration in <code>lb-for-k3s.tf</code></li>
+<li>Routes traffic to worker nodes for high availability</li>
+</ul>
+<p>This setup is ideal for spinning up quick dev/test environments or bootstrap nodes with Docker or Kubernetes, and is easily extendable to other configurations. The K3s workers provide a scalable, secure Kubernetes cluster suitable for production workloads.</p> </div> <nav class="blog-post-navigation">  <a href="/projects/argocd-bootstrap" class="blog-post-nav-link next"> <div class="blog-post-nav-label">Next Project</div> <div class="blog-post-nav-title">Argo CD Bootstrap for K3s Cluster</div> </a> </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Projects</h2> <div class="related-posts-grid"> <a href="/projects/argocd-bootstrap" class="blog-card card-link"> <img src="/assets/projects/argocd-bootstrap/argo-bootstrap.webp" alt="Argo CD Bootstrap for K3s Cluster" class="blog-card-image"> <h3 class="blog-card-title">Argo CD Bootstrap for K3s Cluster</h3> <p class="blog-card-description"> GitOps-based deployment bootstrap for K3s clusters using Argo CD. Includes Ansible playbooks for installation, GitOps folder structure for declarative cluster management, and initial setup of core infrastructure apps like NGINX Ingress Controller and Sealed Secrets. </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container"> <p class="footer-text">© 2025 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer> </body></html>

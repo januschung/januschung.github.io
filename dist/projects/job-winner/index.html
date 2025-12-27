@@ -1,0 +1,93 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="A free, open-source job application tracker built with Java Spring Boot and React. Keep track of all your job applications, interviews, and offers in one place—totally free with no hidden fees."><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v4.16.19"><title>Job Winner - Janus</title><link rel="stylesheet" href="/_astro/about.BqpiiRvk.css"><script type="module" src="/_astro/hoisted.DmkqG5EQ.js"></script></head> <body class="min-h-screen flex flex-col"> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul> <div class="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false}"></div>  </div> </div> </nav> </header>  <main class="flex-1">  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">Job Winner</h1> <div class="blog-post-meta"> <span>3 min read</span>  <span class="blog-post-meta-separator">•</span> <a href="https://github.com/januschung/job-winner" target="_blank" rel="noopener noreferrer" class="blog-post-github-link">
+View on GitHub →
+</a>  </div> <div class="blog-post-tags"> <span class="blog-post-tag">java</span><span class="blog-post-tag">spring-boot</span><span class="blog-post-tag">react</span><span class="blog-post-tag">graphql</span><span class="blog-post-tag">postgres</span> </div> </header> <div class="blog-post-content prose"> <h2 id="live-demo">Live Demo</h2>
+<p>🚀 Check out the live demo! 👉 <a href="https://jobwinner.duckdns.org">https://jobwinner.duckdns.org</a></p>
+<p>✨ The data refreshes automatically every hour, so feel free to explore and test out any feature!</p>
+<p>Let me know if you’d like any further tweaks by submitting an issue!</p>
+<h2 id="background">Background</h2>
+<p>I lost my job right before the holiday season in 2022. I need to look for a new job and apply for as many as I can while all the big techs are laying off talents.</p>
+<p>To keep track of job applications:</p>
+<ol>
+<li>Use Google Spreadsheet (I was using it before this project). It is ugly, hard to maintain and easy to mess up the layout.</li>
+<li>Use online tool like huntr.co. But it can only track 40 jobs and I don’t want to spend a dime for the premium service.</li>
+<li>Use pen and paper. It works but I can’t copy and paste information such as link job link and utilize it later.</li>
+</ol>
+<p>None of the about is fun or totally fit my use case.</p>
+<p>That’s the reason for me to build something for myself, and potentially you, to get the job done (and to get a new job successfully!)</p>
+<h2 id="benefit-of-job-winner">Benefit of Job Winner</h2>
+<p>Job Winner helps you keep track of all your job applications in one place—totally free! No hidden fees, and you won’t have to worry about your personal data being sold.</p>
+<p>One of the handy features is the Profile Page. This is where you can store all the personal information that job applications often ask for (like your LinkedIn URL). Plus, it has a super handy feature that lets you copy any field to your clipboard with just a click.</p>
+<h2 id="features">Features</h2>
+<p>Key Functions:</p>
+<ol>
+<li>
+<p><strong>Index Page:</strong></p>
+<p>View a list of all your job applications in one place, with easy access to each application’s details and status.
+<img src="/assets/projects/job-winner/index.png" alt="index"></p>
+</li>
+<li>
+<p><strong>Create New Job Application:</strong></p>
+<p>Easily add new job applications to your list with a user-friendly form.
+<img src="/assets/projects/job-winner/add.png" alt="new"></p>
+</li>
+<li>
+<p><strong>Delete Job Application:</strong></p>
+<p>Remove any applications you no longer need with a simple delete option.</p>
+</li>
+<li>
+<p><strong>Edit Job Application:</strong></p>
+<p>Make updates to your existing job applications as the status of your applications change or new information becomes available.
+<img src="/assets/projects/job-winner/edit.png" alt="edit"></p>
+<ul>
+<li>
+<p><strong>Manage Interview:</strong></p>
+<p>Keep track of your interviews with the ability to add and manage interview details.
+<img src="/assets/projects/job-winner/interview.png" alt="edit"></p>
+</li>
+<li>
+<p><strong>Manage Offer:</strong></p>
+<p>Track any job offers you’ve received, including details about the salary and offer date.
+<img src="/assets/projects/job-winner/offer.png" alt="edit"></p>
+</li>
+</ul>
+</li>
+<li>
+<p><strong>Profile Page:</strong></p>
+<p>Store and manage all your personal information in one spot
+<img src="/assets/projects/job-winner/profile.png" alt="profile"></p>
+</li>
+<li>
+<p><strong>Interview List:</strong></p>
+<p>Keep track of all your interviews in one place, with easy-to-view details and statuses plus sortable headers.
+<img src="/assets/projects/job-winner/interview-list.png" alt="profile"></p>
+</li>
+<li>
+<p><strong>Offer List:</strong></p>
+<p>Track all job offers you’ve received with sortable headers.
+<img src="/assets/projects/job-winner/offer-list.png" alt="profile"></p>
+</li>
+<li>
+<p><strong>Search and Filter:</strong></p>
+<p>Quickly search for specific job applications based on keywords to help you stay organized. Whether it’s the company name, job title, or description, finding the right job application is easy.</p>
+</li>
+<li>
+<p><strong>Interview and Offer Count:</strong></p>
+<p>Stay on top of your job search with an overview of how many interviews and offers you currently have, making it easier to manage multiple opportunities.</p>
+</li>
+</ol>
+<h2 id="stack">Stack</h2>
+<ol>
+<li>Java 17</li>
+<li>Spring Boot 3.4.5</li>
+<li>Spring Reactive</li>
+<li>GraphQL</li>
+<li>Postgres DB</li>
+<li>React</li>
+<li>Material UI</li>
+</ol>
+<h2 id="github-links">Github links</h2>
+<p>Job Winner has two components</p>
+<ol>
+<li><a href="https://github.com/januschung/job-winner">Backend</a></li>
+<li><a href="https://github.com/januschung/job-winner-ui">UI</a></li>
+</ol> </div> <nav class="blog-post-navigation"> <a href="/projects/asian-comprehension-worksheet-generator" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Project</div> <div class="blog-post-nav-title">Asian Comprehension Worksheet Generator</div> </a>  </nav>  </div> </article>  </main> <footer class="footer"> <div class="container"> <p class="footer-text">© 2025 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer> </body></html>

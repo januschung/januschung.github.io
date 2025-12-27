@@ -1,0 +1,141 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="After transitioning through two new jobs recently, I had the opportunity (and challenge) to set up fresh dev environments on both a Linux desktop and a MacBook. Here’s my comprehensive checklist and s"><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v4.16.19"><title>Bootstrapping My Linux Desktop and MacBook for Dev Work - Janus</title><link rel="stylesheet" href="/_astro/about.BqpiiRvk.css"><script type="module" src="/_astro/hoisted.DmkqG5EQ.js"></script></head> <body class="min-h-screen flex flex-col"> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul> <div class="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false}"></div>  </div> </div> </nav> </header>  <main class="flex-1">  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">Bootstrapping My Linux Desktop and MacBook for Dev Work</h1> <div class="blog-post-meta"> <time>May 14, 2025</time> <span class="blog-post-meta-separator">•</span> <span>3 min read</span> </div> <div class="blog-post-tags"> <span class="blog-post-tag">aws</span><span class="blog-post-tag">kubernetes</span><span class="blog-post-tag">devops</span> </div> </header> <div class="blog-post-content prose"> <h1 id="bootstrapping-my-linux-desktop-and-macbook-for-dev-work">Bootstrapping My Linux Desktop and MacBook for Dev Work</h1>
+<p>After transitioning through two new jobs recently, I had the opportunity (and challenge) to set up fresh dev environments on both a Linux desktop and a MacBook. Here’s my comprehensive checklist and setup notes, including tooling, config files, and references I found useful.</p>
+<p><img src="/assets/blog/computer-setup/banner.jpg" alt="Set up new computer for dev work"></p>
+<!-- more -->
+<h2 id="software-setup">Software Setup</h2>
+<h3 id="1-docker-desktop">1. Docker Desktop</h3>
+<ul>
+<li><strong>Mac</strong>:<br>
+<a href="https://docs.docker.com/desktop/install/mac/">Install Docker Desktop for Mac</a></li>
+<li><strong>Linux</strong>:
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">sudo</span><span style="color:#9ECBFF"> apt-get</span><span style="color:#9ECBFF"> update</span></span>
+<span class="line"><span style="color:#B392F0">sudo</span><span style="color:#9ECBFF"> apt-get</span><span style="color:#9ECBFF"> install</span><span style="color:#9ECBFF"> docker.io</span></span>
+<span class="line"><span style="color:#B392F0">sudo</span><span style="color:#9ECBFF"> systemctl</span><span style="color:#9ECBFF"> enable</span><span style="color:#79B8FF"> --now</span><span style="color:#9ECBFF"> docker</span></span>
+<span class="line"><span style="color:#B392F0">sudo</span><span style="color:#9ECBFF"> usermod</span><span style="color:#79B8FF"> -aG</span><span style="color:#9ECBFF"> docker</span><span style="color:#E1E4E8"> $USER</span></span>
+<span class="line"></span></code></pre>
+</li>
+</ul>
+<h3 id="2-visual-studio-code">2. Visual Studio Code</h3>
+<ul>
+<li><strong>Mac/Linux</strong>:<br>
+Download from <a href="https://code.visualstudio.com/">https://code.visualstudio.com/</a></li>
+</ul>
+<h3 id="3-intellij-idea">3. IntelliJ IDEA</h3>
+<ul>
+<li><strong>Mac/Linux</strong>:<br>
+Download from <a href="https://www.jetbrains.com/idea/download/">https://www.jetbrains.com/idea/download/</a><br>
+Or use <strong>JetBrains Toolbox</strong>.</li>
+</ul>
+<h3 id="4-slack">4. Slack</h3>
+<ul>
+<li><strong>Mac</strong>:<br>
+Download from <a href="https://slack.com/downloads/mac">https://slack.com/downloads/mac</a></li>
+<li><strong>Linux</strong>:
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">sudo</span><span style="color:#9ECBFF"> snap</span><span style="color:#9ECBFF"> install</span><span style="color:#9ECBFF"> slack</span><span style="color:#79B8FF"> --classic</span></span>
+<span class="line"></span></code></pre>
+</li>
+</ul>
+<h3 id="5-github-copilot">5. GitHub Copilot</h3>
+<ul>
+<li>Install the GitHub Copilot plugin in:
+<ul>
+<li><a href="https://marketplace.visualstudio.com/items?itemName=GitHub.copilot">VS Code</a></li>
+<li><a href="https://plugins.jetbrains.com/plugin/17718-github-copilot">IntelliJ</a></li>
+</ul>
+</li>
+</ul>
+<h3 id="6-homebrew-for-mac">6. Homebrew for Mac</h3>
+<p>Install only if you are using it for <code>terraform</code>, <code>npm</code>, or <code>jq</code>.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">/bin/bash</span><span style="color:#79B8FF"> -c</span><span style="color:#9ECBFF"> "$(</span><span style="color:#B392F0">curl</span><span style="color:#79B8FF"> -fsSL</span><span style="color:#9ECBFF"> https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"</span></span>
+<span class="line"></span></code></pre>
+<h3 id="7-kubectl">7. Kubectl</h3>
+<ul>
+<li><strong>Mac</strong>:
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">curl</span><span style="color:#79B8FF"> -LO</span><span style="color:#9ECBFF"> "https://dl.k8s.io/release/$(</span><span style="color:#B392F0">curl</span><span style="color:#79B8FF"> -s</span><span style="color:#9ECBFF"> https://dl.k8s.io/release/stable.txt)/bin/darwin/amd64/kubectl"</span></span>
+<span class="line"><span style="color:#B392F0">chmod</span><span style="color:#9ECBFF"> +x</span><span style="color:#9ECBFF"> kubectl</span></span>
+<span class="line"><span style="color:#B392F0">sudo</span><span style="color:#9ECBFF"> mv</span><span style="color:#9ECBFF"> kubectl</span><span style="color:#9ECBFF"> /usr/local/bin/</span></span>
+<span class="line"></span></code></pre>
+</li>
+<li><strong>Linux</strong>:
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">curl</span><span style="color:#79B8FF"> -LO</span><span style="color:#9ECBFF"> "https://dl.k8s.io/release/$(</span><span style="color:#B392F0">curl</span><span style="color:#79B8FF"> -s</span><span style="color:#9ECBFF"> https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"</span></span>
+<span class="line"><span style="color:#B392F0">chmod</span><span style="color:#9ECBFF"> +x</span><span style="color:#9ECBFF"> kubectl</span></span>
+<span class="line"><span style="color:#B392F0">sudo</span><span style="color:#9ECBFF"> mv</span><span style="color:#9ECBFF"> kubectl</span><span style="color:#9ECBFF"> /usr/local/bin/</span></span>
+<span class="line"></span></code></pre>
+</li>
+</ul>
+<h3 id="8-java-openjdk">8. Java (OpenJDK)</h3>
+<ul>
+<li><strong>Mac</strong>:<br>
+Download OpenJDK DMG from <a href="https://jdk.java.net/">https://jdk.java.net/</a></li>
+<li><strong>Linux</strong>:
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">sudo</span><span style="color:#9ECBFF"> apt</span><span style="color:#9ECBFF"> install</span><span style="color:#9ECBFF"> openjdk-17-jdk</span></span>
+<span class="line"></span></code></pre>
+</li>
+</ul>
+<h3 id="9-python">9. Python</h3>
+<ul>
+<li><strong>Mac</strong>:<br>
+Download official installer from <a href="https://www.python.org/downloads/mac-osx/">https://www.python.org/downloads/mac-osx/</a></li>
+<li><strong>Linux</strong>:
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">sudo</span><span style="color:#9ECBFF"> apt</span><span style="color:#9ECBFF"> install</span><span style="color:#9ECBFF"> python3</span><span style="color:#9ECBFF"> python3-pip</span></span>
+<span class="line"></span></code></pre>
+</li>
+</ul>
+<h3 id="10-terraform">10. Terraform</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">brew</span><span style="color:#9ECBFF"> tap</span><span style="color:#9ECBFF"> hashicorp/tap</span></span>
+<span class="line"><span style="color:#B392F0">brew</span><span style="color:#9ECBFF"> install</span><span style="color:#9ECBFF"> hashicorp/tap/terraform</span></span>
+<span class="line"></span></code></pre>
+<p><a href="https://developer.hashicorp.com/terraform/downloads">Terraform Install Guide</a></p>
+<h3 id="11-npm-via-nodejs">11. npm (via Node.js)</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">brew</span><span style="color:#9ECBFF"> install</span><span style="color:#9ECBFF"> node</span></span>
+<span class="line"></span></code></pre>
+<p><a href="https://nodejs.org/">Node.js Docs</a></p>
+<h3 id="12-jq">12. jq</h3>
+<ul>
+<li><strong>Mac</strong>:
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">brew</span><span style="color:#9ECBFF"> install</span><span style="color:#9ECBFF"> jq</span></span>
+<span class="line"></span></code></pre>
+</li>
+<li><strong>Linux</strong>:
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">sudo</span><span style="color:#9ECBFF"> apt</span><span style="color:#9ECBFF"> install</span><span style="color:#9ECBFF"> jq</span></span>
+<span class="line"></span></code></pre>
+</li>
+</ul>
+<hr>
+<h2 id="configuration-files">Configuration Files</h2>
+<h3 id="1-aws-config">1. AWS Config</h3>
+<h4 id="set-up-aws-cli">Set Up AWS CLI</h4>
+<p><strong>Mac</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">curl</span><span style="color:#9ECBFF"> "https://awscli.amazonaws.com/AWSCLIV2.pkg"</span><span style="color:#79B8FF"> -o</span><span style="color:#9ECBFF"> "AWSCLIV2.pkg"</span></span>
+<span class="line"><span style="color:#B392F0">sudo</span><span style="color:#9ECBFF"> installer</span><span style="color:#79B8FF"> -pkg</span><span style="color:#9ECBFF"> AWSCLIV2.pkg</span><span style="color:#79B8FF"> -target</span><span style="color:#9ECBFF"> /</span></span>
+<span class="line"></span></code></pre>
+<p><strong>Linux</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">curl</span><span style="color:#9ECBFF"> "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"</span><span style="color:#79B8FF"> -o</span><span style="color:#9ECBFF"> "awscliv2.zip"</span></span>
+<span class="line"><span style="color:#B392F0">unzip</span><span style="color:#9ECBFF"> awscliv2.zip</span></span>
+<span class="line"><span style="color:#B392F0">sudo</span><span style="color:#9ECBFF"> ./aws/install</span></span>
+<span class="line"></span></code></pre>
+<p><a href="https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html">Install Docs</a></p>
+<p>Set up AWS config and credential</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">aws</span><span style="color:#9ECBFF"> configure</span></span>
+<span class="line"></span></code></pre>
+<p>follow the prompt:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">AWS</span><span style="color:#9ECBFF"> Access</span><span style="color:#9ECBFF"> Key</span><span style="color:#9ECBFF"> ID</span><span style="color:#E1E4E8"> [None]: YOUR_ACCESS_KEY_ID</span></span>
+<span class="line"><span style="color:#B392F0">AWS</span><span style="color:#9ECBFF"> Secret</span><span style="color:#9ECBFF"> Access</span><span style="color:#9ECBFF"> Key</span><span style="color:#E1E4E8"> [None]: YOUR_SECRET_ACCESS_KEY</span></span>
+<span class="line"><span style="color:#B392F0">Default</span><span style="color:#9ECBFF"> region</span><span style="color:#9ECBFF"> name</span><span style="color:#E1E4E8"> [None]: us-east-1</span></span>
+<span class="line"><span style="color:#B392F0">Default</span><span style="color:#9ECBFF"> output</span><span style="color:#9ECBFF"> format</span><span style="color:#E1E4E8"> [None]: json</span></span>
+<span class="line"></span></code></pre>
+<h3 id="2-kubeconfig">2. Kubeconfig</h3>
+<p>Copy your kubeconfig to:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#F97583">~</span><span style="color:#E1E4E8">/.kube/config</span></span>
+<span class="line"></span></code></pre>
+<p>Or use:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#F97583">export</span><span style="color:#E1E4E8"> KUBECONFIG</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">/path/to/kubeconfig.yaml</span></span>
+<span class="line"></span></code></pre>
+<h3 id="3-github-ssh">3. GitHub SSH</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">ssh-keygen</span><span style="color:#79B8FF"> -t</span><span style="color:#9ECBFF"> ed25519</span><span style="color:#79B8FF"> -C</span><span style="color:#9ECBFF"> "you@example.com"</span></span>
+<span class="line"><span style="color:#79B8FF">eval</span><span style="color:#9ECBFF"> "$(</span><span style="color:#B392F0">ssh-agent</span><span style="color:#79B8FF"> -s</span><span style="color:#9ECBFF">)"</span></span>
+<span class="line"><span style="color:#B392F0">ssh-add</span><span style="color:#9ECBFF"> ~/.ssh/id_ed25519</span></span>
+<span class="line"></span></code></pre>
+<p>Then add the public key to your GitHub account:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">cat</span><span style="color:#9ECBFF"> ~/.ssh/id_ed25519.pub</span></span>
+<span class="line"></span></code></pre> </div> <nav class="blog-post-navigation"> <a href="/blog/oracle-server" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">Setting Up Docker, SSL, and DuckDNS on Oracle Server</div> </a> <a href="/blog/turbo-cache" class="blog-post-nav-link next"> <div class="blog-post-nav-label">Next Post</div> <div class="blog-post-nav-title">Setting Up Turborepo Remote Cache with S3 and GitHub Actions</div> </a> </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Posts</h2> <div class="related-posts-grid"> <a href="/blog/build-promote" class="blog-card card-link"> <img src="/assets/blog/build-promote/banner.jpg" alt="Build Once. Promote Forward. Ship Daily." class="blog-card-image"> <h3 class="blog-card-title">Build Once. Promote Forward. Ship Daily.</h3> <p class="blog-card-description"> How we eliminated rebuild-per-environment pipelines and went from shipping every two weeks to shipping daily. A real-world story of building once, validating once, and promoting the same artifact through environments. </p> </a><a href="/blog/local-ai" class="blog-card card-link"> <img src="/assets/blog/local-ai/banner.png" alt="The &#34;Hybrid&#34; AI Stack: Enterprise Power at Work, Localhost Freedom at Home" class="blog-card-image"> <h3 class="blog-card-title">The &quot;Hybrid&quot; AI Stack: Enterprise Power at Work, Localhost Freedom at Home</h3> <p class="blog-card-description"> How I built a personal AI stack on my MacBook Pro M4 using Ollama, Open WebUI, and Draw Things—running entirely locally with zero privacy leaks and unlimited usage, while keeping enterprise cloud tools for work. </p> </a><a href="/blog/remote-secret-tunnel" class="blog-card card-link"> <img src="/assets/blog/remote-secret-tunnel/banner.jpg" alt="Developing and Testing K3s Apps Locally" class="blog-card-image"> <h3 class="blog-card-title">Developing and Testing K3s Apps Locally</h3> <p class="blog-card-description"> When building Kubernetes-aware tools — whether a CLI, dashboard, or internal Python service — you often need your local environment to talk directly to the cluster API. </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container"> <p class="footer-text">© 2025 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer> </body></html>

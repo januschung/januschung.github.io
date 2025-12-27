@@ -1,0 +1,273 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="dotenv.org recently increased its pricing, and at the same time our organization was already consolidating secrets into **1Password** for engineering, operations, and automation workflows. Maintaining"><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v4.16.19"><title>Migrating From dotenv.org to 1Password in Kubernetes Deployment - Janus</title><link rel="stylesheet" href="/_astro/about.BqpiiRvk.css"><script type="module" src="/_astro/hoisted.DmkqG5EQ.js"></script></head> <body class="min-h-screen flex flex-col"> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul> <div class="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false}"></div>  </div> </div> </nav> </header>  <main class="flex-1">  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">Migrating From dotenv.org to 1Password in Kubernetes Deployment</h1> <div class="blog-post-meta"> <time>November 18, 2025</time> <span class="blog-post-meta-separator">•</span> <span>6 min read</span> </div> <div class="blog-post-tags"> <span class="blog-post-tag">devops</span><span class="blog-post-tag">oci</span><span class="blog-post-tag">kubernetes</span><span class="blog-post-tag">1password</span><span class="blog-post-tag">gitops</span><span class="blog-post-tag">github</span><span class="blog-post-tag">infra</span> </div> </header> <div class="blog-post-content prose"> <h1 id="migrating-from-dotenvorg-to-1password-in-kubernetes-deployment">Migrating From dotenv.org to 1Password in Kubernetes Deployment</h1>
+<h5 id="originally-posted-at-linkedin-at-november-19-2025">originally posted at <a href="https://www.linkedin.com/pulse/migrating-from-dotenvorg-1password-kubernetes-deployment-janus-chung-fvfjc">LinkedIn</a> at November 19, 2025</h5>
+<p>dotenv.org recently increased its pricing, and at the same time our organization was already consolidating secrets into <strong>1Password</strong> for engineering, operations, and automation workflows. Maintaining a parallel <code>.env.vault</code> system became unnecessary and costly — both financially and operationally.</p>
+<p><img src="/assets/blog/migration-1password/banner.png" alt="Transferring all the treasures to the new vault"></p>
+<!-- more -->
+<p>This document describes the new approach we adopted:</p>
+<ul>
+<li>No <code>.env.vault</code> files</li>
+<li>No Kubernetes Secrets or ConfigMaps</li>
+<li>No Argo CD Vault Plugin</li>
+<li>No manifest edits for configuration changes</li>
+<li>All config <strong>keys</strong> committed to Git (transparent)</li>
+<li>All config <strong>values</strong> stored in 1Password (secure)</li>
+<li>Secrets resolved at pod startup via <code>op inject</code></li>
+</ul>
+<h2 id="what-envvault-looked-likeand-why-we-outgrew-it">What <code>.env.vault</code> Looked Like—and Why We Outgrew It</h2>
+<p>dotenv-vault’s model is clever: commit a single encrypted .env.vault file to your repo, decrypt it at runtime, and ship the result as environment variables. A typical file looks like:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#6A737D">#/-.env.vault/</span></span>
+<span class="line"><span style="color:#6A737D">#/         cloud-agnostic vaulting standard         /</span></span>
+<span class="line"><span style="color:#6A737D">#/   [how it works](https://dotenv.org/env-vault)   /</span></span>
+<span class="line"><span style="color:#6A737D">#/--/</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># staging</span></span>
+<span class="line"><span style="color:#9ECBFF">DOTENV_VAULT_STAGING="encrypted-staging-data"</span></span>
+<span class="line"><span style="color:#9ECBFF">DOTENV_VAULT_STAGING_VERSION=25</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># production</span></span>
+<span class="line"><span style="color:#9ECBFF">DOTENV_VAULT_PRODUCTION="encrypted-prod-data"</span></span>
+<span class="line"><span style="color:#9ECBFF">DOTENV_VAULT_PRODUCTION_VERSION=29</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># qa</span></span>
+<span class="line"><span style="color:#9ECBFF">DOTENV_VAULT_QA="encrypted-qa-data"</span></span>
+<span class="line"><span style="color:#9ECBFF">DOTENV_VAULT_QA_VERSION=27</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">#/-settings/metadata--/</span></span>
+<span class="line"><span style="color:#9ECBFF">DOTENV_VAULT="vlt_xxxxxxxx"</span></span>
+<span class="line"><span style="color:#9ECBFF">DOTENV_API_URL="https://vault.dotenv.org"</span></span>
+<span class="line"><span style="color:#9ECBFF">DOTENV_CLI="npx dotenv-vault@latest"</span></span>
+<span class="line"></span></code></pre>
+<h3 id="the-main-drawbacks-for-our-team">The main drawbacks for our team:</h3>
+<p>Even a single-line edit in any .env.* file means:</p>
+<ul>
+<li>dotenv-vault build</li>
+<li>.env.vault hash changes</li>
+<li>Version numbers (DOTENV_VAULT_<env>_VERSION) increase</env></li>
+<li>Commit the new encrypted blob and redeploy</li>
+</ul>
+<p>It’s mechanically correct, but it creates:</p>
+<ul>
+<li>Lots of churn in Git</li>
+<li>Frequent re-encryption cycles</li>
+<li>A manual rebuild step tied to config changes</li>
+<li>Growing diffs containing opaque encrypted blobs</li>
+</ul>
+<p>When pricing doubled and we were already migrating the rest of our secrets to 1Password, it was clear that .env.vault was no longer the best long-term option.</p>
+<h2 id="why-we-avoided-the-argo-cd-vault-plugin">Why We Avoided the Argo CD Vault Plugin</h2>
+<p>As we moved off dotenv, we considered the <strong>Argo CD Vault Plugin (AVP)</strong>. Ultimately, we rejected it for both architectural and operational reasons.</p>
+<h3 id="repo-server-complexity">Repo-Server Complexity</h3>
+<p>AVP requires patching the <code>argocd-repo-server</code> to add:</p>
+<ul>
+<li>Sidecars or CMP plugins</li>
+<li>Custom binaries</li>
+<li>Additional mounted volumes</li>
+<li>Secrets containing backend credentials</li>
+</ul>
+<p>This increases risk during upgrades and complicates Argo CD’s deployment model.</p>
+<h3 id="plugin-specific-yaml">Plugin-Specific YAML</h3>
+<p>AVP introduces templating syntax into manifests, such as:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  annotations</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    avp.kubernetes.io/path</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"kv/data/app/prod"</span></span>
+<span class="line"><span style="color:#85E89D">stringData</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  PASSWORD</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">&#x3C;password></span></span>
+<span class="line"></span></code></pre>
+<p>This couples manifest format to the plugin and leaks backend secret paths into application resources.</p>
+<h3 id="no-automatic-updates-for-changed-secrets">No Automatic Updates for Changed Secrets</h3>
+<p>Argo CD watches:</p>
+<ul>
+<li>Git (desired state)</li>
+<li>Kubernetes (live state)</li>
+</ul>
+<p>It does <strong>not</strong> watch Vault/1Password.</p>
+<p>If a secret changes in your backend:</p>
+<ul>
+<li>AVP does not automatically update cluster Secrets</li>
+<li>Hard refresh or manual sync is required</li>
+</ul>
+<h3 id="argo-cd-maintainers-caution-against-this-pattern">Argo CD Maintainers Caution Against This Pattern</h3>
+<p>The Argo CD team explicitly warns that manifest-generation-time secret injection increases complexity and should be used with caution.</p>
+<h2 id="overview-of-the-new-architecture">Overview of the New Architecture</h2>
+<p>The new approach is simple and avoids all the drawbacks above.</p>
+<h3 id="key-components">Key Components</h3>
+<ul>
+<li><code>.env.1password</code> template stored in Git</li>
+<li>GitHub App with sparse-checkout permissions</li>
+<li>Two initContainers:
+<ol>
+<li>Fetch the template</li>
+<li>Run <code>op inject</code> to generate a real <code>.env</code></li>
+</ol>
+</li>
+<li>Main container loads <code>.env</code> via any standard dotenv library</li>
+</ul>
+<h3 id="benefits">Benefits</h3>
+<ul>
+<li>All config keys visible in Git</li>
+<li>Values pulled securely from 1Password</li>
+<li>Zero Kubernetes Secrets/ConfigMaps required</li>
+<li>No manifest changes needed for config changes</li>
+<li>One template works across all environments via <code>$APP_ENV</code></li>
+<li>Application developers continue using <code>.env</code> formats</li>
+<li>Pods always retrieve fresh secrets when restarted</li>
+</ul>
+<h2 id="generic-env1password-template">Generic <code>.env.1password</code> Template</h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="dotenv"><code><span class="line"><span style="color:#6A737D"># .env.1password</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FFAB70">TZ</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"op://app-$APP_ENV/TZ/notesPlain"</span></span>
+<span class="line"><span style="color:#FFAB70">NODE_ENV</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"op://app-$APP_ENV/NODE_ENV/notesPlain"</span></span>
+<span class="line"><span style="color:#FFAB70">APP_ENVIRONMENT</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"op://app-$APP_ENV/APP_ENVIRONMENT/notesPlain"</span></span>
+<span class="line"><span style="color:#FFAB70">APP_ENV_SHORT</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"op://app-$APP_ENV/APP_ENV_SHORT/notesPlain"</span></span>
+<span class="line"><span style="color:#FFAB70">DATABASE_URL</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"op://app-$APP_ENV/DATABASE_URL/notesPlain"</span></span>
+<span class="line"><span style="color:#FFAB70">REDIS_URL</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"op://app-$APP_ENV/REDIS_URL/notesPlain"</span></span>
+<span class="line"><span style="color:#FFAB70">API_KEY</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"op://app-$APP_ENV/API_KEY/notesPlain"</span></span>
+<span class="line"><span style="color:#FFAB70">THIRD_PARTY_TOKEN</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"op://integrations-$APP_ENV/THIRD_PARTY_TOKEN/notesPlain"</span></span>
+<span class="line"><span style="color:#FFAB70">ANALYTICS_KEY</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"op://integrations-$APP_ENV/ANALYTICS_KEY/notesPlain"</span></span>
+<span class="line"></span></code></pre>
+<h2 id="kubernetes-initcontainer-fetch-template-from-github">Kubernetes InitContainer: Fetch Template from GitHub</h2>
+<p>A GitHub App issues a short-lived installation token and performs a sparse checkout of only the <code>.env.1password</code> file.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">initContainers</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">fetch-template</span></span>
+<span class="line"><span style="color:#85E89D">    image</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">alpine:3.20</span></span>
+<span class="line"><span style="color:#85E89D">    env</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">REPO</span></span>
+<span class="line"><span style="color:#85E89D">        value</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"github.com/ORG/REPO"</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">APP_ID</span></span>
+<span class="line"><span style="color:#85E89D">        valueFrom</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">          secretKeyRef</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">            name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">github-app-creds</span></span>
+<span class="line"><span style="color:#85E89D">            key</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">GITHUB_APP_ID</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">INSTALLATION_ID</span></span>
+<span class="line"><span style="color:#85E89D">        valueFrom</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">          secretKeyRef</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">            name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">github-app-creds</span></span>
+<span class="line"><span style="color:#85E89D">            key</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">GITHUB_INSTALLATION_ID</span></span>
+<span class="line"><span style="color:#85E89D">    volumeMounts</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">workdir</span></span>
+<span class="line"><span style="color:#85E89D">        mountPath</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">/work</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">gh-creds</span></span>
+<span class="line"><span style="color:#85E89D">        mountPath</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">/gh/private.pem</span></span>
+<span class="line"><span style="color:#85E89D">        subPath</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">GITHUB_PRIVATE_KEY</span></span>
+<span class="line"><span style="color:#85E89D">        readOnly</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span>
+<span class="line"><span style="color:#85E89D">    command</span><span style="color:#E1E4E8">: [</span><span style="color:#9ECBFF">"sh"</span><span style="color:#E1E4E8">,</span><span style="color:#9ECBFF">"-lc"</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#85E89D">    args</span><span style="color:#E1E4E8">: </span><span style="color:#F97583">|</span></span>
+<span class="line"><span style="color:#9ECBFF">      set -euo pipefail</span></span>
+<span class="line"><span style="color:#9ECBFF">      apk add --no-cache openssl curl jq git</span></span>
+<span class="line"><span style="color:#9ECBFF">      # git check out the 1password template file</span></span>
+<span class="line"><span style="color:#9ECBFF">      ...</span></span>
+<span class="line"></span></code></pre>
+<h2 id="kubernetes-initcontainer-op-inject--env">Kubernetes InitContainer: <code>op inject</code> → <code>.env</code></h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">op-inject</span></span>
+<span class="line"><span style="color:#85E89D">    image</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">1password/op:latest</span></span>
+<span class="line"><span style="color:#85E89D">    env</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">OP_SERVICE_ACCOUNT_TOKEN</span></span>
+<span class="line"><span style="color:#85E89D">        valueFrom</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">          secretKeyRef</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">            name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">onepassword-service-account</span></span>
+<span class="line"><span style="color:#85E89D">            key</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">token</span></span>
+<span class="line"><span style="color:#85E89D">    workingDir</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">/work</span></span>
+<span class="line"><span style="color:#85E89D">    volumeMounts</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">workdir</span></span>
+<span class="line"><span style="color:#85E89D">        mountPath</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">/work</span></span>
+<span class="line"><span style="color:#85E89D">    command</span><span style="color:#E1E4E8">: [</span><span style="color:#9ECBFF">"sh"</span><span style="color:#E1E4E8">,</span><span style="color:#9ECBFF">"-lc"</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#85E89D">    args</span><span style="color:#E1E4E8">: </span><span style="color:#F97583">|</span></span>
+<span class="line"><span style="color:#9ECBFF">      set -euo pipefail</span></span>
+<span class="line"><span style="color:#9ECBFF">      APP_ENV={{ .Values.environment }} \</span></span>
+<span class="line"><span style="color:#9ECBFF">        op inject -i .env.1password -o .env</span></span>
+<span class="line"><span style="color:#9ECBFF">      chmod 0440 .env</span></span>
+<span class="line"></span></code></pre>
+<h2 id="main-container-loading-the-env">Main Container Loading the <code>.env</code></h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">containers</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">app</span></span>
+<span class="line"><span style="color:#85E89D">    image</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">your-app:latest</span></span>
+<span class="line"><span style="color:#85E89D">    volumeMounts</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">workdir</span></span>
+<span class="line"><span style="color:#85E89D">        mountPath</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">/app/env</span></span>
+<span class="line"><span style="color:#85E89D">    env</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">DOTENV_PATH</span></span>
+<span class="line"><span style="color:#85E89D">        value</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">/app/env/.env</span></span>
+<span class="line"></span></code></pre>
+<h2 id="flow-diagram">Flow Diagram</h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="mermaid"><code><span class="line"><span style="color:#E1E4E8">flowchart LR</span></span>
+<span class="line"><span style="color:#E1E4E8">  subgraph GitHub</span></span>
+<span class="line"><span style="color:#E1E4E8">    TPL[.env.1password Template]</span></span>
+<span class="line"><span style="color:#E1E4E8">  end</span></span>
+<span class="line"><span style="color:#E1E4E8">  subgraph Kubernetes</span></span>
+<span class="line"><span style="color:#E1E4E8">    A[InitContainer A Sparse Checkout]</span></span>
+<span class="line"><span style="color:#E1E4E8">    B[InitContainer B op inject]</span></span>
+<span class="line"><span style="color:#E1E4E8">    C[Main Container Loads .env]</span></span>
+<span class="line"><span style="color:#E1E4E8">  end</span></span>
+<span class="line"><span style="color:#E1E4E8">  subgraph OnePassword</span></span>
+<span class="line"><span style="color:#E1E4E8">    VAULT[app-APP_ENV Vault]</span></span>
+<span class="line"><span style="color:#E1E4E8">  end</span></span>
+<span class="line"><span style="color:#E1E4E8">  TPL --> A</span></span>
+<span class="line"><span style="color:#E1E4E8">  A --> B</span></span>
+<span class="line"><span style="color:#E1E4E8">  VAULT --> B</span></span>
+<span class="line"><span style="color:#E1E4E8">  B --> C</span></span>
+<span class="line"></span></code></pre>
+<h2 id="advantages-summary">Advantages Summary</h2>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Capability</th><th>dotenv.org</th><th>AVP</th><th>1Password + InitContainers</th></tr></thead><tbody><tr><td>Config keys visible in Git</td><td>❌ Hidden</td><td>⚠️ Mixed</td><td>✅ Yes</td></tr><tr><td>Values stored securely</td><td>⚠️ Encrypted blob</td><td>⚠️ In K8s Secrets</td><td>✅ 1Password</td></tr><tr><td>Requires patching Argo CD</td><td>❌</td><td>✅ Yes</td><td>❌</td></tr><tr><td>Detects secret changes</td><td>❌ Rebuild needed</td><td>❌ Hard-sync needed</td><td>✅ Pod restart = fresh</td></tr><tr><td>Kubernetes Secrets required</td><td>❌</td><td>✅ Yes</td><td>❌</td></tr><tr><td>Manifest edits for config changes</td><td>✅ Yes</td><td>⚠️ Sometimes</td><td>❌ Never</td></tr><tr><td>Developer experience</td><td>Medium</td><td>Plugin-dependent</td><td>Excellent</td></tr></tbody></table>
+<h2 id="conclusion">Conclusion</h2>
+<p>This migration allowed us to standardize on a single secrets platform (1Password), remove unnecessary components (dotenv vaulting, Kubernetes Secrets, AVP), and simplify both developer and operational workflows.</p>
+<p>Key benefits:</p>
+<ul>
+<li>No encrypted blob churn in Git</li>
+<li>No manifest changes for config changes</li>
+<li>All config keys visible in Git; all values in 1Password</li>
+<li>Deterministic, environment-agnostic template</li>
+<li>Simple and reliable pod-startup secret injection</li>
+<li>Argo CD stays unmodified and secure</li>
+</ul> </div> <nav class="blog-post-navigation"> <a href="/blog/tailscale-baston" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">Extending Our Tailscale Setup with a Terraform-Managed Bastion</div> </a> <a href="/blog/remote-secret-tunnel" class="blog-post-nav-link next"> <div class="blog-post-nav-label">Next Post</div> <div class="blog-post-nav-title">Developing and Testing K3s Apps Locally</div> </a> </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Posts</h2> <div class="related-posts-grid"> <a href="/blog/build-promote" class="blog-card card-link"> <img src="/assets/blog/build-promote/banner.jpg" alt="Build Once. Promote Forward. Ship Daily." class="blog-card-image"> <h3 class="blog-card-title">Build Once. Promote Forward. Ship Daily.</h3> <p class="blog-card-description"> How we eliminated rebuild-per-environment pipelines and went from shipping every two weeks to shipping daily. A real-world story of building once, validating once, and promoting the same artifact through environments. </p> </a><a href="/blog/local-ai" class="blog-card card-link"> <img src="/assets/blog/local-ai/banner.png" alt="The &#34;Hybrid&#34; AI Stack: Enterprise Power at Work, Localhost Freedom at Home" class="blog-card-image"> <h3 class="blog-card-title">The &quot;Hybrid&quot; AI Stack: Enterprise Power at Work, Localhost Freedom at Home</h3> <p class="blog-card-description"> How I built a personal AI stack on my MacBook Pro M4 using Ollama, Open WebUI, and Draw Things—running entirely locally with zero privacy leaks and unlimited usage, while keeping enterprise cloud tools for work. </p> </a><a href="/blog/remote-secret-tunnel" class="blog-card card-link"> <img src="/assets/blog/remote-secret-tunnel/banner.jpg" alt="Developing and Testing K3s Apps Locally" class="blog-card-image"> <h3 class="blog-card-title">Developing and Testing K3s Apps Locally</h3> <p class="blog-card-description"> When building Kubernetes-aware tools — whether a CLI, dashboard, or internal Python service — you often need your local environment to talk directly to the cluster API. </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container"> <p class="footer-text">© 2025 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer> </body></html>

@@ -1,0 +1,74 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Since my first job after college graduation, I have been looking for a way to setup a portable development environment for the following reasons:"><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v4.16.19"><title>Dev Container - Janus</title><link rel="stylesheet" href="/_astro/about.BqpiiRvk.css"><script type="module" src="/_astro/hoisted.DmkqG5EQ.js"></script></head> <body class="min-h-screen flex flex-col"> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul> <div class="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false}"></div>  </div> </div> </nav> </header>  <main class="flex-1">  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">Dev Container</h1> <div class="blog-post-meta"> <time>July 1, 2023</time> <span class="blog-post-meta-separator">•</span> <span>3 min read</span> </div> <div class="blog-post-tags"> <span class="blog-post-tag">devops</span><span class="blog-post-tag">docker</span> </div> </header> <div class="blog-post-content prose"> <h1 id="dev-container">Dev Container</h1>
+<h2 id="background">Background</h2>
+<p>Since my first job after college graduation, I have been looking for a way to setup a portable development environment for the following reasons:</p>
+<ol>
+<li>to use it on multiple machines</li>
+<li>to share it among the team with teammates who doesn’t have server/platform/os experience</li>
+<li>to standardize os, programming language and library version, etc</li>
+<li>to save myself the headache of rebuilding everything from scratch</li>
+</ol>
+<p><img src="/assets/blog/dev-container/banner.png" alt="banner"></p>
+<!-- more -->
+<p>All throught these years, I have been using the following to achieve this:</p>
+<ol>
+<li>Vmware/Virtualbox</li>
+<li>Puppet</li>
+<li>Docker</li>
+</ol>
+<p>I thought the endgame would be docker since it is lightweight, scriptable and can be run almost anywhere, until I meet <strong>Dev Container</strong>.</p>
+<h2 id="about-dev-container">About Dev Container</h2>
+<p>Dev Container is a feature of VS Code and Docker, which provides an easy and reproducible way to set up development environments, within a button residing on the IDE. It can be used to run an application, to separate tools, libraries, or runtimes needed for working with a codebase</p>
+<h2 id="prerequisite">Prerequisite</h2>
+<ol>
+<li>VS Code</li>
+<li>Docker</li>
+</ol>
+<h2 id="to-create-a-dev-container">To Create a Dev Container</h2>
+<p>As an example, I am going to create a Python 3.9 Dev Container with Docker in Docker (DIID) support</p>
+<ol>
+<li>Click on the lower left green icon at the VS Code IDE</li>
+<li>From the dropdown at the top portion of the VS Code, select <code>Create Dev Container</code>
+<img src="/assets/blog/dev-container/create-dev-container.png" alt="create Dev Container"></li>
+<li>Search for Python 3 and select <code>Python 3 devcontainers</code>
+<img src="/assets/blog/dev-container/python3-devcontainer.png" alt="Python 3"></li>
+<li>Select <code>Additional Options</code> and choose Python 3.9
+<img src="/assets/blog/dev-container/addition-options.png" alt="Additional Options"></li>
+<li>Search for <code>docker-in-docker</code> and check the checkbox
+<img src="/assets/blog/dev-container/docker-in-docker.png" alt="docker-in-docker"></li>
+<li>Click OK</li>
+</ol>
+<p>At this point, VS Code will pop up an information box about the creation of the new Dev Container. After that VS Code will restart in the Dev Container mode.</p>
+<p><img src="/assets/blog/dev-container/building.png" alt="building"></p>
+<p>There you have it. You should be able to run your application inside the Dev Container with Python 3.9 now.</p>
+<p><img src="/assets/blog/dev-container/dev-contianer-terminal.png" alt="terminal"></p>
+<h2 id="configuration-file">Configuration file</h2>
+<p>The configuration of the new Dev Container is saved under <code>.devcontainer/devcontainer.json</code> file. Here is the content of the file.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="json"><code><span class="line"><span style="color:#6A737D">// For format details, see https://aka.ms/devcontainer.json. For config options, see the</span></span>
+<span class="line"><span style="color:#6A737D">// README at: https://github.com/devcontainers/templates/tree/main/src/python</span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#79B8FF">	"name"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Python 3"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#6A737D">	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile</span></span>
+<span class="line"><span style="color:#79B8FF">	"image"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"mcr.microsoft.com/devcontainers/python:1-3.9-bookworm"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">	"features"</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#79B8FF">		"ghcr.io/devcontainers/features/docker-in-docker:2"</span><span style="color:#E1E4E8">: {}</span></span>
+<span class="line"><span style="color:#E1E4E8">	}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">	// Features to add to the dev container. More info: https://containers.dev/features.</span></span>
+<span class="line"><span style="color:#6A737D">	// "features": {},</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">	// Use 'forwardPorts' to make a list of ports inside the container available locally.</span></span>
+<span class="line"><span style="color:#6A737D">	// "forwardPorts": [],</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">	// Use 'postCreateCommand' to run commands after the container is created.</span></span>
+<span class="line"><span style="color:#6A737D">	// "postCreateCommand": "pip3 install --user -r requirements.txt",</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">	// Configure tool-specific properties.</span></span>
+<span class="line"><span style="color:#6A737D">	// "customizations": {},</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.</span></span>
+<span class="line"><span style="color:#6A737D">	// "remoteUser": "root"</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span></code></pre>
+<h2 id="link">Link</h2>
+<p><a href="https://code.visualstudio.com/docs/devcontainers/containers">Dev Container</a></p>
+<p><a href="https://github.com/microsoft/vscode-dev-containers">Github Repo</a></p> </div> <nav class="blog-post-navigation"> <a href="/blog/github-repository-dispatch" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">Triggering GitHub Workflows Across Repositories with Repository Dispatch</div> </a> <a href="/blog/github-shared-action" class="blog-post-nav-link next"> <div class="blog-post-nav-label">Next Post</div> <div class="blog-post-nav-title">Creating Reusable GitHub Actions with Composite Actions</div> </a> </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Posts</h2> <div class="related-posts-grid"> <a href="/blog/build-promote" class="blog-card card-link"> <img src="/assets/blog/build-promote/banner.jpg" alt="Build Once. Promote Forward. Ship Daily." class="blog-card-image"> <h3 class="blog-card-title">Build Once. Promote Forward. Ship Daily.</h3> <p class="blog-card-description"> How we eliminated rebuild-per-environment pipelines and went from shipping every two weeks to shipping daily. A real-world story of building once, validating once, and promoting the same artifact through environments. </p> </a><a href="/blog/local-ai" class="blog-card card-link"> <img src="/assets/blog/local-ai/banner.png" alt="The &#34;Hybrid&#34; AI Stack: Enterprise Power at Work, Localhost Freedom at Home" class="blog-card-image"> <h3 class="blog-card-title">The &quot;Hybrid&quot; AI Stack: Enterprise Power at Work, Localhost Freedom at Home</h3> <p class="blog-card-description"> How I built a personal AI stack on my MacBook Pro M4 using Ollama, Open WebUI, and Draw Things—running entirely locally with zero privacy leaks and unlimited usage, while keeping enterprise cloud tools for work. </p> </a><a href="/blog/remote-secret-tunnel" class="blog-card card-link"> <img src="/assets/blog/remote-secret-tunnel/banner.jpg" alt="Developing and Testing K3s Apps Locally" class="blog-card-image"> <h3 class="blog-card-title">Developing and Testing K3s Apps Locally</h3> <p class="blog-card-description"> When building Kubernetes-aware tools — whether a CLI, dashboard, or internal Python service — you often need your local environment to talk directly to the cluster API. </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container"> <p class="footer-text">© 2025 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer> </body></html>

@@ -1,0 +1,129 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Lately I am working on a project to dockerize an e2e application with React as the front end and Ruby on Rails as the backend. I would like to set up a docker-compose file so that:"><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v4.16.19"><title>React and Ruby Docker Development Environment - Janus</title><link rel="stylesheet" href="/_astro/about.BqpiiRvk.css"><script type="module" src="/_astro/hoisted.DmkqG5EQ.js"></script></head> <body class="min-h-screen flex flex-col"> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul> <div class="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false}"></div>  </div> </div> </nav> </header>  <main class="flex-1">  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">React and Ruby Docker Development Environment</h1> <div class="blog-post-meta"> <time>May 7, 2024</time> <span class="blog-post-meta-separator">•</span> <span>3 min read</span> </div> <div class="blog-post-tags"> <span class="blog-post-tag">react</span><span class="blog-post-tag">ruby</span><span class="blog-post-tag">docker</span><span class="blog-post-tag">devops</span> </div> </header> <div class="blog-post-content prose"> <h1 id="react-and-ruby-docker-development-environment">React and Ruby Docker Development Environment</h1>
+<h2 id="background">Background</h2>
+<p>Lately I am working on a project to dockerize an e2e application with React as the front end and Ruby on Rails as the backend. I would like to set up a docker-compose file so that:</p>
+<ol>
+<li>user can bring up the e2e environment with a single command</li>
+<li>the environment supports hot reload of code for both the React and Ruby on Rails parts</li>
+<li>it can be served as a testing environment for e2e test</li>
+<li>developers can run manual test in a local environment</li>
+</ol>
+<p><img src="/assets/blog/react-ruby-docker-dev-environment/banner.png" alt="banner"></p>
+<!-- more -->
+<h2 id="react-dockerfile">React Dockerfile</h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">FROM</span><span style="color:#9ECBFF"> node:lts-alpine3.17</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">WORKDIR</span><span style="color:#9ECBFF"> /app</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">COPY</span><span style="color:#9ECBFF"> package.json</span><span style="color:#9ECBFF"> /app/</span></span>
+<span class="line"><span style="color:#B392F0">COPY</span><span style="color:#9ECBFF"> yarn.lock</span><span style="color:#9ECBFF"> /app/</span></span>
+<span class="line"><span style="color:#B392F0">RUN</span><span style="color:#9ECBFF"> yarn</span><span style="color:#9ECBFF"> install</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">COPY</span><span style="color:#9ECBFF"> .</span><span style="color:#9ECBFF"> /app</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">RUN</span><span style="color:#9ECBFF"> yarn</span><span style="color:#9ECBFF"> run</span><span style="color:#9ECBFF"> build</span></span>
+<span class="line"><span style="color:#B392F0">CMD</span><span style="color:#9ECBFF"> yarn</span><span style="color:#9ECBFF"> start</span></span>
+<span class="line"></span></code></pre>
+<h2 id="docker-compose">docker-compose</h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">version:</span><span style="color:#9ECBFF"> '3'</span></span>
+<span class="line"><span style="color:#B392F0">services:</span></span>
+<span class="line"><span style="color:#B392F0">  api:</span></span>
+<span class="line"><span style="color:#B392F0">    build:</span><span style="color:#9ECBFF"> ./backend</span></span>
+<span class="line"><span style="color:#79B8FF">    command</span><span style="color:#9ECBFF">:</span><span style="color:#9ECBFF"> bundle</span><span style="color:#9ECBFF"> exec</span><span style="color:#9ECBFF"> rails</span><span style="color:#9ECBFF"> server</span><span style="color:#79B8FF"> -p</span><span style="color:#79B8FF"> 3000</span><span style="color:#79B8FF"> -b</span><span style="color:#9ECBFF"> '0.0.0.0'</span></span>
+<span class="line"><span style="color:#B392F0">    ports:</span></span>
+<span class="line"><span style="color:#B392F0">      -</span><span style="color:#9ECBFF"> "3000:3000"</span></span>
+<span class="line"><span style="color:#B392F0">    volumes:</span></span>
+<span class="line"><span style="color:#B392F0">      -</span><span style="color:#9ECBFF"> "./backend/:/rails"</span></span>
+<span class="line"><span style="color:#B392F0">  web:</span></span>
+<span class="line"><span style="color:#B392F0">    build:</span><span style="color:#9ECBFF"> ./frontend</span></span>
+<span class="line"><span style="color:#B392F0">    environment:</span></span>
+<span class="line"><span style="color:#B392F0">      REACT_APP_BACKEND_URL:</span><span style="color:#9ECBFF"> "http://localhost:3000"</span></span>
+<span class="line"><span style="color:#B392F0">      WATCHPACK_POLLING:</span><span style="color:#9ECBFF"> "true"</span></span>
+<span class="line"><span style="color:#79B8FF">    command</span><span style="color:#9ECBFF">:</span><span style="color:#9ECBFF"> npm</span><span style="color:#9ECBFF"> start</span></span>
+<span class="line"><span style="color:#B392F0">    ports:</span></span>
+<span class="line"><span style="color:#B392F0">      -</span><span style="color:#9ECBFF"> "8080:3000"</span></span>
+<span class="line"><span style="color:#B392F0">    volumes:</span></span>
+<span class="line"><span style="color:#B392F0">      -</span><span style="color:#9ECBFF"> ./frontend/:/app</span></span>
+<span class="line"><span style="color:#B392F0">    depends_on:</span></span>
+<span class="line"><span style="color:#B392F0">      -</span><span style="color:#9ECBFF"> api</span></span>
+<span class="line"></span></code></pre>
+<p>note that the followings are essential to enable hot reload for both React and Rails:</p>
+<h3 id="react-hot-reload">React Hot Reload</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">  web:</span></span>
+<span class="line"><span style="color:#79B8FF">    ...</span></span>
+<span class="line"><span style="color:#B392F0">    environment:</span></span>
+<span class="line"><span style="color:#B392F0">      WATCHPACK_POLLING:</span><span style="color:#9ECBFF"> "true"</span></span>
+<span class="line"><span style="color:#79B8FF">    command</span><span style="color:#9ECBFF">:</span><span style="color:#9ECBFF"> npm</span><span style="color:#9ECBFF"> start</span></span>
+<span class="line"><span style="color:#79B8FF">    ...</span></span>
+<span class="line"><span style="color:#B392F0">    volumes:</span></span>
+<span class="line"><span style="color:#B392F0">      -</span><span style="color:#9ECBFF"> ./frontend/:/app</span></span>
+<span class="line"></span></code></pre>
+<h3 id="ruby-on-rails-hot-reload">Ruby on Rails Hot Reload</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">  api:</span></span>
+<span class="line"><span style="color:#79B8FF">    ...</span></span>
+<span class="line"><span style="color:#79B8FF">    command</span><span style="color:#9ECBFF">:</span><span style="color:#9ECBFF"> bundle</span><span style="color:#9ECBFF"> exec</span><span style="color:#9ECBFF"> rails</span><span style="color:#9ECBFF"> server</span><span style="color:#79B8FF"> -p</span><span style="color:#79B8FF"> 3000</span><span style="color:#79B8FF"> -b</span><span style="color:#9ECBFF"> '0.0.0.0'</span></span>
+<span class="line"><span style="color:#79B8FF">    ...</span></span>
+<span class="line"><span style="color:#B392F0">    volumes:</span></span>
+<span class="line"><span style="color:#B392F0">      -</span><span style="color:#9ECBFF"> "./backend/:/rails"</span></span>
+<span class="line"></span></code></pre>
+<h2 id="connecting-front-end-to-back-end">Connecting Front End to Back End</h2>
+<p>When the React application was trying to consume the Rails API, CORS error was reported. The following is the fix to make them communicate properly:</p>
+<h3 id="backendgemfile">backend/Gemfile</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">gem</span><span style="color:#9ECBFF"> "rack-cors"</span></span>
+<span class="line"></span></code></pre>
+<h3 id="backendconfiginitializerscorsrb">backend/config/initializers/cors.rb</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">Rails.application.config.middleware.insert_before</span><span style="color:#9ECBFF"> 0,</span><span style="color:#9ECBFF"> Rack::Cors</span><span style="color:#9ECBFF"> do</span></span>
+<span class="line"><span style="color:#B392F0">  allow</span><span style="color:#9ECBFF"> do</span></span>
+<span class="line"><span style="color:#B392F0">    origins</span><span style="color:#9ECBFF"> 'localhost:3000',</span></span>
+<span class="line"><span style="color:#B392F0">            '127.0.0.1:3000'</span><span style="color:#B392F0">,</span></span>
+<span class="line"><span style="color:#B392F0">            'localhost:8080'</span><span style="color:#B392F0">,</span></span>
+<span class="line"><span style="color:#B392F0">            '127.0.0.1:8080'</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">    resource</span><span style="color:#9ECBFF"> '*',</span></span>
+<span class="line"><span style="color:#B392F0">             headers:</span><span style="color:#9ECBFF"> :any,</span></span>
+<span class="line"><span style="color:#B392F0">             methods:</span><span style="color:#9ECBFF"> %i[get</span><span style="color:#9ECBFF"> post</span><span style="color:#9ECBFF"> put</span><span style="color:#9ECBFF"> patch</span><span style="color:#9ECBFF"> delete</span><span style="color:#9ECBFF"> options</span><span style="color:#9ECBFF"> head]</span></span>
+<span class="line"><span style="color:#F97583">  end</span></span>
+<span class="line"><span style="color:#F97583">end</span></span>
+<span class="line"><span style="color:#B392F0">Rails.application.config.hosts</span><span style="color:#9ECBFF"> +=</span><span style="color:#E1E4E8"> [</span><span style="color:#9ECBFF">'localhost:3000'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#B392F0">                                   'localhost'</span><span style="color:#B392F0">,</span></span>
+<span class="line"><span style="color:#B392F0">                                   '127.0.0.1:3000'</span><span style="color:#B392F0">,</span></span>
+<span class="line"><span style="color:#B392F0">                                   'localhost:8080'</span><span style="color:#B392F0">,</span></span>
+<span class="line"><span style="color:#B392F0">                                   '127.0.0.1:8080'</span></span>
+<span class="line"><span style="color:#E1E4E8">                                ]</span></span>
+<span class="line"></span></code></pre>
+<h2 id="sample-react-component-to-consume-ruby-on-rails-api">Sample React Component to Consume Ruby on Rails API</h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="js"><code><span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> React, { useState, useEffect } </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> 'react'</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#B392F0"> BackendTest</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> () </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#E1E4E8"> [</span><span style="color:#79B8FF">error</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">setError</span><span style="color:#E1E4E8">] </span><span style="color:#F97583">=</span><span style="color:#B392F0"> useState</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">null</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#E1E4E8"> [</span><span style="color:#79B8FF">isLoaded</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">setIsLoaded</span><span style="color:#E1E4E8">] </span><span style="color:#F97583">=</span><span style="color:#B392F0"> useState</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">false</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#E1E4E8"> [</span><span style="color:#79B8FF">foo</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">setFoo</span><span style="color:#E1E4E8">] </span><span style="color:#F97583">=</span><span style="color:#B392F0"> useState</span><span style="color:#E1E4E8">([]);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">  useEffect</span><span style="color:#E1E4E8">(() </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#B392F0">    fetch</span><span style="color:#E1E4E8">(process.env.</span><span style="color:#79B8FF">REACT_APP_BACKEND_URL</span><span style="color:#F97583"> +</span><span style="color:#9ECBFF"> "/v0/health-check"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">      .</span><span style="color:#B392F0">then</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">res</span><span style="color:#F97583"> =></span><span style="color:#E1E4E8"> res.</span><span style="color:#B392F0">json</span><span style="color:#E1E4E8">())</span></span>
+<span class="line"><span style="color:#E1E4E8">      .</span><span style="color:#B392F0">then</span><span style="color:#E1E4E8">(</span></span>
+<span class="line"><span style="color:#E1E4E8">        (</span><span style="color:#FFAB70">data</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#B392F0">          setIsLoaded</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">true</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#B392F0">          setFoo</span><span style="color:#E1E4E8">(data);</span></span>
+<span class="line"><span style="color:#E1E4E8">        },</span></span>
+<span class="line"><span style="color:#E1E4E8">        (</span><span style="color:#FFAB70">error</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#B392F0">          setIsLoaded</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">true</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#B392F0">          setError</span><span style="color:#E1E4E8">(error);</span></span>
+<span class="line"><span style="color:#E1E4E8">        }</span></span>
+<span class="line"><span style="color:#E1E4E8">      );</span></span>
+<span class="line"><span style="color:#E1E4E8">  }, []);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">  if</span><span style="color:#E1E4E8"> (error) {</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#E1E4E8"> &#x3C;</span><span style="color:#85E89D">div</span><span style="color:#E1E4E8">>Error: {error.message}&#x3C;/</span><span style="color:#85E89D">div</span><span style="color:#E1E4E8">>;</span></span>
+<span class="line"><span style="color:#E1E4E8">  } </span><span style="color:#F97583">else</span><span style="color:#F97583"> if</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">!</span><span style="color:#E1E4E8">isLoaded) {</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#E1E4E8"> &#x3C;</span><span style="color:#85E89D">div</span><span style="color:#E1E4E8">>Loading...&#x3C;/</span><span style="color:#85E89D">div</span><span style="color:#E1E4E8">>;</span></span>
+<span class="line"><span style="color:#E1E4E8">  } </span><span style="color:#F97583">else</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    console.</span><span style="color:#B392F0">log</span><span style="color:#E1E4E8">(foo);</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#E1E4E8"> (</span></span>
+<span class="line"><span style="color:#E1E4E8">      &#x3C;</span><span style="color:#85E89D">div</span><span style="color:#E1E4E8">>{foo.data}&#x3C;/</span><span style="color:#85E89D">div</span><span style="color:#E1E4E8">></span></span>
+<span class="line"><span style="color:#E1E4E8">    );</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">};</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">export</span><span style="color:#F97583"> default</span><span style="color:#E1E4E8"> BackendTest;</span></span>
+<span class="line"></span></code></pre> </div> <nav class="blog-post-navigation"> <a href="/blog/github-multi-repo-update" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">Automating Multi-Repository Updates with Reusable Scripts</div> </a> <a href="/blog/create-ecr-public-login" class="blog-post-nav-link next"> <div class="blog-post-nav-label">Next Post</div> <div class="blog-post-nav-title">Authenticating with Amazon ECR Public: Tokens, Login, and Automated Refresh</div> </a> </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Posts</h2> <div class="related-posts-grid"> <a href="/blog/build-promote" class="blog-card card-link"> <img src="/assets/blog/build-promote/banner.jpg" alt="Build Once. Promote Forward. Ship Daily." class="blog-card-image"> <h3 class="blog-card-title">Build Once. Promote Forward. Ship Daily.</h3> <p class="blog-card-description"> How we eliminated rebuild-per-environment pipelines and went from shipping every two weeks to shipping daily. A real-world story of building once, validating once, and promoting the same artifact through environments. </p> </a><a href="/blog/local-ai" class="blog-card card-link"> <img src="/assets/blog/local-ai/banner.png" alt="The &#34;Hybrid&#34; AI Stack: Enterprise Power at Work, Localhost Freedom at Home" class="blog-card-image"> <h3 class="blog-card-title">The &quot;Hybrid&quot; AI Stack: Enterprise Power at Work, Localhost Freedom at Home</h3> <p class="blog-card-description"> How I built a personal AI stack on my MacBook Pro M4 using Ollama, Open WebUI, and Draw Things—running entirely locally with zero privacy leaks and unlimited usage, while keeping enterprise cloud tools for work. </p> </a><a href="/blog/remote-secret-tunnel" class="blog-card card-link"> <img src="/assets/blog/remote-secret-tunnel/banner.jpg" alt="Developing and Testing K3s Apps Locally" class="blog-card-image"> <h3 class="blog-card-title">Developing and Testing K3s Apps Locally</h3> <p class="blog-card-description"> When building Kubernetes-aware tools — whether a CLI, dashboard, or internal Python service — you often need your local environment to talk directly to the cluster API. </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container"> <p class="footer-text">© 2025 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer> </body></html>

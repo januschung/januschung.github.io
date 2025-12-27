@@ -1,0 +1,101 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="How we eliminated rebuild-per-environment pipelines and went from shipping every two weeks to shipping daily. A real-world story of building once, validating once, and promoting the same artifact through environments."><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v4.16.19"><title>Build Once. Promote Forward. Ship Daily. - Janus</title><link rel="stylesheet" href="/_astro/about.BqpiiRvk.css"><script type="module" src="/_astro/hoisted.DmkqG5EQ.js"></script></head> <body class="min-h-screen flex flex-col"> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul> <div class="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false}"></div>  </div> </div> </nav> </header>  <main class="flex-1">  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">Build Once. Promote Forward. Ship Daily.</h1> <div class="blog-post-meta"> <time>December 11, 2025</time> <span class="blog-post-meta-separator">•</span> <span>6 min read</span> </div> <div class="blog-post-tags"> <span class="blog-post-tag">devops</span><span class="blog-post-tag">cicd</span><span class="blog-post-tag">docker</span><span class="blog-post-tag">argocd</span><span class="blog-post-tag">gitops</span><span class="blog-post-tag">kubernetes</span> </div> </header> <div class="blog-post-content prose"> <h1 id="build-once-promote-forward-ship-daily">Build Once. Promote Forward. Ship Daily.</h1>
+<h5 id="originally-posted-at-linkedin-at-december-12-2025">originally posted at <a href="https://www.linkedin.com/pulse/build-once-promote-forward-ship-daily-janus-chung-1lrxc">LinkedIn</a> at December 12, 2025</h5>
+<p>Eight years ago—before I had “DevOps” in my title—I ran into a release process that felt… unnecessarily painful.</p>
+<p>We built a Docker image for dev and ran tests. Then we rebuilt for staging and ran the same tests. Then we rebuilt again for production and ran the same tests again.</p>
+<p><img src="/assets/blog/build-promote/banner.jpg" alt="DevOps Mario Promotes the Same Docker Image Acorss Different Stages"></p>
+<p>At first it looked “safe.” In practice it was slow, expensive, and frustrating. It also produced multiple artifacts to store and track, even though the code hadn’t changed. And that’s the part that kept bothering me: if we build three times, are we really shipping the same thing?</p>
+<p>Back then, I didn’t have control over the pipeline, so I filed the thought away and moved on. But I never forgot it.</p>
+<p>Fast forward to Flagler. When I was asked, “What can we improve?”, that old idea came back immediately—and this time I had the opportunity to make it real.</p>
+<p>This post is the story of what we changed, why it worked, and how it helped us go from shipping every two weeks to shipping daily.</p>
+<hr>
+<h2 id="the-hidden-cost-of-rebuilding-per-environment">The hidden cost of rebuilding per environment</h2>
+<p>“Rebuild per stage” is one of those patterns that sneaks into organizations quietly. It’s often a reasonable starting point: each environment has its own configuration, its own secrets, its own rules. So the pipeline grows stage by stage, until rebuilding becomes “just how it’s done.”</p>
+<p>But once you look closely, it carries a few big problems.</p>
+<h3 id="its-slow-in-the-most-painful-place">It’s slow in the most painful place</h3>
+<p>Rebuilding and re-testing doesn’t just add time—it adds time right where humans are waiting. The work is done, the change is approved, and now you’re watching a pipeline crawl through repeated steps that don’t create new value.</p>
+<h3 id="it-multiplies-artifacts-and-complexity">It multiplies artifacts and complexity</h3>
+<p>If each stage produces its own image tag, you end up with more storage, more scanning events, and more “which image is actually deployed?” conversations than you’d like to admit.</p>
+<h3 id="it-creates-room-for-almost-the-same-releases">It creates room for “almost the same” releases</h3>
+<p>Even when application code doesn’t change, rebuilds aren’t always identical. Base images update. Package repositories change. Dependency resolution changes. A minor timing difference changes a layer, which changes a scan result, which changes everything.</p>
+<p>And that leads to the worst kind of failure: the kind that makes everyone feel helpless.</p>
+<hr>
+<h2 id="the-security-scan-loop-that-broke-everyones-patience">The security scan loop that broke everyone’s patience</h2>
+<p>In a previous job, we had a policy: every image had to be security scanned. Totally reasonable.</p>
+<p>But the workflow was built around rebuilding in each stage. And that’s where it got ugly.</p>
+<p>We’d finish scanning the staging image… then rebuild for production… and the production scan would fail.</p>
+<p>Not because the app changed. Because the world around the build changed.</p>
+<p>Now we’re stuck. The fix wasn’t “promote staging to prod.” The fix was “rebuild everything again,” starting from dev.</p>
+<p>So we’d run the loop again. And there was no guarantee we wouldn’t hit the same failure again, because the build inputs were still drifting under our feet.</p>
+<p>That’s the kind of process that drains teams:</p>
+<ul>
+<li>engineers lose confidence in releases</li>
+<li>people start delaying deployments</li>
+<li>frustration becomes normal</li>
+</ul>
+<p>It wasn’t anyone’s fault. The system was just designed in a way that made this inevitable.</p>
+<p>The lesson I took from that experience was simple:</p>
+<p>If you rebuild three times, you’re validating three different artifacts.<br>
+And you’re leaving yourself exposed to randomness.</p>
+<hr>
+<h2 id="the-shift-build-once-promote-forward">The shift: build once, promote forward</h2>
+<p>At Flagler, when I was asked what we could improve, I finally had the chance to revisit the idea that had been sitting in my head for years:</p>
+<p>Stop rebuilding the same artifact in every environment.</p>
+<p>Instead:</p>
+<ol>
+<li>Build the image once</li>
+<li>Test it once</li>
+<li>Scan it once</li>
+<li>Promote that exact same image through environments</li>
+</ol>
+<p>We tag our images with the git short SHA (for example, <code>app:1a2b3c4</code>). That tag becomes the “identity” of the artifact that passed CI.</p>
+<p>Promotion is then a controlled change to point each environment at the same artifact.</p>
+<p>The big mindset change is this:</p>
+<ul>
+<li>environments are deployment targets</li>
+<li>they shouldn’t be build targets</li>
+</ul>
+<p>Build and test answer: <strong>“Is this artifact valid?”</strong><br>
+Promotion answers: <strong>“Where should this validated artifact run next?”</strong></p>
+<hr>
+<h2 id="why-argo-cd-makes-this-click">Why Argo CD makes this click</h2>
+<p>Once you adopt promotion, Argo CD becomes a force multiplier.</p>
+<p>Instead of having a long pipeline do heavy work at each stage, the workflow becomes:</p>
+<ul>
+<li>build + validate once</li>
+<li>update the environment configuration to reference the same image tag</li>
+<li>Argo CD syncs and deploys</li>
+</ul>
+<p>So promotion becomes a small Git change, not a “run the whole world again” event.</p>
+<p>And that changes the pace of delivery.</p>
+<hr>
+<h2 id="what-changed-in-the-real-world">What changed in the real world</h2>
+<p>This wasn’t just a pipeline optimization. It changed how shipping feels.</p>
+<h3 id="promotions-went-from-hours-to-minutes">Promotions went from hours to minutes</h3>
+<p>Previously, moving a feature through environments meant waiting on repeated rebuilds and repeated test runs. Now it’s closer to: update a reference, Argo syncs, done.</p>
+<h3 id="the-release-event-disappeared">The release “event” disappeared</h3>
+<p>When releases are slow and heavy, teams batch changes. When releases are fast and reliable, teams ship smaller changes more often.</p>
+<h3 id="we-went-from-biweekly-to-daily-shipping">We went from biweekly to daily shipping</h3>
+<p>By removing redundant rebuild + re-test loops, and by treating promotion as a GitOps action, we shortened the path from “ready” to “deployed” enough that shipping daily became normal.</p>
+<p>Not heroic. Not stressful. Normal.</p>
+<hr>
+<h2 id="the-advantages-plainly">The advantages, plainly</h2>
+<p>Here’s what we gained by building once and promoting forward.</p>
+<h3 id="reliability-the-same-artifact-in-every-environment">Reliability: the same artifact in every environment</h3>
+<p>If staging is running <code>app:1a2b3c4</code>, production runs <code>app:1a2b3c4</code>. Not “the same code rebuilt later,” but the same artifact.</p>
+<p>That one detail eliminates a surprising amount of chaos.</p>
+<h3 id="faster-feedback-and-faster-delivery">Faster feedback and faster delivery</h3>
+<p>Less waiting, fewer repeated steps, fewer opportunities for a pipeline to fail for reasons unrelated to the change.</p>
+<h3 id="reduced-operational-noise">Reduced operational noise</h3>
+<p>Fewer artifacts. Clearer traceability. Easier debugging when something goes wrong, because you can answer “what changed?” without guesswork.</p>
+<h3 id="a-better-security-story">A better security story</h3>
+<p>Scanning is most meaningful when it’s tied to a specific artifact that you actually deploy. Promotion aligns security validation with reality: the scanned thing is the shipped thing.</p>
+<hr>
+<h2 id="the-human-part-trust-and-flexibility">The human part: trust and flexibility</h2>
+<p>This kind of change is technical, but it isn’t only technical.</p>
+<p>It takes trust, because you’re changing a ritual people rely on, even if it’s painful. I’m grateful to my boss for the flexibility and confidence to let me push this through and prove it out.</p>
+<hr>
+<h2 id="closing">Closing</h2>
+<p>Eight years ago, I saw rebuild-per-environment pipelines and wondered why we accepted them as normal. I didn’t have control then. At Flagler, I finally did.</p>
+<p>Build once. Validate once. Promote forward.</p>
+<p>And once we did, daily shipping stopped being an aspiration and became a habit.</p>
+<p>If you’ve lived through “it passed in staging but failed in production” rebuild loops—especially around security scans—I’d love to hear what patterns helped you break out of it.</p> </div> <nav class="blog-post-navigation"> <a href="/blog/local-ai" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">The &quot;Hybrid&quot; AI Stack: Enterprise Power at Work, Localhost Freedom at Home</div> </a>  </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Posts</h2> <div class="related-posts-grid"> <a href="/blog/local-ai" class="blog-card card-link"> <img src="/assets/blog/local-ai/banner.png" alt="The &#34;Hybrid&#34; AI Stack: Enterprise Power at Work, Localhost Freedom at Home" class="blog-card-image"> <h3 class="blog-card-title">The &quot;Hybrid&quot; AI Stack: Enterprise Power at Work, Localhost Freedom at Home</h3> <p class="blog-card-description"> How I built a personal AI stack on my MacBook Pro M4 using Ollama, Open WebUI, and Draw Things—running entirely locally with zero privacy leaks and unlimited usage, while keeping enterprise cloud tools for work. </p> </a><a href="/blog/remote-secret-tunnel" class="blog-card card-link"> <img src="/assets/blog/remote-secret-tunnel/banner.jpg" alt="Developing and Testing K3s Apps Locally" class="blog-card-image"> <h3 class="blog-card-title">Developing and Testing K3s Apps Locally</h3> <p class="blog-card-description"> When building Kubernetes-aware tools — whether a CLI, dashboard, or internal Python service — you often need your local environment to talk directly to the cluster API. </p> </a><a href="/blog/migration-1password" class="blog-card card-link"> <img src="/assets/blog/migration-1password/banner.png" alt="Migrating From dotenv.org to 1Password in Kubernetes Deployment" class="blog-card-image"> <h3 class="blog-card-title">Migrating From dotenv.org to 1Password in Kubernetes Deployment</h3> <p class="blog-card-description"> dotenv.org recently increased its pricing, and at the same time our organization was already consolidating secrets into **1Password** for engineering, operations, and automation workflows. Maintaining </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container"> <p class="footer-text">© 2025 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer> </body></html>

@@ -1,0 +1,99 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="In early-stage engineering teams, it's natural for tools to start out simple — often running on a single developer machine, just to get things moving. That’s how our Airbyte setup began: quick to spin"><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v4.16.19"><title>Replatforming Airbyte: From Developer Laptop to EKS - Janus</title><link rel="stylesheet" href="/_astro/about.BqpiiRvk.css"><script type="module" src="/_astro/hoisted.DmkqG5EQ.js"></script></head> <body class="min-h-screen flex flex-col"> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul> <div class="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false}"></div>  </div> </div> </nav> </header>  <main class="flex-1">  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">Replatforming Airbyte: From Developer Laptop to EKS</h1> <div class="blog-post-meta"> <time>July 24, 2025</time> <span class="blog-post-meta-separator">•</span> <span>5 min read</span> </div> <div class="blog-post-tags"> <span class="blog-post-tag">tailscale</span><span class="blog-post-tag">airbyte</span><span class="blog-post-tag">kubernetes</span><span class="blog-post-tag">networking</span><span class="blog-post-tag">devops</span><span class="blog-post-tag">etl</span><span class="blog-post-tag">helm</span> </div> </header> <div class="blog-post-content prose"> <h1 id="replatforming-airbyte-from-developer-laptop-to-eks">Replatforming Airbyte: From Developer Laptop to EKS</h1>
+<h5 id="originally-posted-at-linkedin-at-july-25-2025">originally posted at <a href="https://www.linkedin.com/pulse/replatforming-airbyte-from-developer-laptop-eks-janus-chung-550sc/">LinkedIn</a> at July 25, 2025</h5>
+<p>In early-stage engineering teams, it’s natural for tools to start out simple — often running on a single developer machine, just to get things moving. That’s how our Airbyte setup began: quick to spin up, good enough for testing connectors, and easy to iterate on.</p>
+<p>But as our team grew and data pipelines became more embedded in how we operated, we knew it was time to treat Airbyte like real infrastructure. That meant moving beyond local environments and into a scalable, secure, and repeatable deployment.</p>
+<p>We migrated Airbyte OSS to Amazon EKS, using Helm and AWS-native services like S3 and IAM Roles for Service Accounts (IRSA). Our goal wasn’t to fix something broken, but to build on what was working and make it production-ready—without sacrificing developer velocity.</p>
+<p>This post shares how we did it, what we learned, and what you might want to consider if you’re operationalizing Airbyte (or any similar open-source tool) in a small but growing cloud-native team.</p>
+<p><img src="/assets/blog/airbyte-replatform/banner.jpg" alt="DevOps Clown sending laptop application to the Cloud"></p>
+<!-- more -->
+<h2 id="-from-local-dev-to-platform-service">📦 From Local Dev to Platform Service</h2>
+<p>The starting point was a typical OSS install: Airbyte running via Docker Compose, with internal Postgres and MinIO providing storage.</p>
+<p>For a single user, this setup works. But as sync jobs became more important — and more cloud-integrated — the limitations grew obvious:</p>
+<ul>
+<li>Only one person could run or inspect jobs</li>
+<li>Jobs stopped if the machine rebooted or slept</li>
+<li>The setup didn’t integrate cleanly with AWS services like KMS or IAM</li>
+</ul>
+<p>We needed to make Airbyte a first-class internal service — which meant replatforming it onto our Kubernetes infrastructure.</p>
+<h2 id="-helm-first-on-eks">🚀 Helm-First on EKS</h2>
+<p>We deployed Airbyte using the official Helm chart on Amazon EKS, with all configuration defined in a single <code>values.yaml</code> file.</p>
+<p>This made it easy to:</p>
+<ul>
+<li>Version control the deployment</li>
+<li>Propagate changes to dev, stage, or prod clusters</li>
+<li>Configure each Airbyte component with its own replica count, resources, and ingress</li>
+</ul>
+<p>We enabled the core stack:</p>
+<ul>
+<li><code>webapp</code>, <code>server</code>, and <code>worker</code> components</li>
+<li>Internal Postgres with persistent volumes</li>
+<li>An Ingress controller (in our case, Tailscale) for secure access</li>
+</ul>
+<p>All of this is managed by Helm, making deployment and upgrades consistent and CI/CD-friendly.</p>
+<h2 id="️-why-we-abandoned-minio">☁️ Why We Abandoned MinIO</h2>
+<p>MinIO ships by default in Airbyte’s OSS Helm chart — and it’s fine if you’re storing state internally.</p>
+<p>But as soon as we configured an S3 destination connector, we ran into a hard blocker.</p>
+<p>Airbyte’s connector expects <strong>actual AWS S3</strong> — not a MinIO alias. The authentication flows, endpoint discovery, and SDK behavior are incompatible. The result? Jobs fail, and you lose the ability to use one of Airbyte’s most valuable features.</p>
+<p>So we turned off MinIO and went all-in on real S3:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">global</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  storage</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    type</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">s3</span></span>
+<span class="line"><span style="color:#85E89D">    bucket</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      log</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">&#x3C;BUCKET_NAME></span></span>
+<span class="line"><span style="color:#85E89D">      state</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">&#x3C;BUCKET_NAME></span></span>
+<span class="line"><span style="color:#85E89D">      workloadOutput</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">&#x3C;BUCKET_NAME></span></span>
+<span class="line"><span style="color:#85E89D">    s3</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      region</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">&#x3C;AWS_REGION></span></span>
+<span class="line"><span style="color:#85E89D">      authenticationType</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">instanceProfile</span></span>
+<span class="line"><span style="color:#85E89D">minio</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  enabled</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">false</span></span>
+<span class="line"></span></code></pre>
+<p>This cleared the path for both internal object storage and S3 destination connectors — no hacks required.</p>
+<h2 id="-evolving-iam-from-node-role-to-irsa">🔐 Evolving IAM: From Node Role to IRSA</h2>
+<p>To integrate Airbyte with S3 securely, we started with the simplest approach: attaching S3 access to the EKS node role. This allowed Airbyte to access S3 without static credentials—a good start, but too broad.</p>
+<p>Later, we switched to <strong>IAM Roles for Service Accounts (IRSA)</strong> to scope permissions only to Airbyte pods.</p>
+<p>We configured:</p>
+<ul>
+<li>An IRSA role (<code>airbyte-irsa-role-prod</code>) in Terraform.</li>
+<li>A trust policy bound to the <code>airbyte-admin</code> service account.</li>
+<li>A Helm annotation to bind that IAM role:</li>
+</ul>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">serviceAccount</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  annotations</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    eks.amazonaws.com/role-arn</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">arn:aws:iam::&#x3C;AWS_ACCOUNT>:role/airbyte-irsa-role-prod</span></span>
+<span class="line"></span></code></pre>
+<p>This let us remove reliance on the NodeInstanceRole and grant least-privilege S3 + KMS access directly to Airbyte.</p>
+<h2 id="️-tuning-resources-for-job-efficiency">⚙️ Tuning Resources for Job Efficiency</h2>
+<p>One thing that stood out during testing: <strong>Airbyte jobs default to higher resource allocations than expected</strong> — likely to support heavy syncs across large datasets.</p>
+<p>But for our workloads, that was overkill.</p>
+<p>We explicitly set <code>jobs.resources</code> to more modest requests and limits:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">global</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  jobs</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    resources</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      requests</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">        memory</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">256Mi</span></span>
+<span class="line"><span style="color:#85E89D">        cpu</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">250m</span></span>
+<span class="line"><span style="color:#85E89D">      limits</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">        memory</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">1Gi</span></span>
+<span class="line"><span style="color:#85E89D">        cpu</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">200m</span></span>
+<span class="line"></span></code></pre>
+<p>This helped reduce noise in our Kubernetes scheduler, especially when running multiple concurrent jobs. If you’re deploying Airbyte in an environment with resource quotas or shared node pools, this is a worthwhile tweak.</p>
+<h2 id="-stable-auditable-cloud-integrated">🧱 Stable, Auditable, Cloud-Integrated</h2>
+<p>With the final setup:</p>
+<ul>
+<li>Airbyte OSS runs fully inside EKS.</li>
+<li>Storage is backed by real S3, with KMS support.</li>
+<li>IAM is scoped via IRSA — no static secrets anywhere.</li>
+<li>Ingress is handled through our standard controller (Tailscale).</li>
+<li>PostgreSQL is deployed in-cluster with persistent volume claims.</li>
+</ul>
+<p>It’s reproducible, secure, and fits neatly into how we manage infrastructure.</p>
+<h2 id="-key-lessons-for-platform-teams">✅ Key Lessons for Platform Teams</h2>
+<p>If you’re supporting internal data or integration teams:</p>
+<ul>
+<li><strong>MinIO doesn’t work with S3 destination connectors</strong> — we learned this the hard way and switched to real S3</li>
+<li><strong>Start simple with IAM</strong>, then evolve to IRSA as your use case grows</li>
+<li><strong>Use Helm to its full extent</strong> — the Airbyte chart is surprisingly complete</li>
+<li><strong>Tune job resources</strong> — the defaults may be more than you need</li>
+</ul>
+<p>By replatforming Airbyte this way, we made it stable, scalable, and production-ready — not just for one user, but for the whole company.</p> </div> <nav class="blog-post-navigation"> <a href="/blog/tailscale" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">Swapping VPN for Tailscale: A Five-Day Internal Infra Upgrade</div> </a> <a href="/blog/doraemon" class="blog-post-nav-link next"> <div class="blog-post-nav-label">Next Post</div> <div class="blog-post-nav-title">Reviving Doraemon: A Slack Bot’s Second Life in Kubernetes</div> </a> </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Posts</h2> <div class="related-posts-grid"> <a href="/blog/build-promote" class="blog-card card-link"> <img src="/assets/blog/build-promote/banner.jpg" alt="Build Once. Promote Forward. Ship Daily." class="blog-card-image"> <h3 class="blog-card-title">Build Once. Promote Forward. Ship Daily.</h3> <p class="blog-card-description"> How we eliminated rebuild-per-environment pipelines and went from shipping every two weeks to shipping daily. A real-world story of building once, validating once, and promoting the same artifact through environments. </p> </a><a href="/blog/local-ai" class="blog-card card-link"> <img src="/assets/blog/local-ai/banner.png" alt="The &#34;Hybrid&#34; AI Stack: Enterprise Power at Work, Localhost Freedom at Home" class="blog-card-image"> <h3 class="blog-card-title">The &quot;Hybrid&quot; AI Stack: Enterprise Power at Work, Localhost Freedom at Home</h3> <p class="blog-card-description"> How I built a personal AI stack on my MacBook Pro M4 using Ollama, Open WebUI, and Draw Things—running entirely locally with zero privacy leaks and unlimited usage, while keeping enterprise cloud tools for work. </p> </a><a href="/blog/remote-secret-tunnel" class="blog-card card-link"> <img src="/assets/blog/remote-secret-tunnel/banner.jpg" alt="Developing and Testing K3s Apps Locally" class="blog-card-image"> <h3 class="blog-card-title">Developing and Testing K3s Apps Locally</h3> <p class="blog-card-description"> When building Kubernetes-aware tools — whether a CLI, dashboard, or internal Python service — you often need your local environment to talk directly to the cluster API. </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container"> <p class="footer-text">© 2025 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer> </body></html>

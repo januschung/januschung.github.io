@@ -1,0 +1,72 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="A Python tool to generate unlimited unique math worksheets in PDF format. Perfect for parents and teachers who want to give kids more practice without buying new materials."><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v4.16.19"><title>Math Worksheet Generator - Janus</title><link rel="stylesheet" href="/_astro/about.BqpiiRvk.css"><script type="module" src="/_astro/hoisted.DmkqG5EQ.js"></script></head> <body class="min-h-screen flex flex-col"> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul> <div class="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false}"></div>  </div> </div> </nav> </header>  <main class="flex-1">  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">Math Worksheet Generator</h1> <div class="blog-post-meta"> <span>3 min read</span>  <span class="blog-post-meta-separator">•</span> <a href="https://github.com/januschung/math-worksheet-generator" target="_blank" rel="noopener noreferrer" class="blog-post-github-link">
+View on GitHub →
+</a>  </div> <div class="blog-post-tags"> <span class="blog-post-tag">python</span><span class="blog-post-tag">education</span> </div> </header> <div class="blog-post-content prose"> <p><img src="/assets/projects/math-worksheet-generator/sample.png" alt="sample worksheet"></p>
+<h2 id="background">Background</h2>
+<p>My best friend tests his 5 year old basic math questions from store-bought material which is good for one time use (his son memorizes the answers) …. but he wants to give him more practice.</p>
+<p>Two solutions:</p>
+<ol>
+<li>keep buying more one time usage materials (less beer budget); or</li>
+<li>make question sets with the number pairs and calculate the answer for each question manually (less beer time)</li>
+</ol>
+<p>Not ideal.</p>
+<p>That’s the reason for me to look into an automate way to get the job done.</p>
+<h2 id="benefit-of-the-math-worksheet-generator">Benefit of the Math Worksheet Generator</h2>
+<p>With the Math Worksheet Generator, you can create a PDF with unique questions, as needed, in a fraction of second.</p>
+<p>There are five choices:</p>
+<ol>
+<li>Addition</li>
+<li>Subtraction</li>
+<li>Multiplication</li>
+<li>Division</li>
+<li>Mixed</li>
+</ol>
+<h2 id="requirements">Requirements</h2>
+<p><a href="https://www.python.org/downloads/">python3</a></p>
+<p>Install required package with the following command:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="shell"><code><span class="line"><span style="color:#B392F0">pip</span><span style="color:#9ECBFF"> install</span><span style="color:#79B8FF"> -r</span><span style="color:#9ECBFF"> requirements.txt</span></span>
+<span class="line"></span></code></pre>
+<h2 id="how-to-use">How to Use</h2>
+<ol>
+<li>Generate the worksheet in pdf format with the following command:</li>
+</ol>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="shell"><code><span class="line"><span style="color:#B392F0">python3</span><span style="color:#9ECBFF"> run.py</span><span style="color:#79B8FF"> --type</span><span style="color:#E1E4E8"> [+</span><span style="color:#F97583">|</span><span style="color:#B392F0">-</span><span style="color:#F97583">|</span><span style="color:#B392F0">x</span><span style="color:#F97583">|</span><span style="color:#B392F0">/</span><span style="color:#F97583">|</span><span style="color:#B392F0">mix]</span><span style="color:#79B8FF"> --digits</span><span style="color:#E1E4E8"> [1</span><span style="color:#F97583">|</span><span style="color:#B392F0">2</span><span style="color:#F97583">|</span><span style="color:#B392F0">3]</span><span style="color:#E1E4E8"> [-q</span><span style="color:#F97583">|</span><span style="color:#B392F0">--question_count]</span><span style="color:#E1E4E8"> [int] --output [custom-name.pdf]</span></span>
+<span class="line"></span></code></pre>
+<ol start="2">
+<li>Print out the generated file <code>worksheet.pdf</code></li>
+</ol>
+<p>For addition only worksheet:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="shell"><code><span class="line"><span style="color:#B392F0">python3</span><span style="color:#9ECBFF"> run.py</span><span style="color:#79B8FF"> --type</span><span style="color:#9ECBFF"> +</span></span>
+<span class="line"></span></code></pre>
+<p>For calculation up to 3 digits range:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="shell"><code><span class="line"><span style="color:#B392F0">python3</span><span style="color:#9ECBFF"> run.py</span><span style="color:#79B8FF"> --digits</span><span style="color:#79B8FF"> 3</span></span>
+<span class="line"></span></code></pre>
+<p>For generating different number of question, eg. 100 (default is 80):</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="shell"><code><span class="line"><span style="color:#B392F0">python3</span><span style="color:#9ECBFF"> run.py</span><span style="color:#79B8FF"> -q</span><span style="color:#79B8FF"> 100</span></span>
+<span class="line"></span></code></pre>
+<p>or</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="shell"><code><span class="line"><span style="color:#B392F0">python3</span><span style="color:#9ECBFF"> run.py</span><span style="color:#79B8FF"> --question_count</span><span style="color:#79B8FF"> 100</span></span>
+<span class="line"></span></code></pre>
+<p>For custom output filename (default is worksheet.pdf):</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="shell"><code><span class="line"><span style="color:#B392F0">python3</span><span style="color:#9ECBFF"> run.py</span><span style="color:#79B8FF"> --output</span><span style="color:#9ECBFF"> custom-name.pdf</span></span>
+<span class="line"></span></code></pre>
+<h2 id="sample">Sample</h2>
+<p><a href="https://github.com/januschung/math-worksheet-generator/blob/master/sample-worksheet.pdf">sample worksheet</a></p>
+<h2 id="special-thanks">Special Thanks</h2>
+<p>My long time friend San for the inspiration of this project and lovely sons Tim and Hin. Thanks <a href="https://github.com/thedanimal">thedanimal</a> for reviewing this README and adding new features.</p>
+<p>Also, thank you for the love and support form the <a href="https://www.reddit.com/r/Python/comments/ja5y2m/made_this_tool_with_python_and_my_son_now_hates_me/">Reddit Python community</a>. You guys are amazing and are helping me to make this project better.</p>
+<h2 id="successful-story">Successful Story</h2>
+<p>Thanks <a href="https://github.com/k1m0ch1">k1m0ch1</a> for sharing this heartwarming story:</p>
+<blockquote>
+<p>…I made this card for my kid, and then the teacher asks me if I can make some for the kids, well its generated anyway and very helpful, and the next day he asks me to make for a whole class, and next day he wants me to make for a whole school, and a weeks later other schools want me to help to make for a whole school.<br>
+more than 1000 generated file, with a custom filename for every kid and sent to the email
+I’m doing it for free, while you made this free, love it &#x3C;3</p>
+</blockquote>
+<h2 id="coverage">Coverage</h2>
+<p>The project was featured in the following links:</p>
+<p><a href="https://pycoders.com/issues/442">PyCoder’s Weekly Issue #442</a></p>
+<p><a href="https://twitter.com/pycoders/status/1316379986417381376">PyCoder’s Weekly Twitter</a></p>
+<p><a href="https://www.facebook.com/LearnRealPython/posts/1688239528018053?__tn__=-R">Real Python Facebook</a></p>
+<p><a href="https://t.me/githubtrending/9007">Github Trends Telegram</a></p>
+<p><a href="https://twitter.com/pythontrending/status/1316659466935373826">Python Trending Twitter</a></p>
+<h2 id="github-link">Github link</h2>
+<p><a href="https://github.com/januschung/math-worksheet-generator">Math Worksheet Generator</a></p> </div> <nav class="blog-post-navigation"> <a href="/projects/argocd-bootstrap" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Project</div> <div class="blog-post-nav-title">Argo CD Bootstrap for K3s Cluster</div> </a> <a href="/projects/asian-character-worksheet-generator" class="blog-post-nav-link next"> <div class="blog-post-nav-label">Next Project</div> <div class="blog-post-nav-title">Asian Character Worksheet Generator</div> </a> </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Projects</h2> <div class="related-posts-grid"> <a href="/projects/asian-comprehension-worksheet-generator" class="blog-card card-link"> <img src="/assets/projects/asian-comprehension-worksheet-generator/comprehension-ws.webp" alt="Asian Comprehension Worksheet Generator" class="blog-card-image"> <h3 class="blog-card-title">Asian Comprehension Worksheet Generator</h3> <p class="blog-card-description"> A Python tool to generate PDF worksheets for practicing Chinese and Japanese reading comprehension. Creates worksheets with empty columns for phonetic notes or writing practice. </p> </a><a href="/projects/asian-character-worksheet-generator" class="blog-card card-link"> <img src="/assets/projects/asian-character-worksheet-generator/chracter-ws.webp" alt="Asian Character Worksheet Generator" class="blog-card-image"> <h3 class="blog-card-title">Asian Character Worksheet Generator</h3> <p class="blog-card-description"> A Python tool to generate PDF worksheets for practicing Chinese and Japanese characters. Automatically creates grid-based worksheets with proper spacing and column widths. </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container"> <p class="footer-text">© 2025 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer> </body></html>

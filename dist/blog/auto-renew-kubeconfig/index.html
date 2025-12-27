@@ -1,0 +1,73 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Working with AWS EKS clusters via AWS SSO is secure but sometimes frustrating."><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v4.16.19"><title>Automatically Renew AWS SSO Session and Refresh Kubeconfig for EKS Access - Janus</title><link rel="stylesheet" href="/_astro/about.BqpiiRvk.css"><script type="module" src="/_astro/hoisted.DmkqG5EQ.js"></script></head> <body class="min-h-screen flex flex-col"> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul> <div class="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false}"></div>  </div> </div> </nav> </header>  <main class="flex-1">  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">Automatically Renew AWS SSO Session and Refresh Kubeconfig for EKS Access</h1> <div class="blog-post-meta"> <time>May 16, 2025</time> <span class="blog-post-meta-separator">•</span> <span>2 min read</span> </div> <div class="blog-post-tags"> <span class="blog-post-tag">shell script</span><span class="blog-post-tag">sso</span><span class="blog-post-tag">kubernetes</span><span class="blog-post-tag">aws</span><span class="blog-post-tag">devops</span> </div> </header> <div class="blog-post-content prose"> <h1 id="automatically-renew-aws-sso-session-and-refresh-kubeconfig-for-eks-access">Automatically Renew AWS SSO Session and Refresh Kubeconfig for EKS Access</h1>
+<p>Working with AWS EKS clusters via AWS SSO is secure but sometimes frustrating.<br>
+If your session expires, <code>kubectl</code> commands will fail until you manually renew the session and update your kubeconfig.</p>
+<p>Let’s automate that with a small Bash script.</p>
+<p><img src="/assets/blog/auto-renew-kubeconfig/banner.jpg" alt="Auto Renew Kubeconfig"></p>
+<!-- more -->
+<h2 id="problem">Problem</h2>
+<ul>
+<li>AWS SSO sessions expire every 8–12 hours by default.</li>
+<li><code>kubectl</code> will throw <code>ExpiredTokenException</code> or connection errors.</li>
+<li>You need to manually run <code>aws sso login</code> and <code>aws eks update-kubeconfig</code>.</li>
+</ul>
+<p>!!! danger “Frustration”
+Manually logging back in slows you down and interrupts your work.</p>
+<hr>
+<h2 id="solution-bash-script">Solution: Bash Script</h2>
+<p>Create a script called <code>aws_sso_kubeconfig.sh</code>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#6A737D">#!/bin/bash</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">PROFILE</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"prod"</span></span>
+<span class="line"><span style="color:#E1E4E8">CLUSTER_NAME</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"your-eks-cluster-name"</span></span>
+<span class="line"><span style="color:#E1E4E8">REGION</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"your-eks-cluster-region"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Check if AWS SSO session is valid</span></span>
+<span class="line"><span style="color:#F97583">if</span><span style="color:#F97583"> !</span><span style="color:#B392F0"> aws</span><span style="color:#9ECBFF"> sts</span><span style="color:#9ECBFF"> get-caller-identity</span><span style="color:#79B8FF"> --profile</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$PROFILE</span><span style="color:#9ECBFF">"</span><span style="color:#F97583"> ></span><span style="color:#9ECBFF"> /dev/null</span><span style="color:#F97583"> 2>&#x26;1</span><span style="color:#E1E4E8">; </span><span style="color:#F97583">then</span></span>
+<span class="line"><span style="color:#79B8FF">  echo</span><span style="color:#9ECBFF"> "🔒 AWS SSO session expired. Logging in again..."</span></span>
+<span class="line"><span style="color:#B392F0">  aws</span><span style="color:#9ECBFF"> sso</span><span style="color:#9ECBFF"> login</span><span style="color:#79B8FF"> --profile</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$PROFILE</span><span style="color:#9ECBFF">"</span></span>
+<span class="line"><span style="color:#F97583">else</span></span>
+<span class="line"><span style="color:#79B8FF">  echo</span><span style="color:#9ECBFF"> "✅ AWS SSO session still valid."</span></span>
+<span class="line"><span style="color:#F97583">fi</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Always refresh kubeconfig</span></span>
+<span class="line"><span style="color:#B392F0">aws</span><span style="color:#9ECBFF"> eks</span><span style="color:#9ECBFF"> update-kubeconfig</span><span style="color:#79B8FF"> --name</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$CLUSTER_NAME</span><span style="color:#9ECBFF">"</span><span style="color:#79B8FF"> --region</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$REGION</span><span style="color:#9ECBFF">"</span><span style="color:#79B8FF"> --profile</span><span style="color:#9ECBFF"> "</span><span style="color:#E1E4E8">$PROFILE</span><span style="color:#9ECBFF">"</span></span>
+<span class="line"><span style="color:#79B8FF">echo</span><span style="color:#9ECBFF"> "✅ Kubeconfig updated."</span></span>
+<span class="line"></span></code></pre>
+<h2 id="how-to-use">How to Use</h2>
+<p>Make it executable:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">chmod</span><span style="color:#9ECBFF"> +x</span><span style="color:#9ECBFF"> aws_sso_kubeconfig.sh</span></span>
+<span class="line"></span></code></pre>
+<p>Run it before using kubectl:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">./aws_sso_kubeconfig.sh</span></span>
+<span class="line"></span></code></pre>
+<p>!!! tip “Quick Tip”
+Add an alias to your .bashrc or .zshrc for faster use: bash alias krenew=”~/path/to/aws_sso_kubeconfig.sh”</p>
+<p>Then just type:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">krenew</span></span>
+<span class="line"></span></code></pre>
+<h2 id="bonus-automate-it-with-a-cron-job">Bonus: Automate it with a Cron Job</h2>
+<p>You can set up a cron job to run the script every 4–6 hours automatically, keeping your session fresh.</p>
+<p>Edit your crontab:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">crontab</span><span style="color:#79B8FF"> -e</span></span>
+<span class="line"></span></code></pre>
+<p>Add this line (every 6 hours):</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">0</span><span style="color:#79B8FF"> *</span><span style="color:#9ECBFF">/6</span><span style="color:#79B8FF"> *</span><span style="color:#79B8FF"> *</span><span style="color:#79B8FF"> *</span><span style="color:#9ECBFF"> /path/to/aws_sso_kubeconfig.sh</span><span style="color:#F97583"> >></span><span style="color:#9ECBFF"> /tmp/aws_sso_renew.log</span><span style="color:#F97583"> 2>&#x26;1</span></span>
+<span class="line"></span></code></pre>
+<p>This:</p>
+<ul>
+<li>Runs the script every 6 hours</li>
+<li>Redirects output to /tmp/aws_sso_renew.log for easy debugging if needed</li>
+</ul>
+<p>!!! note “Important”
+Make sure your environment variables ($PATH) are properly available inside cron.
+Sometimes you need to load your AWS credentials manually inside the script if your environment is not loaded.</p>
+<h2 id="why-it-matters">Why It Matters</h2>
+<ul>
+<li>⏳ No more session expiration surprises.</li>
+<li>🔒 Maintain secure access to your Kubernetes cluster.</li>
+<li>🚀 Speed up your daily development workflow.</li>
+</ul>
+<h2 id="final-thoughts">Final Thoughts</h2>
+<p>AWS SSO is great for security, but it can disrupt your Kubernetes operations without automation.
+This small script saves time, reduces frustration, and helps you maintain a smooth EKS workflow without manual steps.</p>
+<p>Happy Kubernetes hacking! 🚀</p> </div> <nav class="blog-post-navigation"> <a href="/blog/turbo-cache" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">Setting Up Turborepo Remote Cache with S3 and GitHub Actions</div> </a> <a href="/blog/auto-tls-dns-kubernetes" class="blog-post-nav-link next"> <div class="blog-post-nav-label">Next Post</div> <div class="blog-post-nav-title">Automated TLS and DNS in Kubernetes with ExternalDNS, Ingress, and Let&#39;s Encrypt</div> </a> </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Posts</h2> <div class="related-posts-grid"> <a href="/blog/build-promote" class="blog-card card-link"> <img src="/assets/blog/build-promote/banner.jpg" alt="Build Once. Promote Forward. Ship Daily." class="blog-card-image"> <h3 class="blog-card-title">Build Once. Promote Forward. Ship Daily.</h3> <p class="blog-card-description"> How we eliminated rebuild-per-environment pipelines and went from shipping every two weeks to shipping daily. A real-world story of building once, validating once, and promoting the same artifact through environments. </p> </a><a href="/blog/local-ai" class="blog-card card-link"> <img src="/assets/blog/local-ai/banner.png" alt="The &#34;Hybrid&#34; AI Stack: Enterprise Power at Work, Localhost Freedom at Home" class="blog-card-image"> <h3 class="blog-card-title">The &quot;Hybrid&quot; AI Stack: Enterprise Power at Work, Localhost Freedom at Home</h3> <p class="blog-card-description"> How I built a personal AI stack on my MacBook Pro M4 using Ollama, Open WebUI, and Draw Things—running entirely locally with zero privacy leaks and unlimited usage, while keeping enterprise cloud tools for work. </p> </a><a href="/blog/remote-secret-tunnel" class="blog-card card-link"> <img src="/assets/blog/remote-secret-tunnel/banner.jpg" alt="Developing and Testing K3s Apps Locally" class="blog-card-image"> <h3 class="blog-card-title">Developing and Testing K3s Apps Locally</h3> <p class="blog-card-description"> When building Kubernetes-aware tools — whether a CLI, dashboard, or internal Python service — you often need your local environment to talk directly to the cluster API. </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container"> <p class="footer-text">© 2025 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer> </body></html>

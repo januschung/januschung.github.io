@@ -1,0 +1,73 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Securing your website with HTTPS is a critical step in establishing trust and improving SEO. This guide will show how to generate and install a free Let's Encrypt SSL certificate on a GoDaddy-hosted s"><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v4.16.19"><title>Let&#39;s Encrypt SSL Certificate with Certbot for GoDaddy - Janus</title><link rel="stylesheet" href="/_astro/about.BqpiiRvk.css"><script type="module" src="/_astro/hoisted.DmkqG5EQ.js"></script></head> <body class="min-h-screen flex flex-col"> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul> <div class="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false}"></div>  </div> </div> </nav> </header>  <main class="flex-1">  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">Let&#39;s Encrypt SSL Certificate with Certbot for GoDaddy</h1> <div class="blog-post-meta"> <time>November 29, 2024</time> <span class="blog-post-meta-separator">•</span> <span>3 min read</span> </div> <div class="blog-post-tags"> <span class="blog-post-tag">ssl</span><span class="blog-post-tag">devops</span> </div> </header> <div class="blog-post-content prose"> <h1 id="lets-encrypt-ssl-certificate-with-certbot-for-godaddy">Let’s Encrypt SSL Certificate with Certbot for GoDaddy</h1>
+<p>Securing your website with HTTPS is a critical step in establishing trust and improving SEO. This guide will show how to generate and install a free Let’s Encrypt SSL certificate on a GoDaddy-hosted site using Certbot, and set up automatic certificate renewal.</p>
+<p><img src="/assets/blog/ssl/banner.jpg" alt="SSL Hero"></p>
+<!-- more -->
+<p>This guide will walk you through the steps to generate and install a Let’s Encrypt SSL certificate on your GoDaddy-hosted website, including automating certificate renewal.</p>
+<h2 id="prerequisites">Prerequisites</h2>
+<ul>
+<li>A GoDaddy account with VPS or Dedicated Hosting ( ustom SSL certificates can be installed).</li>
+<li>SSH access to your hosting server. (Optional)</li>
+<li>Certbot installed on your local machine or server.</li>
+</ul>
+<h2 id="step-1-install-certbot">Step 1: Install Certbot</h2>
+<p>To generate a Let’s Encrypt SSL certificate, you’ll need to install Certbot. Follow these steps based on your operating system.</p>
+<p>For Ubuntu/Debian-based systems:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">sudo</span><span style="color:#9ECBFF"> apt</span><span style="color:#9ECBFF"> update</span></span>
+<span class="line"><span style="color:#B392F0">sudo</span><span style="color:#9ECBFF"> apt</span><span style="color:#9ECBFF"> install</span><span style="color:#9ECBFF"> certbot</span></span>
+<span class="line"></span></code></pre>
+<p>For macOS (using Homebrew):</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">brew</span><span style="color:#9ECBFF"> install</span><span style="color:#9ECBFF"> certbot</span></span>
+<span class="line"></span></code></pre>
+<h2 id="step-2-generate-the-ssl-certificate">Step 2: Generate the SSL Certificate</h2>
+<p>To generate the SSL certificate, use Certbot’s DNS validation method. This is particularly useful when you’re hosting with GoDaddy but running Certbot elsewhere.</p>
+<p>Run the following command, replacing yourdomain.com with your domain:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">certbot</span><span style="color:#9ECBFF"> certonly</span><span style="color:#79B8FF"> --manual</span><span style="color:#79B8FF"> --preferred-challenges=dns</span><span style="color:#79B8FF"> -d</span><span style="color:#9ECBFF"> yourdomain.com</span><span style="color:#79B8FF"> -d</span><span style="color:#9ECBFF"> www.yourdomain.com</span></span>
+<span class="line"></span></code></pre>
+<p>Certbot will prompt you to create a DNS TXT record to verify domain ownership.</p>
+<p>Add the DNS TXT record in GoDaddy:</p>
+<ol>
+<li>Log in to your GoDaddy account.</li>
+<li>Go to Domains > DNS Settings.</li>
+<li>Add a new TXT record with the value provided by Certbot (it will look something like _acme-challenge.yourdomain.com).</li>
+<li>Wait for DNS propagation to complete (this can take a few minutes to a couple of hours).</li>
+<li>Confirm the certificate: After DNS propagation, confirm the certificate generation by following the instructions provided by Certbot.</li>
+</ol>
+<p>Certbot will generate the following files:</p>
+<ul>
+<li>fullchain.pem (certificate)</li>
+<li>privkey.pem (private key)</li>
+</ul>
+<h2 id="step-3-install-the-certificate-on-godaddy">Step 3: Install the Certificate on GoDaddy</h2>
+<ol>
+<li>Log in to your GoDaddy cPanel.</li>
+<li>Go to Security > SSL/TLS.</li>
+<li>Under Manage SSL Sites, click Manage SSL Sites.</li>
+<li>Paste the content of:
+<ul>
+<li>fullchain.pem into the “Certificate” field.</li>
+<li>privkey.pem into the “Private Key” field.</li>
+</ul>
+</li>
+<li>Click Install Certificate to complete the process.</li>
+</ol>
+<h2 id="step-4-automate-renewal-with-certbot">Step 4: Automate Renewal with Certbot</h2>
+<p>Let’s Encrypt certificates expire every 90 days, so it’s important to set up automatic renewal.</p>
+<h3 id="test-the-renewal-process">Test the renewal process:</h3>
+<p>Run the following command to test renewal:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">sudo</span><span style="color:#9ECBFF"> certbot</span><span style="color:#9ECBFF"> renew</span><span style="color:#79B8FF"> --dry-run</span></span>
+<span class="line"></span></code></pre>
+<h3 id="set-up-a-cron-job-for-automatic-renewal">Set up a cron job for automatic renewal:</h3>
+<p>To automatically renew your certificates, create a cron job that runs periodically (e.g., every day at midnight):</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">sudo</span><span style="color:#9ECBFF"> crontab</span><span style="color:#79B8FF"> -e</span></span>
+<span class="line"></span></code></pre>
+<p>Add the following line to the cron file:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">0</span><span style="color:#79B8FF"> 0</span><span style="color:#79B8FF"> *</span><span style="color:#79B8FF"> *</span><span style="color:#79B8FF"> *</span><span style="color:#9ECBFF"> certbot</span><span style="color:#9ECBFF"> renew</span><span style="color:#79B8FF"> --quiet</span><span style="color:#E1E4E8"> &#x26;&#x26; </span><span style="color:#B392F0">systemctl</span><span style="color:#9ECBFF"> reload</span><span style="color:#9ECBFF"> apache2</span><span style="color:#6A737D">  # For Apache</span></span>
+<span class="line"></span></code></pre>
+<p>OR</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">0</span><span style="color:#79B8FF"> 0</span><span style="color:#79B8FF"> *</span><span style="color:#79B8FF"> *</span><span style="color:#79B8FF"> *</span><span style="color:#9ECBFF"> certbot</span><span style="color:#9ECBFF"> renew</span><span style="color:#79B8FF"> --quiet</span><span style="color:#E1E4E8"> &#x26;&#x26; </span><span style="color:#B392F0">systemctl</span><span style="color:#9ECBFF"> reload</span><span style="color:#9ECBFF"> nginx</span><span style="color:#6A737D">   # For Nginx</span></span>
+<span class="line"></span></code></pre>
+<p>This ensures that certificates are checked and renewed daily, if necessary.</p>
+<h2 id="step-5-verify-ssl-installation">Step 5: Verify SSL Installation</h2>
+<p>Once the certificate is installed, use the SSL Labs Test to verify your SSL certificate and check for any issues.</p>
+<h2 id="conclusion">Conclusion</h2>
+<p>By following this guide, you’ve successfully secured your GoDaddy-hosted website with a free Let’s Encrypt SSL certificate. With automated renewal in place, you can now enjoy secure and hassle-free HTTPS for your site.</p> </div> <nav class="blog-post-navigation"> <a href="/blog/redis-jedis-setup" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">Using Redis with SpringBoot</div> </a> <a href="/blog/oracle-server" class="blog-post-nav-link next"> <div class="blog-post-nav-label">Next Post</div> <div class="blog-post-nav-title">Setting Up Docker, SSL, and DuckDNS on Oracle Server</div> </a> </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Posts</h2> <div class="related-posts-grid"> <a href="/blog/build-promote" class="blog-card card-link"> <img src="/assets/blog/build-promote/banner.jpg" alt="Build Once. Promote Forward. Ship Daily." class="blog-card-image"> <h3 class="blog-card-title">Build Once. Promote Forward. Ship Daily.</h3> <p class="blog-card-description"> How we eliminated rebuild-per-environment pipelines and went from shipping every two weeks to shipping daily. A real-world story of building once, validating once, and promoting the same artifact through environments. </p> </a><a href="/blog/local-ai" class="blog-card card-link"> <img src="/assets/blog/local-ai/banner.png" alt="The &#34;Hybrid&#34; AI Stack: Enterprise Power at Work, Localhost Freedom at Home" class="blog-card-image"> <h3 class="blog-card-title">The &quot;Hybrid&quot; AI Stack: Enterprise Power at Work, Localhost Freedom at Home</h3> <p class="blog-card-description"> How I built a personal AI stack on my MacBook Pro M4 using Ollama, Open WebUI, and Draw Things—running entirely locally with zero privacy leaks and unlimited usage, while keeping enterprise cloud tools for work. </p> </a><a href="/blog/remote-secret-tunnel" class="blog-card card-link"> <img src="/assets/blog/remote-secret-tunnel/banner.jpg" alt="Developing and Testing K3s Apps Locally" class="blog-card-image"> <h3 class="blog-card-title">Developing and Testing K3s Apps Locally</h3> <p class="blog-card-description"> When building Kubernetes-aware tools — whether a CLI, dashboard, or internal Python service — you often need your local environment to talk directly to the cluster API. </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container"> <p class="footer-text">© 2025 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer> </body></html>

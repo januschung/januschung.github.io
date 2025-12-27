@@ -1,0 +1,128 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="&#34;How we started replacing our VPN with Tailscale, improved onboarding and access control, and reduced costs—all in five days.&#34;"><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v4.16.19"><title>Swapping VPN for Tailscale: A Five-Day Internal Infra Upgrade - Janus</title><link rel="stylesheet" href="/_astro/about.BqpiiRvk.css"><script type="module" src="/_astro/hoisted.DmkqG5EQ.js"></script></head> <body class="min-h-screen flex flex-col"> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul> <div class="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false}"></div>  </div> </div> </nav> </header>  <main class="flex-1">  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">Swapping VPN for Tailscale: A Five-Day Internal Infra Upgrade</h1> <div class="blog-post-meta"> <time>June 24, 2025</time> <span class="blog-post-meta-separator">•</span> <span>4 min read</span> </div> <div class="blog-post-tags"> <span class="blog-post-tag">tailscale</span><span class="blog-post-tag">vpn</span><span class="blog-post-tag">kubernetes</span><span class="blog-post-tag">networking</span><span class="blog-post-tag">devops</span> </div> </header> <div class="blog-post-content prose"> <h1 id="swapping-vpn-for-tailscale-a-five-day-internal-infra-upgrade">Swapping VPN for Tailscale: A Five-Day Internal Infra Upgrade</h1>
+<h5 id="originally-posted-at-linkedin-at-june-25-2025">originally posted at <a href="https://www.linkedin.com/pulse/swapping-vpn-tailscale-five-day-internal-infra-upgrade-janus-chung-rnucc">LinkedIn</a> at June 25, 2025</h5>
+<p>We recently started migrating away from our traditional VPN setup—and toward something simpler, faster, and cheaper: <strong>Tailscale</strong>.</p>
+<p>This wasn’t a full rip-and-replace. In just five days, we moved a core set of internal Kubernetes services behind Tailscale, enough to start retiring our legacy VPN setup piece by piece.</p>
+<p>The results?<br>
+✅ Smoother developer workflows<br>
+✅ Better access control<br>
+✅ Significant cost savings<br>
+✅ Self-serve onboarding<br>
+✅ Fewer support headaches</p>
+<p><img src="/assets/blog/tailscale/banner.jpg" alt="Enjoy Super Speeding in Private Network Tunnel"></p>
+<!-- more -->
+<h2 id="why-we-looked-beyond-our-vpn">Why We Looked Beyond Our VPN</h2>
+<p>Our old VPN setup worked, but it came with pain:</p>
+<ul>
+<li><strong>Unreliable onboarding</strong>: Getting new devs access to internal tools meant following tribal checklists.</li>
+<li><strong>Flaky performance</strong>: DNS routing issues and random client disconnects were routine.</li>
+<li><strong>Scaling cost</strong>: Per-user pricing added up quickly as the team grew.</li>
+</ul>
+<p>We needed a way to:</p>
+<ul>
+<li>Securely expose internal services</li>
+<li>Manage access with identity, not IPs</li>
+<li>Spend less time maintaining tunnels</li>
+</ul>
+<p>Tailscale had already been a favorite among engineers for peer-to-peer dev work. With their Kubernetes integration, we realized it could be the backbone of our internal network.</p>
+<h2 id="the-tailscale-kubernetes-operator">The Tailscale Kubernetes Operator</h2>
+<p>We used the <a href="https://tailscale.com/kb/1236/kubernetes-operator/">Tailscale Kubernetes Operator</a> to expose services inside our EKS cluster directly onto our Tailscale network.</p>
+<p>That meant:</p>
+<ul>
+<li>No public ingress</li>
+<li>No legacy VPN tunnels</li>
+<li>Just a Tailscale IP and ACL-based access control</li>
+</ul>
+<p>To make it work, we asked Tailscale to enable a beta feature. They did so the same day—unblocking us instantly.</p>
+<blockquote>
+<p>💬 “Tailscale’s support was fast, helpful, and low-friction. That made a huge difference in moving quickly.”</p>
+</blockquote>
+<h2 id="what-we-did-in-5-days">What We Did in 5 Days</h2>
+<p>This wasn’t a full migration—but it was a meaningful one.</p>
+<h3 id="-day-1-planning-and-access">✅ Day 1: Planning and Access</h3>
+<ul>
+<li>Audited internal services for migration</li>
+<li>Requested access to the necessary beta feature</li>
+<li>Set up a test namespace in EKS</li>
+</ul>
+<h3 id="-day-2-deploy-the-operator">✅ Day 2: Deploy the Operator</h3>
+<ul>
+<li>Installed the Tailscale operator in Kubernetes</li>
+<li>Verified access to a test service via tailnet</li>
+</ul>
+<h3 id="-days-34-migrate-key-services">✅ Days 3–4: Migrate Key Services</h3>
+<ul>
+<li>Moved internal dashboards and dev/test APIs</li>
+<li>Replaced ingress rules with tailnet-only access</li>
+</ul>
+<h3 id="-day-5-move-golink-off-a-laptop">✅ Day 5: Move GoLink Off a Laptop</h3>
+<p>Our internal GoLink (URL shortener) was still running on a MacBook.<br>
+We containerized it, deployed it to EKS, and exposed it via Tailscale.</p>
+<p>It’s now:</p>
+<ul>
+<li>Always available</li>
+<li>Protected by SSO and ACLs</li>
+<li>No longer a “single MacBook of failure”</li>
+</ul>
+<h2 id="-cost-comparison-traditional-vpn-vs-tailscale">📉 Cost Comparison: Traditional VPN vs. Tailscale</h2>
+<p>Here’s how costs shake out for teams of 10 to 50 users:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Team Size</th><th>Traditional VPN ($10–15 PMPM)</th><th>Tailscale ($6 PMPM)</th><th><strong>Monthly Savings</strong></th></tr></thead><tbody><tr><td>10 users</td><td>$100–150</td><td>$60</td><td>$40–90</td></tr><tr><td>25 users</td><td>$250–375</td><td>$150</td><td>$100–225</td></tr><tr><td>50 users</td><td>$500–750</td><td>$300</td><td>$200–450</td></tr></tbody></table>
+<blockquote>
+<p>With Tailscale, pricing is flat, predictable, and scales cleanly with the team.</p>
+</blockquote>
+<h2 id="what-we-gained-so-far">What We Gained So Far</h2>
+<p>Even with a partial rollout, the impact was immediate:</p>
+<h3 id="-effortless-onboarding">🧠 Effortless Onboarding</h3>
+<p>New teammates just sign in with SSO and install the Tailscale app—on desktop <strong>or mobile</strong>.<br>
+No setup guides. No support pings. No friction.</p>
+<blockquote>
+<p>One team member called it <em>“the smoothest internal access experience I’ve had.”</em></p>
+</blockquote>
+<h3 id="-better-access-control">🔐 Better Access Control</h3>
+<p>We make use of ACL tagging right in the YAML config, and manage everything from one clean web UI.<br>
+It’s simple, auditable, and role-aware—without any subnet headaches.</p>
+<h3 id="-developer-happiness">⚡ Developer Happiness</h3>
+<p>Internal tools are instantly reachable from anywhere via tailnet IPs.<br>
+No more wrestling with VPN clients or wondering why DNS isn’t resolving.</p>
+<h3 id="-real-cost-savings">💸 Real Cost Savings</h3>
+<p>We’re already spending less than before—and the savings will grow as we migrate more.</p>
+<h2 id="whats-next">What’s Next</h2>
+<p>This rollout laid the groundwork for more:</p>
+<ul>
+<li>Expanding Tailscale coverage to more services</li>
+<li>Introducing <strong>exit nodes</strong> for outbound traffic</li>
+<li>Removing our legacy VPN entirely</li>
+<li>Testing <strong>Tailscale Funnel</strong> for preview environments</li>
+</ul>
+<h2 id="final-thoughts">Final Thoughts</h2>
+<p>We didn’t replace everything in five days—but we replaced enough to see a clear difference.</p>
+<p>With Tailscale, we simplified onboarding, secured access by identity, improved our internal network’s resilience, and lowered our costs. All without writing custom infra or managing new VPN servers.</p>
+<p>If you’re dealing with a brittle VPN setup or want something simpler, Tailscale’s worth exploring. Start small—see what happens.</p> </div> <nav class="blog-post-navigation"> <a href="/blog/traefik-vs-nginx" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">Goodbye Nginx, Hello Traefik! Effortless HTTPS with Let&#39;s Encrypt and Docker</div> </a> <a href="/blog/airbyte-replatform" class="blog-post-nav-link next"> <div class="blog-post-nav-label">Next Post</div> <div class="blog-post-nav-title">Replatforming Airbyte: From Developer Laptop to EKS</div> </a> </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Posts</h2> <div class="related-posts-grid"> <a href="/blog/build-promote" class="blog-card card-link"> <img src="/assets/blog/build-promote/banner.jpg" alt="Build Once. Promote Forward. Ship Daily." class="blog-card-image"> <h3 class="blog-card-title">Build Once. Promote Forward. Ship Daily.</h3> <p class="blog-card-description"> How we eliminated rebuild-per-environment pipelines and went from shipping every two weeks to shipping daily. A real-world story of building once, validating once, and promoting the same artifact through environments. </p> </a><a href="/blog/local-ai" class="blog-card card-link"> <img src="/assets/blog/local-ai/banner.png" alt="The &#34;Hybrid&#34; AI Stack: Enterprise Power at Work, Localhost Freedom at Home" class="blog-card-image"> <h3 class="blog-card-title">The &quot;Hybrid&quot; AI Stack: Enterprise Power at Work, Localhost Freedom at Home</h3> <p class="blog-card-description"> How I built a personal AI stack on my MacBook Pro M4 using Ollama, Open WebUI, and Draw Things—running entirely locally with zero privacy leaks and unlimited usage, while keeping enterprise cloud tools for work. </p> </a><a href="/blog/remote-secret-tunnel" class="blog-card card-link"> <img src="/assets/blog/remote-secret-tunnel/banner.jpg" alt="Developing and Testing K3s Apps Locally" class="blog-card-image"> <h3 class="blog-card-title">Developing and Testing K3s Apps Locally</h3> <p class="blog-card-description"> When building Kubernetes-aware tools — whether a CLI, dashboard, or internal Python service — you often need your local environment to talk directly to the cluster API. </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container"> <p class="footer-text">© 2025 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer> </body></html>

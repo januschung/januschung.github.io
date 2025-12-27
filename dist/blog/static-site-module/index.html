@@ -1,0 +1,302 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="A common need in modern cloud infrastructure is hosting static websites — whether it's marketing sites, documentation portals, or Single Page Applications (SPAs) built with React, Vue, or Svelte."><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v4.16.19"><title>Building a Reusable Terraform Static Site Module with CloudFront, S3, and Route 53 - Janus</title><link rel="stylesheet" href="/_astro/about.BqpiiRvk.css"><script type="module" src="/_astro/hoisted.DmkqG5EQ.js"></script></head> <body class="min-h-screen flex flex-col"> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul> <div class="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false}"></div>  </div> </div> </nav> </header>  <main class="flex-1">  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">Building a Reusable Terraform Static Site Module with CloudFront, S3, and Route 53</h1> <div class="blog-post-meta"> <time>June 3, 2025</time> <span class="blog-post-meta-separator">•</span> <span>6 min read</span> </div> <div class="blog-post-tags"> <span class="blog-post-tag">terraform</span><span class="blog-post-tag">cloudfront</span><span class="blog-post-tag">aws</span><span class="blog-post-tag">route53</span><span class="blog-post-tag">ssl</span><span class="blog-post-tag">s3</span><span class="blog-post-tag">devops</span> </div> </header> <div class="blog-post-content prose"> <h1 id="building-a-reusable-terraform-static-site-module-with-cloudfront-s3-and-route-53">Building a Reusable Terraform Static Site Module with CloudFront, S3, and Route 53</h1>
+<h2 id="overview">Overview</h2>
+<p>A common need in modern cloud infrastructure is hosting static websites — whether it’s marketing sites, documentation portals, or Single Page Applications (SPAs) built with React, Vue, or Svelte.</p>
+<p>At first, the AWS building blocks for this are fairly simple:</p>
+<ul>
+<li>S3 for object storage</li>
+<li>CloudFront for CDN</li>
+<li>ACM for HTTPS</li>
+<li>Route 53 for DNS</li>
+</ul>
+<p>But quickly, managing this setup by hand or duplicating configs across environments (prod, staging, QA) becomes painful:</p>
+<ul>
+<li>Too many copy/paste Terraform files</li>
+<li>Hard to apply consistent policies</li>
+<li>Complicated to manage uploads (especially when some sites are CI/CD and some are manual content sites)</li>
+</ul>
+<p><img src="/assets/blog/static-site-module/banner.jpg" alt="Terraform Static Site Module"></p>
+<!-- more -->
+<h2 id="why-a-reusable-module">Why a Reusable Module?</h2>
+<p>I wanted a simple, composable way to manage:</p>
+<ul>
+<li>Multiple static sites across environments</li>
+<li>Both “content” sites (manual file uploads)</li>
+<li>And React apps (deployed by CI/CD)</li>
+<li>With a consistent CloudFront + ACM + Route 53 setup</li>
+<li>Using Terraform modules to avoid duplication</li>
+</ul>
+<h2 id="architecture">Architecture</h2>
+<p>The module will:</p>
+<ol>
+<li>Create an S3 bucket</li>
+<li>(Optional) Enable versioning</li>
+<li>Create a CloudFront distribution with Origin Access Identity (OAI)</li>
+<li>Request an ACM certificate (DNS validated via Route 53)</li>
+<li>Create an A/ALIAS record in Route 53 for the domain</li>
+<li>(Optional) Upload local files using Terraform</li>
+</ol>
+<h2 id="module-main-code-modulesstatic-sitemaintf">Module Main Code (<code>modules/static-site/main.tf</code>)</h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="hcl"><code><span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "aws_s3_bucket"</span><span style="color:#79B8FF"> "bucket"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  bucket</span><span style="color:#F97583">        =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">bucket_name</span></span>
+<span class="line"><span style="color:#E1E4E8">  force_destroy</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> true</span></span>
+<span class="line"><span style="color:#E1E4E8">  tags</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    Name        </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> var.bucket_name_tag</span></span>
+<span class="line"><span style="color:#E1E4E8">    Environment </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> var.environment</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "aws_s3_bucket_versioning"</span><span style="color:#79B8FF"> "bucket_versioning"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  count</span><span style="color:#F97583">  =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">enable_versioning </span><span style="color:#F97583">?</span><span style="color:#79B8FF"> 1</span><span style="color:#F97583"> :</span><span style="color:#79B8FF"> 0</span></span>
+<span class="line"><span style="color:#E1E4E8">  bucket</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> aws_s3_bucket</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">bucket</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">id</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">  versioning_configuration</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    status</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "Enabled"</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "aws_cloudfront_origin_access_identity"</span><span style="color:#79B8FF"> "oai"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  comment</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "OAI for </span><span style="color:#F97583">${</span><span style="color:#E1E4E8">var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">domain_name</span><span style="color:#F97583">}</span><span style="color:#9ECBFF">"</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "aws_s3_bucket_policy"</span><span style="color:#79B8FF"> "allow_cf"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  bucket</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> aws_s3_bucket</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">bucket</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">id</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">  policy</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> jsonencode</span><span style="color:#E1E4E8">({</span></span>
+<span class="line"><span style="color:#E1E4E8">    Version </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> "2012-10-17"</span></span>
+<span class="line"><span style="color:#E1E4E8">    Statement </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> [</span></span>
+<span class="line"><span style="color:#E1E4E8">      {</span></span>
+<span class="line"><span style="color:#E1E4E8">        Effect </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> "Allow"</span></span>
+<span class="line"><span style="color:#E1E4E8">        Principal </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">          AWS </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> aws_cloudfront_origin_access_identity.oai.iam_arn</span></span>
+<span class="line"><span style="color:#E1E4E8">        }</span></span>
+<span class="line"><span style="color:#E1E4E8">        Action   </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> "s3:GetObject"</span></span>
+<span class="line"><span style="color:#E1E4E8">        Resource </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> "</span><span style="color:#F97583">${</span><span style="color:#E1E4E8">aws_s3_bucket</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">bucket</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">arn</span><span style="color:#F97583">}</span><span style="color:#9ECBFF">/*"</span></span>
+<span class="line"><span style="color:#E1E4E8">      }</span></span>
+<span class="line"><span style="color:#E1E4E8">    ]</span></span>
+<span class="line"><span style="color:#E1E4E8">  })</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "aws_acm_certificate"</span><span style="color:#79B8FF"> "cert"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  domain_name</span><span style="color:#F97583">       =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">domain_name</span></span>
+<span class="line"><span style="color:#E1E4E8">  validation_method</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "DNS"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">  lifecycle</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    create_before_destroy</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> true</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "aws_route53_record"</span><span style="color:#79B8FF"> "cert_validation"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  for_each</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">    for</span><span style="color:#E1E4E8"> dvo </span><span style="color:#F97583">in</span><span style="color:#E1E4E8"> aws_acm_certificate</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">cert</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">domain_validation_options </span><span style="color:#F97583">:</span><span style="color:#E1E4E8"> dvo</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">domain_name </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">      name   </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> dvo.resource_record_name</span></span>
+<span class="line"><span style="color:#E1E4E8">      type   </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> dvo.resource_record_type</span></span>
+<span class="line"><span style="color:#E1E4E8">      record </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> dvo.resource_record_value</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">  zone_id</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">route53_zone_id</span></span>
+<span class="line"><span style="color:#E1E4E8">  name</span><span style="color:#F97583">    =</span><span style="color:#E1E4E8"> each</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">value</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">name</span></span>
+<span class="line"><span style="color:#E1E4E8">  type</span><span style="color:#F97583">    =</span><span style="color:#E1E4E8"> each</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">value</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">type</span></span>
+<span class="line"><span style="color:#E1E4E8">  ttl</span><span style="color:#F97583">     =</span><span style="color:#79B8FF"> 300</span></span>
+<span class="line"><span style="color:#E1E4E8">  records</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> [each</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">value</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">record]</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "aws_acm_certificate_validation"</span><span style="color:#79B8FF"> "validate_cert"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  certificate_arn</span><span style="color:#F97583">         =</span><span style="color:#E1E4E8"> aws_acm_certificate</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">cert</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">arn</span></span>
+<span class="line"><span style="color:#E1E4E8">  validation_record_fqdns</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> [</span><span style="color:#F97583">for</span><span style="color:#E1E4E8"> record </span><span style="color:#F97583">in</span><span style="color:#E1E4E8"> aws_route53_record</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">cert_validation </span><span style="color:#F97583">:</span><span style="color:#E1E4E8"> record</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">fqdn]</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "aws_cloudfront_distribution"</span><span style="color:#79B8FF"> "cdn"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  depends_on</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> [aws_acm_certificate_validation</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">validate_cert]</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">  origin</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    domain_name</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> aws_s3_bucket</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">bucket</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">bucket_regional_domain_name</span></span>
+<span class="line"><span style="color:#E1E4E8">    origin_id</span><span style="color:#F97583">   =</span><span style="color:#9ECBFF"> "s3-origin"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">    s3_origin_config</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">      origin_access_identity</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> aws_cloudfront_origin_access_identity</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">oai</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">cloudfront_access_identity_path</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">  enabled</span><span style="color:#F97583">             =</span><span style="color:#79B8FF"> true</span></span>
+<span class="line"><span style="color:#E1E4E8">  default_root_object</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "index.html"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">  default_cache_behavior</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    allowed_methods</span><span style="color:#F97583">  =</span><span style="color:#E1E4E8"> [</span><span style="color:#9ECBFF">"GET"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"HEAD"</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#E1E4E8">    cached_methods</span><span style="color:#F97583">   =</span><span style="color:#E1E4E8"> [</span><span style="color:#9ECBFF">"GET"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"HEAD"</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#E1E4E8">    target_origin_id</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "s3-origin"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">    forwarded_values</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">      query_string</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> false</span></span>
+<span class="line"><span style="color:#B392F0">      cookies</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">        forward</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "none"</span></span>
+<span class="line"><span style="color:#E1E4E8">      }</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">    viewer_protocol_policy</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "redirect-to-https"</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">  viewer_certificate</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    acm_certificate_arn</span><span style="color:#F97583">      =</span><span style="color:#E1E4E8"> aws_acm_certificate_validation</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">validate_cert</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">certificate_arn</span></span>
+<span class="line"><span style="color:#E1E4E8">    ssl_support_method</span><span style="color:#F97583">       =</span><span style="color:#9ECBFF"> "sni-only"</span></span>
+<span class="line"><span style="color:#E1E4E8">    minimum_protocol_version</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "TLSv1.2_2021"</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">  aliases</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> [var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">domain_name]</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">  restrictions</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#B392F0">    geo_restriction</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">      restriction_type</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "none"</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">  custom_error_response</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    error_code</span><span style="color:#F97583">         =</span><span style="color:#79B8FF"> 404</span></span>
+<span class="line"><span style="color:#E1E4E8">    response_code</span><span style="color:#F97583">      =</span><span style="color:#79B8FF"> 200</span></span>
+<span class="line"><span style="color:#E1E4E8">    response_page_path</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "/index.html"</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "aws_route53_record"</span><span style="color:#79B8FF"> "cf_alias"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  zone_id</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">route53_zone_id</span></span>
+<span class="line"><span style="color:#E1E4E8">  name</span><span style="color:#F97583">    =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">domain_name</span></span>
+<span class="line"><span style="color:#E1E4E8">  type</span><span style="color:#F97583">    =</span><span style="color:#9ECBFF"> "A"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">  alias</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    name</span><span style="color:#F97583">                   =</span><span style="color:#E1E4E8"> aws_cloudfront_distribution</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">cdn</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">domain_name</span></span>
+<span class="line"><span style="color:#E1E4E8">    zone_id</span><span style="color:#F97583">                =</span><span style="color:#E1E4E8"> aws_cloudfront_distribution</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">cdn</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">hosted_zone_id</span></span>
+<span class="line"><span style="color:#E1E4E8">    evaluate_target_health</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> false</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># -------------------- Upload logic (optional) --------------------</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">locals</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  upload_path</span><span style="color:#F97583">  =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">upload_path </span><span style="color:#F97583">!=</span><span style="color:#79B8FF"> null</span><span style="color:#F97583"> ?</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">upload_path </span><span style="color:#F97583">:</span><span style="color:#9ECBFF"> "</span><span style="color:#F97583">${</span><span style="color:#E1E4E8">path</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">root</span><span style="color:#F97583">}</span><span style="color:#9ECBFF">/upload/</span><span style="color:#F97583">${</span><span style="color:#E1E4E8">var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">bucket_name</span><span style="color:#F97583">}</span><span style="color:#9ECBFF">"</span></span>
+<span class="line"><span style="color:#E1E4E8">  upload_files</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">enable_uploads </span><span style="color:#F97583">?</span><span style="color:#79B8FF"> fileset</span><span style="color:#E1E4E8">(local</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">upload_path, </span><span style="color:#9ECBFF">"*"</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">:</span><span style="color:#E1E4E8"> []</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "aws_s3_object"</span><span style="color:#79B8FF"> "uploads"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  for_each</span><span style="color:#F97583">     =</span><span style="color:#E1E4E8"> { </span><span style="color:#F97583">for</span><span style="color:#E1E4E8"> f </span><span style="color:#F97583">in</span><span style="color:#E1E4E8"> local</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">upload_files </span><span style="color:#F97583">:</span><span style="color:#E1E4E8"> f </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> f }</span></span>
+<span class="line"><span style="color:#E1E4E8">  bucket</span><span style="color:#F97583">       =</span><span style="color:#E1E4E8"> aws_s3_bucket</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">bucket</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">id</span></span>
+<span class="line"><span style="color:#E1E4E8">  key</span><span style="color:#F97583">          =</span><span style="color:#E1E4E8"> each</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">key</span></span>
+<span class="line"><span style="color:#E1E4E8">  source</span><span style="color:#F97583">       =</span><span style="color:#9ECBFF"> "</span><span style="color:#F97583">${</span><span style="color:#E1E4E8">var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">upload_path</span><span style="color:#F97583">}</span><span style="color:#9ECBFF">/</span><span style="color:#F97583">${</span><span style="color:#E1E4E8">each</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">key</span><span style="color:#F97583">}</span><span style="color:#9ECBFF">"</span></span>
+<span class="line"><span style="color:#E1E4E8">  source_hash</span><span style="color:#F97583">  =</span><span style="color:#79B8FF"> filemd5</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"</span><span style="color:#F97583">${</span><span style="color:#E1E4E8">var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">upload_path</span><span style="color:#F97583">}</span><span style="color:#9ECBFF">/</span><span style="color:#F97583">${</span><span style="color:#E1E4E8">each</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">key</span><span style="color:#F97583">}</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">  content_type</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> lookup</span><span style="color:#E1E4E8">(var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">mime_types, </span><span style="color:#79B8FF">regex</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"[^.]+$"</span><span style="color:#E1E4E8">, each</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">key), </span><span style="color:#9ECBFF">"application/octet-stream"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span></code></pre>
+<h2 id="module-outputs-modulesstatic-siteoutputstf">Module Outputs (<code>modules/static-site/outputs.tf</code>)</h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="hcl"><code><span class="line"><span style="color:#B392F0">output</span><span style="color:#79B8FF"> "cloudfront_domain_name"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  value</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> aws_cloudfront_distribution</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">cdn</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">domain_name</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">output</span><span style="color:#79B8FF"> "s3_bucket_name"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  value</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> aws_s3_bucket</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">bucket</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">bucket</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">output</span><span style="color:#79B8FF"> "public_file_urls"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  value</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> can</span><span style="color:#E1E4E8">(aws_s3_object</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">uploads) </span><span style="color:#F97583">?</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">    for</span><span style="color:#E1E4E8"> f, obj </span><span style="color:#F97583">in</span><span style="color:#E1E4E8"> aws_s3_object</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">uploads </span><span style="color:#F97583">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    f </span><span style="color:#F97583">=></span><span style="color:#9ECBFF"> "https://</span><span style="color:#F97583">${</span><span style="color:#E1E4E8">var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">domain_name</span><span style="color:#F97583">}</span><span style="color:#9ECBFF">/</span><span style="color:#F97583">${</span><span style="color:#E1E4E8">obj</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">key</span><span style="color:#F97583">}</span><span style="color:#9ECBFF">"</span></span>
+<span class="line"><span style="color:#E1E4E8">  } </span><span style="color:#F97583">:</span><span style="color:#E1E4E8"> {}</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span></code></pre>
+<h2 id="module-variables">Module Variables</h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="hcl"><code><span class="line"><span style="color:#B392F0">variable</span><span style="color:#79B8FF"> "bucket_name"</span><span style="color:#E1E4E8"> {}</span></span>
+<span class="line"><span style="color:#B392F0">variable</span><span style="color:#79B8FF"> "bucket_name_tag"</span><span style="color:#E1E4E8"> {}</span></span>
+<span class="line"><span style="color:#B392F0">variable</span><span style="color:#79B8FF"> "environment"</span><span style="color:#E1E4E8"> {}</span></span>
+<span class="line"><span style="color:#B392F0">variable</span><span style="color:#79B8FF"> "domain_name"</span><span style="color:#E1E4E8"> {}</span></span>
+<span class="line"><span style="color:#B392F0">variable</span><span style="color:#79B8FF"> "route53_zone_id"</span><span style="color:#E1E4E8"> {}</span></span>
+<span class="line"><span style="color:#B392F0">variable</span><span style="color:#79B8FF"> "enable_versioning"</span><span style="color:#E1E4E8"> { default</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> false</span><span style="color:#E1E4E8"> }</span></span>
+<span class="line"><span style="color:#B392F0">variable</span><span style="color:#79B8FF"> "enable_uploads"</span><span style="color:#E1E4E8"> { default</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> false</span><span style="color:#E1E4E8"> }</span></span>
+<span class="line"><span style="color:#B392F0">variable</span><span style="color:#79B8FF"> "upload_path"</span><span style="color:#E1E4E8"> { default</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> null</span><span style="color:#E1E4E8"> }</span></span>
+<span class="line"><span style="color:#B392F0">variable</span><span style="color:#79B8FF"> "mime_types"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  description</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "Map of file extensions to MIME types"</span></span>
+<span class="line"><span style="color:#E1E4E8">  type</span><span style="color:#F97583">        =</span><span style="color:#F97583"> map</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">string</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">  default</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    json </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> "application/json"</span></span>
+<span class="line"><span style="color:#E1E4E8">    txt  </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> "text/plain"</span></span>
+<span class="line"><span style="color:#E1E4E8">    jpg  </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> "image/jpeg"</span></span>
+<span class="line"><span style="color:#E1E4E8">    jpeg </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> "image/jpeg"</span></span>
+<span class="line"><span style="color:#E1E4E8">    png  </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> "image/png"</span></span>
+<span class="line"><span style="color:#E1E4E8">    pdf  </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> "application/pdf"</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span></code></pre>
+<h2 id="example-usage-static-sitestf-in-root">Example Usage (<code>static-sites.tf</code> in root)</h2>
+<h3 id="example-1---static-file-site-uploads-enabled">Example 1 - Static File Site (uploads enabled)</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="hcl"><code><span class="line"><span style="color:#B392F0">module</span><span style="color:#79B8FF"> "files_site"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  source</span><span style="color:#F97583">            =</span><span style="color:#9ECBFF"> "./modules/static-site"</span></span>
+<span class="line"><span style="color:#E1E4E8">  bucket_name</span><span style="color:#F97583">       =</span><span style="color:#9ECBFF"> "files-site"</span></span>
+<span class="line"><span style="color:#E1E4E8">  bucket_name_tag</span><span style="color:#F97583">   =</span><span style="color:#9ECBFF"> "files-site"</span></span>
+<span class="line"><span style="color:#E1E4E8">  environment</span><span style="color:#F97583">       =</span><span style="color:#9ECBFF"> "prod"</span></span>
+<span class="line"><span style="color:#E1E4E8">  domain_name</span><span style="color:#F97583">       =</span><span style="color:#9ECBFF"> "files.example.com"</span></span>
+<span class="line"><span style="color:#E1E4E8">  route53_zone_id</span><span style="color:#F97583">   =</span><span style="color:#E1E4E8"> data</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">aws_route53_zone</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">example_com</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">zone_id</span></span>
+<span class="line"><span style="color:#E1E4E8">  enable_versioning</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> true</span></span>
+<span class="line"><span style="color:#E1E4E8">  enable_uploads</span><span style="color:#F97583">    =</span><span style="color:#79B8FF"> true</span></span>
+<span class="line"><span style="color:#E1E4E8">  upload_path</span><span style="color:#F97583">       =</span><span style="color:#9ECBFF"> "</span><span style="color:#F97583">${</span><span style="color:#E1E4E8">path</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">root</span><span style="color:#F97583">}</span><span style="color:#9ECBFF">/upload/files_site"</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span></code></pre>
+<h3 id="example-2---react-app-no-uploads-no-versioning">Example 2 - React App (no uploads, no versioning)</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="hcl"><code><span class="line"><span style="color:#B392F0">module</span><span style="color:#79B8FF"> "dev_web"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  source</span><span style="color:#F97583">            =</span><span style="color:#9ECBFF"> "./modules/static-site"</span></span>
+<span class="line"><span style="color:#E1E4E8">  bucket_name</span><span style="color:#F97583">       =</span><span style="color:#9ECBFF"> "dev-web"</span></span>
+<span class="line"><span style="color:#E1E4E8">  bucket_name_tag</span><span style="color:#F97583">   =</span><span style="color:#9ECBFF"> "dev-web"</span></span>
+<span class="line"><span style="color:#E1E4E8">  environment</span><span style="color:#F97583">       =</span><span style="color:#9ECBFF"> "dev"</span></span>
+<span class="line"><span style="color:#E1E4E8">  domain_name</span><span style="color:#F97583">       =</span><span style="color:#9ECBFF"> "dev.example.com"</span></span>
+<span class="line"><span style="color:#E1E4E8">  route53_zone_id</span><span style="color:#F97583">   =</span><span style="color:#E1E4E8"> data</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">aws_route53_zone</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">example_com</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">zone_id</span></span>
+<span class="line"><span style="color:#E1E4E8">  enable_versioning</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> false</span></span>
+<span class="line"><span style="color:#E1E4E8">  enable_uploads</span><span style="color:#F97583">    =</span><span style="color:#79B8FF"> false</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span></code></pre>
+<h3 id="upload_path-default-behavior"><code>upload_path</code> default behavior</h3>
+<p>If <code>upload_path</code> is not specified, it defaults to:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="hcl"><code><span class="line"><span style="color:#B392F0">locals</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  upload_path</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">upload_path </span><span style="color:#F97583">!=</span><span style="color:#79B8FF"> null</span><span style="color:#F97583"> ?</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">upload_path </span><span style="color:#F97583">:</span><span style="color:#9ECBFF"> "</span><span style="color:#F97583">${</span><span style="color:#E1E4E8">path</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">root</span><span style="color:#F97583">}</span><span style="color:#9ECBFF">/upload/</span><span style="color:#F97583">${</span><span style="color:#E1E4E8">var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">bucket_name</span><span style="color:#F97583">}</span><span style="color:#9ECBFF">"</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span></code></pre>
+<hr>
+<h2 id="directory-structure">Directory Structure</h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>project-root/</span></span>
+<span class="line"><span>├── main.tf</span></span>
+<span class="line"><span>├── variables.tf</span></span>
+<span class="line"><span>├── outputs.tf</span></span>
+<span class="line"><span>├── terraform.tfvars</span></span>
+<span class="line"><span>├── upload/</span></span>
+<span class="line"><span>│   └── files_site/</span></span>
+<span class="line"><span>└── modules/</span></span>
+<span class="line"><span>    └── static-site/</span></span>
+<span class="line"><span>        ├── main.tf</span></span>
+<span class="line"><span>        ├── variables.tf</span></span>
+<span class="line"><span>        ├── outputs.tf</span></span>
+<span class="line"><span>        └── README.md</span></span>
+<span class="line"><span></span></span></code></pre>
+<h2 id="uploading-or-replacing-files">Uploading or Replacing Files</h2>
+<p>For modules with <code>enable_uploads = true</code>, files will be uploaded from:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>upload/&#x3C;bucket_name>/</span></span>
+<span class="line"><span></span></span></code></pre>
+<p>Or from:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>upload/&#x3C;custom path></span></span>
+<span class="line"><span></span></span></code></pre>
+<p>Terraform will handle uploading new files, updating changed files, or deleting removed files.</p>
+<h2 id="url-for-uploaded-files">URL for Uploaded Files</h2>
+<p>For static resource Site (uploads enabled), eg. with domain_name <code>files.example.com</code></p>
+<p>The files will be served at:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>https://files.example.com/&#x3C;filename></span></span>
+<span class="line"><span></span></span></code></pre>
+<h2 id="conclusion">Conclusion</h2>
+<p>This reusable module pattern has been a very helpful addition to my Terraform workflows:</p>
+<ul>
+<li>I can spin up new static sites in minutes</li>
+<li>I can mix manual content sites and CI/CD React apps seamlessly</li>
+<li>Everything stays consistent across environments</li>
+<li>It is safe, extensible, and easy to maintain</li>
+</ul>
+<p>If you need to manage multiple static sites with Terraform, I highly recommend building or adopting a module like this:</p>
+<p>It keeps your configuration clean, avoids “copy/paste debt,” and makes it easy to scale as your team or product grows.</p>
+<h2 id="future-improvements">Future Improvements</h2>
+<p>Some future ideas to improve this module:</p>
+<ul>
+<li>Add CloudFront logging</li>
+<li>Add S3 lifecycle policies</li>
+</ul> </div> <nav class="blog-post-navigation"> <a href="/blog/auto-tls-dns-kubernetes" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">Automated TLS and DNS in Kubernetes with ExternalDNS, Ingress, and Let&#39;s Encrypt</div> </a> <a href="/blog/traefik-vs-nginx" class="blog-post-nav-link next"> <div class="blog-post-nav-label">Next Post</div> <div class="blog-post-nav-title">Goodbye Nginx, Hello Traefik! Effortless HTTPS with Let&#39;s Encrypt and Docker</div> </a> </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Posts</h2> <div class="related-posts-grid"> <a href="/blog/build-promote" class="blog-card card-link"> <img src="/assets/blog/build-promote/banner.jpg" alt="Build Once. Promote Forward. Ship Daily." class="blog-card-image"> <h3 class="blog-card-title">Build Once. Promote Forward. Ship Daily.</h3> <p class="blog-card-description"> How we eliminated rebuild-per-environment pipelines and went from shipping every two weeks to shipping daily. A real-world story of building once, validating once, and promoting the same artifact through environments. </p> </a><a href="/blog/local-ai" class="blog-card card-link"> <img src="/assets/blog/local-ai/banner.png" alt="The &#34;Hybrid&#34; AI Stack: Enterprise Power at Work, Localhost Freedom at Home" class="blog-card-image"> <h3 class="blog-card-title">The &quot;Hybrid&quot; AI Stack: Enterprise Power at Work, Localhost Freedom at Home</h3> <p class="blog-card-description"> How I built a personal AI stack on my MacBook Pro M4 using Ollama, Open WebUI, and Draw Things—running entirely locally with zero privacy leaks and unlimited usage, while keeping enterprise cloud tools for work. </p> </a><a href="/blog/remote-secret-tunnel" class="blog-card card-link"> <img src="/assets/blog/remote-secret-tunnel/banner.jpg" alt="Developing and Testing K3s Apps Locally" class="blog-card-image"> <h3 class="blog-card-title">Developing and Testing K3s Apps Locally</h3> <p class="blog-card-description"> When building Kubernetes-aware tools — whether a CLI, dashboard, or internal Python service — you often need your local environment to talk directly to the cluster API. </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container"> <p class="footer-text">© 2025 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer> </body></html>

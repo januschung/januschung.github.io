@@ -1,0 +1,164 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Managing DNS and TLS certificates for Kubernetes applications can be tedious and error-prone. Thankfully, tools like **ExternalDNS**, **Ingress**, and **Cert-Manager** automate the entire process — fr"><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v4.16.19"><title>Automated TLS and DNS in Kubernetes with ExternalDNS, Ingress, and Let&#39;s Encrypt - Janus</title><link rel="stylesheet" href="/_astro/about.BqpiiRvk.css"><script type="module" src="/_astro/hoisted.DmkqG5EQ.js"></script></head> <body class="min-h-screen flex flex-col"> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul> <div class="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false}"></div>  </div> </div> </nav> </header>  <main class="flex-1">  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">Automated TLS and DNS in Kubernetes with ExternalDNS, Ingress, and Let&#39;s Encrypt</h1> <div class="blog-post-meta"> <time>May 29, 2025</time> <span class="blog-post-meta-separator">•</span> <span>4 min read</span> </div> <div class="blog-post-tags"> <span class="blog-post-tag">networking</span><span class="blog-post-tag">ssl</span><span class="blog-post-tag">kubernetes</span><span class="blog-post-tag">aws</span><span class="blog-post-tag">eks</span><span class="blog-post-tag">devops</span> </div> </header> <div class="blog-post-content prose"> <h1 id="automated-tls-and-dns-in-kubernetes-with-externaldns-ingress-and-lets-encrypt">Automated TLS and DNS in Kubernetes with ExternalDNS, Ingress, and Let’s Encrypt</h1>
+<p>Managing DNS and TLS certificates for Kubernetes applications can be tedious and error-prone. Thankfully, tools like <strong>ExternalDNS</strong>, <strong>Ingress</strong>, and <strong>Cert-Manager</strong> automate the entire process — from setting DNS records to provisioning Let’s Encrypt certificates.</p>
+<p>In this guide, we’ll walk through how to:</p>
+<ul>
+<li>Use <strong>ExternalDNS</strong> to automatically create DNS records.</li>
+<li>Annotate <strong>Ingress</strong> resources to request a Let’s Encrypt TLS cert.</li>
+<li>Get HTTPS with minimal manual intervention.</li>
+<li>Understand how these components interact.</li>
+</ul>
+<p><img src="/assets/blog/auto-tls-dns-kubernetes/banner.jpg" alt="Auto TLS and DNS with ExternalDNS, Ingress, and Let&#x27;s Encrypt"></p>
+<!-- more -->
+<h2 id="prerequisites">Prerequisites</h2>
+<ul>
+<li>A Kubernetes cluster (EKS, GKE, K3s, etc.)</li>
+<li>A domain name (e.g., <code>example.com</code>) with access to its DNS provider</li>
+<li>A public DNS provider supported by ExternalDNS (e.g., Route53, Cloudflare, Google DNS)</li>
+<li>Helm 3 installed locally</li>
+<li><code>kubectl</code> configured for your cluster</li>
+</ul>
+<h2 id="step-1-set-up-externaldns">Step 1: Set Up ExternalDNS</h2>
+<p>ExternalDNS watches your Kubernetes resources (like <code>Ingress</code>) and creates the corresponding DNS records in your provider.</p>
+<h3 id="install-externaldns-via-helm">Install ExternalDNS via Helm</h3>
+<p>For Route53 (AWS example):</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">helm</span><span style="color:#9ECBFF"> repo</span><span style="color:#9ECBFF"> add</span><span style="color:#9ECBFF"> bitnami</span><span style="color:#9ECBFF"> https://charts.bitnami.com/bitnami</span></span>
+<span class="line"><span style="color:#B392F0">helm</span><span style="color:#9ECBFF"> install</span><span style="color:#9ECBFF"> external-dns</span><span style="color:#9ECBFF"> bitnami/external-dns</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --set</span><span style="color:#9ECBFF"> provider=aws</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --set</span><span style="color:#9ECBFF"> aws.zoneType=public</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --set</span><span style="color:#9ECBFF"> domainFilters[0]=example.com</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --set</span><span style="color:#9ECBFF"> policy=sync</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --set</span><span style="color:#9ECBFF"> registry=txt</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --set</span><span style="color:#9ECBFF"> txtOwnerId=my-cluster</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --set</span><span style="color:#9ECBFF"> serviceAccount.create=</span><span style="color:#79B8FF">true</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --set</span><span style="color:#9ECBFF"> serviceAccount.name=external-dns</span></span>
+<span class="line"></span></code></pre>
+<blockquote>
+<p>⚠️ IAM permissions for Route53 are required on the node or pod role.</p>
+</blockquote>
+<h3 id="iam-policy-for-externaldns-route53-example">IAM Policy for ExternalDNS (Route53 Example)</h3>
+<p>If you are using AWS Route53, ExternalDNS needs permission to manage DNS records.</p>
+<p>Here is a sample IAM policy for managing <strong>multiple domains</strong>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="json"><code><span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#79B8FF">  "Version"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"2012-10-17"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  "Statement"</span><span style="color:#E1E4E8">: [</span></span>
+<span class="line"><span style="color:#E1E4E8">    {</span></span>
+<span class="line"><span style="color:#79B8FF">      "Effect"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Allow"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">      "Action"</span><span style="color:#E1E4E8">: [</span></span>
+<span class="line"><span style="color:#9ECBFF">        "route53:ChangeResourceRecordSets"</span></span>
+<span class="line"><span style="color:#E1E4E8">      ],</span></span>
+<span class="line"><span style="color:#79B8FF">      "Resource"</span><span style="color:#E1E4E8">: [</span></span>
+<span class="line"><span style="color:#9ECBFF">        "arn:aws:route53:::hostedzone/ZONE_ID_1"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">        "arn:aws:route53:::hostedzone/ZONE_ID_2"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">        "arn:aws:route53:::hostedzone/ZONE_ID_3"</span></span>
+<span class="line"><span style="color:#E1E4E8">      ]</span></span>
+<span class="line"><span style="color:#E1E4E8">    },</span></span>
+<span class="line"><span style="color:#E1E4E8">    {</span></span>
+<span class="line"><span style="color:#79B8FF">      "Effect"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Allow"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">      "Action"</span><span style="color:#E1E4E8">: [</span></span>
+<span class="line"><span style="color:#9ECBFF">        "route53:ListHostedZones"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">        "route53:ListResourceRecordSets"</span></span>
+<span class="line"><span style="color:#E1E4E8">      ],</span></span>
+<span class="line"><span style="color:#79B8FF">      "Resource"</span><span style="color:#E1E4E8">: [</span><span style="color:#9ECBFF">"*"</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">  ]</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span></code></pre>
+<blockquote>
+<p>🛠 Replace <code>ZONE_ID_X</code> with your actual Route53 hosted zone IDs (you can find them in the AWS Console under Route53).</p>
+</blockquote>
+<p>If you’re using <strong>EKS</strong>, create an IAM role with this policy and bind it to the Kubernetes ServiceAccount used by ExternalDNS using <strong>IRSA</strong>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">v1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">ServiceAccount</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">external-dns</span></span>
+<span class="line"><span style="color:#85E89D">  namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">default</span></span>
+<span class="line"><span style="color:#85E89D">  annotations</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    eks.amazonaws.com/role-arn</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">arn:aws:iam::&#x3C;ACCOUNT_ID>:role/ExternalDNSRole</span></span>
+<span class="line"></span></code></pre>
+<h2 id="step-2-set-up-cert-manager-for-lets-encrypt">Step 2: Set Up Cert-Manager for Let’s Encrypt</h2>
+<p>Cert-Manager issues and renews TLS certs from Let’s Encrypt.</p>
+<h3 id="install-cert-manager-via-helm">Install Cert-Manager via Helm</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">helm</span><span style="color:#9ECBFF"> repo</span><span style="color:#9ECBFF"> add</span><span style="color:#9ECBFF"> jetstack</span><span style="color:#9ECBFF"> https://charts.jetstack.io</span></span>
+<span class="line"><span style="color:#B392F0">helm</span><span style="color:#9ECBFF"> repo</span><span style="color:#9ECBFF"> update</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">helm</span><span style="color:#9ECBFF"> install</span><span style="color:#9ECBFF"> cert-manager</span><span style="color:#9ECBFF"> jetstack/cert-manager</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --namespace</span><span style="color:#9ECBFF"> cert-manager</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --create-namespace</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --set</span><span style="color:#9ECBFF"> installCRDs=</span><span style="color:#79B8FF">true</span></span>
+<span class="line"></span></code></pre>
+<h3 id="create-lets-encrypt-issuer">Create Let’s Encrypt Issuer</h3>
+<p>Create a production Issuer or Staging one (for testing) with HTTP-01 challenge:</p>
+<p><strong><code>issuer.yaml</code></strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">cert-manager.io/v1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">ClusterIssuer</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">letsencrypt-http</span></span>
+<span class="line"><span style="color:#85E89D">spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  acme</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    server</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">https://acme-v02.api.letsencrypt.org/directory</span></span>
+<span class="line"><span style="color:#85E89D">    email</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">your-email@example.com</span></span>
+<span class="line"><span style="color:#85E89D">    privateKeySecretRef</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">letsencrypt-http-private-key</span></span>
+<span class="line"><span style="color:#85E89D">    solvers</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#85E89D">http01</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">          ingress</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">            class</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">nginx</span></span>
+<span class="line"></span></code></pre>
+<p>Apply it:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#9ECBFF"> apply</span><span style="color:#79B8FF"> -f</span><span style="color:#9ECBFF"> issuer.yaml</span></span>
+<span class="line"></span></code></pre>
+<h2 id="step-3-create-ingress-with-dns-and-tls-annotations">Step 3: Create Ingress with DNS and TLS Annotations</h2>
+<p>Now that DNS and Cert-Manager are configured, create an Ingress resource.</p>
+<p><strong><code>ingress.yaml</code></strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">networking.k8s.io/v1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Ingress</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">my-app</span></span>
+<span class="line"><span style="color:#85E89D">  annotations</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    kubernetes.io/ingress.class</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"nginx"</span></span>
+<span class="line"><span style="color:#85E89D">    cert-manager.io/cluster-issuer</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"letsencrypt-http"</span></span>
+<span class="line"><span style="color:#85E89D">    external-dns.alpha.kubernetes.io/hostname</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">app.example.com</span></span>
+<span class="line"><span style="color:#85E89D">spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  tls</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">hosts</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">        - </span><span style="color:#9ECBFF">app.example.com</span></span>
+<span class="line"><span style="color:#85E89D">      secretName</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">my-app-tls</span></span>
+<span class="line"><span style="color:#85E89D">  rules</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">host</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">app.example.com</span></span>
+<span class="line"><span style="color:#85E89D">      http</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">        paths</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">          - </span><span style="color:#85E89D">path</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">/</span></span>
+<span class="line"><span style="color:#85E89D">            pathType</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Prefix</span></span>
+<span class="line"><span style="color:#85E89D">            backend</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">              service</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">                name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">my-app-service</span></span>
+<span class="line"><span style="color:#85E89D">                port</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">                  number</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">80</span></span>
+<span class="line"></span></code></pre>
+<p>Apply it:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#9ECBFF"> apply</span><span style="color:#79B8FF"> -f</span><span style="color:#9ECBFF"> ingress.yaml</span></span>
+<span class="line"></span></code></pre>
+<h2 id="how-it-all-works-together">How It All Works Together</h2>
+<ol>
+<li><strong>ExternalDNS</strong> sees the Ingress annotation and creates a DNS A or CNAME record for <code>app.example.com</code> pointing to your Ingress controller’s IP or hostname.</li>
+<li><strong>Cert-Manager</strong> notices the <code>cert-manager.io/cluster-issuer</code> annotation and requests a cert from Let’s Encrypt using the <code>ClusterIssuer</code>.</li>
+<li>It completes the HTTP-01 challenge via your NGINX ingress controller.</li>
+<li>If successful, a TLS secret is created (<code>my-app-tls</code>) and used by the Ingress to serve HTTPS.</li>
+</ol>
+<h2 id="additional-tips">Additional Tips</h2>
+<ul>
+<li>You can use <strong>wildcard DNS</strong> with Let’s Encrypt using <strong>DNS-01 challenge</strong>, which requires API access to your DNS provider.</li>
+<li>For custom Ingress controllers (like Traefik or HAProxy), make sure their class matches the annotation.</li>
+<li>Always start with <strong>Let’s Encrypt Staging</strong> to avoid rate limits.</li>
+<li>Monitor logs of <code>cert-manager</code>, <code>external-dns</code>, and the ingress controller for debugging.</li>
+</ul>
+<h2 id="sample-dns-record">Sample DNS Record</h2>
+<p>After everything is set up, you should see a record like this in your DNS provider:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>app.example.com  ->  &#x3C;Ingress LoadBalancer IP or hostname></span></span>
+<span class="line"><span></span></span></code></pre>
+<p>And your app should be accessible via:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>https://app.example.com</span></span>
+<span class="line"><span></span></span></code></pre>
+<p>with a valid Let’s Encrypt certificate.</p>
+<h2 id="conclusion">Conclusion</h2>
+<p>By combining <strong>ExternalDNS</strong>, <strong>Ingress</strong>, and <strong>Cert-Manager</strong>, you can fully automate the setup of public DNS and TLS for Kubernetes workloads. This reduces manual effort and increases reliability — all with a simple set of annotations.</p> </div> <nav class="blog-post-navigation"> <a href="/blog/auto-renew-kubeconfig" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">Automatically Renew AWS SSO Session and Refresh Kubeconfig for EKS Access</div> </a> <a href="/blog/static-site-module" class="blog-post-nav-link next"> <div class="blog-post-nav-label">Next Post</div> <div class="blog-post-nav-title">Building a Reusable Terraform Static Site Module with CloudFront, S3, and Route 53</div> </a> </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Posts</h2> <div class="related-posts-grid"> <a href="/blog/build-promote" class="blog-card card-link"> <img src="/assets/blog/build-promote/banner.jpg" alt="Build Once. Promote Forward. Ship Daily." class="blog-card-image"> <h3 class="blog-card-title">Build Once. Promote Forward. Ship Daily.</h3> <p class="blog-card-description"> How we eliminated rebuild-per-environment pipelines and went from shipping every two weeks to shipping daily. A real-world story of building once, validating once, and promoting the same artifact through environments. </p> </a><a href="/blog/local-ai" class="blog-card card-link"> <img src="/assets/blog/local-ai/banner.png" alt="The &#34;Hybrid&#34; AI Stack: Enterprise Power at Work, Localhost Freedom at Home" class="blog-card-image"> <h3 class="blog-card-title">The &quot;Hybrid&quot; AI Stack: Enterprise Power at Work, Localhost Freedom at Home</h3> <p class="blog-card-description"> How I built a personal AI stack on my MacBook Pro M4 using Ollama, Open WebUI, and Draw Things—running entirely locally with zero privacy leaks and unlimited usage, while keeping enterprise cloud tools for work. </p> </a><a href="/blog/remote-secret-tunnel" class="blog-card card-link"> <img src="/assets/blog/remote-secret-tunnel/banner.jpg" alt="Developing and Testing K3s Apps Locally" class="blog-card-image"> <h3 class="blog-card-title">Developing and Testing K3s Apps Locally</h3> <p class="blog-card-description"> When building Kubernetes-aware tools — whether a CLI, dashboard, or internal Python service — you often need your local environment to talk directly to the cluster API. </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container"> <p class="footer-text">© 2025 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer> </body></html>

@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Dark background -->
+  <rect width="100" height="100" fill="#0a0a0f"/>
+  
+  <!-- Glow effect behind text -->
+  <defs>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="glow-strong">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- JC Text with cyberpunk styling -->
+  <text 
+    x="50" 
+    y="65" 
+    font-size="50" 
+    font-weight="900" 
+    fill="#00ff88" 
+    text-anchor="middle" 
+    font-family="'Orbitron', 'Courier New', monospace"
+    filter="url(#glow-strong)"
+    style="letter-spacing: -2px;"
+  >JC</text>
+  
+  <!-- Accent line/scanline effect -->
+  <line x1="20" y1="75" x2="80" y2="75" stroke="#00d9ff" stroke-width="1" opacity="0.6" filter="url(#glow)"/>
+</svg>
