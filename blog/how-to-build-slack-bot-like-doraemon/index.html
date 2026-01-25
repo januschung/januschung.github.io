@@ -1,0 +1,192 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="A practical walkthrough on building a Slack bot using Socket Mode and Python 3.11, based on a real-world project."><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v4.16.19"><title>How to Build a Slack Bot Like Doraemon - Janus</title><link rel="stylesheet" href="/_astro/_page_.DV0sxq_i.css">
+<link rel="stylesheet" href="/_astro/index.D1_DOynq.css"><script type="module" src="/_astro/hoisted.utjinJ1X.js"></script></head> <body class="min-h-screen flex flex-col"> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul> <div class="mobile-controls"> <button class="search-icon-button" aria-label="Toggle search" id="search-toggle"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"> <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round"></path> </svg> </button> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> </div> <div class="header-search" id="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false}"></div>  </div> </div> </nav> </header>  <main class="flex-1">  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">How to Build a Slack Bot Like Doraemon</h1> <div class="blog-post-meta"> <time>January 25, 2026</time> <span class="blog-post-meta-separator">•</span> <span>4 min read</span>  </div> <div class="blog-post-tags"> <span class="blog-post-tag">slackbot</span><span class="blog-post-tag">python</span><span class="blog-post-tag">hackathon</span> </div> </header> <div class="blog-post-content prose"> <h1 id="how-to-build-a-slack-bot-like-doraemon">How to Build a Slack Bot Like Doraemon</h1>
+<p><img src="/assets/blog/how-to-build-slack-bot-like-doraemon/banner.webp" alt="Doraemon - the abandoned hackathon project is revived with a big smile
+"></p>
+<p><a href="../doraemon">Last time</a>, I shared the personal story behind Doraemon — a Slack bot that started as a hackathon idea and eventually found its way back into my hands.</p>
+<p>This time, I want to switch gears and focus on the practical side: how to actually build a Slack bot like Doraemon, from setting up the app to running it locally.</p>
+<p>No theory, no shortcuts — just the steps that worked.</p>
+<hr>
+<h2 id="what-youre-building">What You’re Building</h2>
+<p>A Slack bot that:</p>
+<ul>
+<li>Runs in <strong>Socket Mode</strong> (no public HTTP endpoint required)</li>
+<li>Responds to messages and mentions (for example: <code>hi @doraemon</code>)</li>
+<li>Uses a clean, handler-based structure</li>
+<li>Can run locally and later be containerized or deployed to Kubernetes</li>
+</ul>
+<p>This is meant to be useful, not clever.</p>
+<hr>
+<h2 id="1-create-a-slack-app">1) Create a Slack App</h2>
+<ol>
+<li>Go to <a href="https://api.slack.com/apps">https://api.slack.com/apps</a></li>
+<li>Click <strong>Create New App</strong></li>
+<li>Choose <strong>From scratch</strong></li>
+<li>Give it a name (for example: <code>doraemon</code>)</li>
+<li>Select your workspace</li>
+</ol>
+<hr>
+<h2 id="2-copy-the-ids-and-secrets">2) Copy the IDs and Secrets</h2>
+<p>In <strong>Basic Information</strong>, copy and store the following values:</p>
+<ul>
+<li>App ID</li>
+<li>Client ID</li>
+<li>Client Secret</li>
+<li>Signing Secret</li>
+<li>Verification Token</li>
+</ul>
+<p>Treat these like credentials. Don’t commit them or hardcode them.</p>
+<hr>
+<h2 id="3-oauth--permissions">3) OAuth &#x26; Permissions</h2>
+<p>Open <strong>OAuth &#x26; Permissions</strong> and add these scopes:</p>
+<ul>
+<li>app_mentions:read</li>
+<li>channels:history</li>
+<li>channels:join</li>
+<li>chat:write</li>
+<li>commands</li>
+<li>incoming-webhook</li>
+<li>pins:read</li>
+<li>reactions:read</li>
+<li>reactions:write</li>
+</ul>
+<p>Scroll back to the top and click <strong>Install to Workspace</strong>.</p>
+<p>After installation, copy the <strong>Bot User OAuth Token</strong>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>xoxb-...</span></span>
+<span class="line"><span></span></span></code></pre>
+<hr>
+<h2 id="4-enable-socket-mode">4) Enable Socket Mode</h2>
+<p>Socket Mode avoids inbound HTTP traffic and is ideal for internal tools.</p>
+<ol>
+<li>Go to <strong>Socket Mode</strong></li>
+<li>Turn it <strong>ON</strong></li>
+<li>Click <strong>Generate App Token</strong>
+<ul>
+<li>Name it (for example: <code>doraemon-token</code>)</li>
+<li>Add scope: <code>connections:write</code></li>
+</ul>
+</li>
+<li>Copy the token:</li>
+</ol>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>xapp-1-...</span></span>
+<span class="line"><span></span></span></code></pre>
+<hr>
+<h2 id="5-run-it-locally">5) Run It Locally</h2>
+<h3 id="prerequisites">Prerequisites</h3>
+<ul>
+<li>Python <strong>3.11</strong></li>
+<li>Two environment variables:
+<ul>
+<li><code>SLACK_BOT_TOKEN</code> = <code>xoxb-...</code></li>
+<li><code>SLACK_APP_TOKEN</code> = <code>xapp-...</code></li>
+</ul>
+</li>
+</ul>
+<h3 id="install-and-start">Install and start</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">python</span><span style="color:#79B8FF"> -m</span><span style="color:#9ECBFF"> venv</span><span style="color:#9ECBFF"> .venv</span></span>
+<span class="line"><span style="color:#79B8FF">source</span><span style="color:#9ECBFF"> .venv/bin/activate</span></span>
+<span class="line"><span style="color:#B392F0">pip</span><span style="color:#9ECBFF"> install</span><span style="color:#79B8FF"> -r</span><span style="color:#9ECBFF"> requirements.txt</span></span>
+<span class="line"></span></code></pre>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#F97583">export</span><span style="color:#E1E4E8"> SLACK_BOT_TOKEN</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"xoxb-your-token"</span></span>
+<span class="line"><span style="color:#F97583">export</span><span style="color:#E1E4E8"> SLACK_APP_TOKEN</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"xapp-your-token"</span></span>
+<span class="line"></span></code></pre>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">python</span><span style="color:#9ECBFF"> app.py</span></span>
+<span class="line"></span></code></pre>
+<p>If everything is wired correctly, the process will stay running and you’ll see logs as Slack events arrive.</p>
+<hr>
+<h2 id="6-test-it-in-slack">6) Test It in Slack</h2>
+<p>Invite the bot to a channel:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>/invite @doraemon</span></span>
+<span class="line"><span></span></span></code></pre>
+<p>Then test it:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>hi @doraemon</span></span>
+<span class="line"><span></span></span></code></pre>
+<p>You should receive a threaded reply:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>Hello &#x3C;@you>! 👋</span></span>
+<span class="line"><span></span></span></code></pre>
+<p>You can also DM the bot and type <code>hi</code>.</p>
+<hr>
+<h2 id="code-wireframe-minimal-working-shape">Code Wireframe (Minimal, Working Shape)</h2>
+<h3 id="requirementstxt">requirements.txt</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="txt"><code><span class="line"><span>slack_bolt</span></span>
+<span class="line"><span>slack_sdk</span></span>
+<span class="line"><span>PyYAML</span></span>
+<span class="line"><span>PyJWT</span></span>
+<span class="line"><span>PyJWT[crypto]</span></span>
+<span class="line"><span>requests</span></span>
+<span class="line"><span>packaging</span></span>
+<span class="line"><span></span></span></code></pre>
+<h3 id="suggested-layout">Suggested layout</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="txt"><code><span class="line"><span>.</span></span>
+<span class="line"><span>├── app.py</span></span>
+<span class="line"><span>├── requirements.txt</span></span>
+<span class="line"><span>├── handlers/</span></span>
+<span class="line"><span>│   └── greeting.py</span></span>
+<span class="line"><span>└── utils/</span></span>
+<span class="line"><span>    └── logger.py</span></span>
+<span class="line"><span></span></span></code></pre>
+<h3 id="handlersgreetingpy">handlers/greeting.py</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> re</span></span>
+<span class="line"><span style="color:#F97583">from</span><span style="color:#E1E4E8"> utils.logger </span><span style="color:#F97583">import</span><span style="color:#E1E4E8"> logger</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF">GREETINGS</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> {</span><span style="color:#9ECBFF">"hi"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"hello"</span><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">def</span><span style="color:#B392F0"> handle</span><span style="color:#E1E4E8">(event, say):</span></span>
+<span class="line"><span style="color:#E1E4E8">    text </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> event.get(</span><span style="color:#9ECBFF">"text"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">""</span><span style="color:#E1E4E8">).lower().strip()</span></span>
+<span class="line"><span style="color:#E1E4E8">    user </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> event.get(</span><span style="color:#9ECBFF">"user"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">    thread_ts </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> event.get(</span><span style="color:#9ECBFF">"thread_ts"</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">or</span><span style="color:#E1E4E8"> event.get(</span><span style="color:#9ECBFF">"ts"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    if</span><span style="color:#79B8FF"> any</span><span style="color:#E1E4E8">(text </span><span style="color:#F97583">==</span><span style="color:#E1E4E8"> g </span><span style="color:#F97583">or</span><span style="color:#E1E4E8"> text.startswith(g </span><span style="color:#F97583">+</span><span style="color:#9ECBFF"> " "</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">for</span><span style="color:#E1E4E8"> g </span><span style="color:#F97583">in</span><span style="color:#79B8FF"> GREETINGS</span><span style="color:#E1E4E8">):</span></span>
+<span class="line"><span style="color:#E1E4E8">        logger.info(</span><span style="color:#F97583">f</span><span style="color:#9ECBFF">"Greeting received from </span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">user</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">        say(</span><span style="color:#F97583">f</span><span style="color:#9ECBFF">"Hello &#x3C;@</span><span style="color:#79B8FF">{</span><span style="color:#E1E4E8">user</span><span style="color:#79B8FF">}</span><span style="color:#9ECBFF">>! 👋"</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">thread_ts</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">thread_ts)</span></span>
+<span class="line"></span></code></pre>
+<h3 id="apppy">app.py</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> os</span></span>
+<span class="line"><span style="color:#F97583">from</span><span style="color:#E1E4E8"> slack_bolt </span><span style="color:#F97583">import</span><span style="color:#E1E4E8"> App</span></span>
+<span class="line"><span style="color:#F97583">from</span><span style="color:#E1E4E8"> slack_bolt.adapter.socket_mode </span><span style="color:#F97583">import</span><span style="color:#E1E4E8"> SocketModeHandler</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">from</span><span style="color:#E1E4E8"> handlers </span><span style="color:#F97583">import</span><span style="color:#E1E4E8"> greeting</span></span>
+<span class="line"><span style="color:#F97583">from</span><span style="color:#E1E4E8"> utils.logger </span><span style="color:#F97583">import</span><span style="color:#E1E4E8"> setup_logger</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">setup_logger()</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79B8FF">SLACK_BOT_TOKEN</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> os.environ.get(</span><span style="color:#9ECBFF">"SLACK_BOT_TOKEN"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#79B8FF">SLACK_APP_TOKEN</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> os.environ.get(</span><span style="color:#9ECBFF">"SLACK_APP_TOKEN"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">app </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> App(</span><span style="color:#FFAB70">token</span><span style="color:#F97583">=</span><span style="color:#79B8FF">SLACK_BOT_TOKEN</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">@app.event</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"message"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#B392F0">@app.event</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"app_mention"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#F97583">def</span><span style="color:#B392F0"> handle_all_messages</span><span style="color:#E1E4E8">(event, say):</span></span>
+<span class="line"><span style="color:#E1E4E8">    greeting.handle(event, say)</span></span>
+<span class="line"></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">if</span><span style="color:#79B8FF"> __name__</span><span style="color:#F97583"> ==</span><span style="color:#9ECBFF"> "__main__"</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    SocketModeHandler(app, </span><span style="color:#79B8FF">SLACK_APP_TOKEN</span><span style="color:#E1E4E8">).start()</span></span>
+<span class="line"></span></code></pre>
+<h3 id="utilsloggerpy">utils/logger.py</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> logging</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">logger </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> logging.getLogger(</span><span style="color:#9ECBFF">"doraemon"</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">def</span><span style="color:#B392F0"> setup_logger</span><span style="color:#E1E4E8">():</span></span>
+<span class="line"><span style="color:#E1E4E8">    logging.basicConfig(</span></span>
+<span class="line"><span style="color:#FFAB70">        level</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">logging.</span><span style="color:#79B8FF">INFO</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#FFAB70">        format</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"</span><span style="color:#79B8FF">%(asctime)s</span><span style="color:#9ECBFF"> [</span><span style="color:#79B8FF">%(levelname)s</span><span style="color:#9ECBFF">] </span><span style="color:#79B8FF">%(name)s</span><span style="color:#9ECBFF">: </span><span style="color:#79B8FF">%(message)s</span><span style="color:#9ECBFF">"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">    )</span></span>
+<span class="line"></span></code></pre>
+<h3 id="dockerfile">Dockerfile</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="dockerfile"><code><span class="line"><span style="color:#F97583">FROM</span><span style="color:#E1E4E8"> python:3.11.9-slim</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">WORKDIR</span><span style="color:#E1E4E8"> /app</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">COPY</span><span style="color:#E1E4E8"> requirements.txt .</span></span>
+<span class="line"><span style="color:#F97583">RUN</span><span style="color:#E1E4E8"> pip install --no-cache-dir -r requirements.txt &#x26;&#x26; pip check</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">COPY</span><span style="color:#E1E4E8"> app.py .</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">CMD</span><span style="color:#E1E4E8"> [</span><span style="color:#9ECBFF">"python"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"app.py"</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"></span></code></pre>
+<p>At this point, you have a Slack bot that responds, logs what it’s doing, and runs cleanly on your machine. You can talk to it in a channel, mention it directly, or DM it — and more importantly, you now have a structure that won’t fight you as it grows.</p>
+<p>Start small. Let real usage guide what you add next.</p> </div> <nav class="blog-post-navigation"> <a href="/blog/eks-arm-migration" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">From x86 to ARM in production: the EKS migration story</div> </a>  </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Posts</h2> <div class="related-posts-grid"> <a href="/blog/doraemon" class="blog-card card-link"> <img src="/assets/blog/doraemon/banner.jpg" alt="Reviving Doraemon: A Slack Bot’s Second Life in Kubernetes" class="blog-card-image"> <h3 class="blog-card-title">Reviving Doraemon: A Slack Bot’s Second Life in Kubernetes</h3> <p class="blog-card-description"> Some projects stick with you. For me, it was a little Slack bot I hacked together at a previous job—something that could talk to our infrastructure and give quick answers without switching tools. I ne </p> </a><a href="/blog/test-redis-with-generated-data" class="blog-card card-link"> <img src="/assets/blog/test-redis-with-generated-data/banner.png" alt="Test Redis with Generated Data" class="blog-card-image"> <h3 class="blog-card-title">Test Redis with Generated Data</h3> <p class="blog-card-description"> Recently I need to test out Redis integration with a Ruby on Rails application. I wanted to test how fast Redis is with 1GB of data. </p> </a><a href="/blog/hackathon-champion" class="blog-card card-link"> <img src="/assets/blog/hackathon-champion/fdr.png" alt="Hackathon Champion: Dockerizing a Monolith Platform" class="blog-card-image"> <h3 class="blog-card-title">Hackathon Champion: Dockerizing a Monolith Platform</h3> <p class="blog-card-description"> Winning a company hackathon by leading a team to Dockerize a complex monolith platform, reducing setup time from days to hours and driving cross-team collaboration. </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container"> <p class="footer-text">© 2026 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer> </body></html>
