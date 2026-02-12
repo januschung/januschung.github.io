@@ -1,0 +1,138 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="A practical reinstall guide for Proxmox VE 9.1 on an HPE MicroServer Gen8, plus the one Gen8 boot fix that saves your future self."><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v4.16.19"><title>Part 1: Proxmox 9.1 on a Gen8 — The UI Is Dead Trap - Janus</title><link rel="stylesheet" href="/_astro/_page_.CFzgG4Ey.css">
+<link rel="stylesheet" href="/_astro/index.DsFTPgSQ.css"><script type="module" src="/_astro/hoisted.utjinJ1X.js"></script></head> <body class="min-h-screen flex flex-col"> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/homelab-arena">Homelab Arena</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul> <div class="mobile-controls"> <button class="search-icon-button" aria-label="Toggle search" id="search-toggle"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"> <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round"></path> </svg> </button> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> </div> <div class="header-search" id="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false}"></div>  </div> </div> </nav> </header>  <main class="flex-1">  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">Part 1: Proxmox 9.1 on a Gen8 — The UI Is Dead Trap</h1> <div class="blog-post-meta"> <time>February 11, 2026</time> <span class="blog-post-meta-separator">•</span> <span>6 min read</span>  </div> <div class="pill-group pill-group--top"> <span class="pill">proxmox</span><span class="pill">linux</span> </div> </header> <div class="blog-post-content prose"> <h2 id="proxmox-ve-91-on-an-hpe-microserver-gen8--and-the-ui-is-dead-trap">Proxmox VE 9.1 on an HPE MicroServer Gen8 — and the “UI Is Dead” Trap</h2>
+<p>Plan ahead. Not in the “print a checklist and laminate it” way — in the <em>Homelab Arena</em> way: know your loadout before you step into the fight.</p>
+<p>This was a <strong>reinstall</strong>, not a mystery box unboxing. I knew what was in the chassis before the ISO even finished downloading: a big SSD for the hypervisor and fast VM disks, plus HDDs for bulk storage. Same machine, same intent, clean slate. The whole point of a reinstall is that the boring parts stay boring.</p>
+<p>Of course, the arena has a sense of humor.</p>
+<p>After installation, I <strong>couldn’t reach the Proxmox UI</strong> from another machine on the same network. From the host, I could ping other machines just fine — so networking looked alive — but the web UI was a brick wall. No login screen. No TLS warning. Just… nothing.</p>
+<p>That’s when I stopped guessing and asked the only question that matters:</p>
+<p><strong>Is anything even listening on port 8006?</strong></p>
+<p><img src="/assets/homelab-arena/homelab-arena-proxmox-install/banner.webp" alt="Bio Miracle Bokutte Upa is fighting in the Hardware Arena Stage."></p>
+<!-- more -->
+<h2 id="0-decide-your-storage-layout-recommended">0) Decide your storage layout (recommended)</h2>
+<p>Before you install, decide where things will live. It’s not just aesthetics — it’s how you avoid turning your hypervisor into a junk drawer.</p>
+<p><strong>Recommended pattern:</strong></p>
+<ul>
+<li><strong>SSD</strong>: Proxmox OS + VM/CT “fast” storage (LVM-thin is totally fine)</li>
+<li><strong>HDDs</strong>: bulk storage + backups (often ZFS)</li>
+</ul>
+<blockquote>
+<p>Reality note: on this run, Proxmox only showed <strong>3×4TB HDD</strong> under Node → Disks. I expected 4. The box disagreed. We’ll live with reality and move forward.</p>
+</blockquote>
+<h2 id="1-prep-the-microserver-gen8-bios-important">1) Prep the MicroServer Gen8 BIOS (important)</h2>
+<ol>
+<li>Boot the server and enter BIOS (usually <strong>F9</strong>).</li>
+<li>Enable virtualization:
+<ul>
+<li><strong>Intel VT-x</strong></li>
+<li><strong>VT-d / IOMMU</strong> if you want passthrough later (optional)</li>
+</ul>
+</li>
+<li>Storage controller mode:
+<ul>
+<li>If you plan ZFS later, you want <strong>raw disks</strong>, not a hardware RAID volume.</li>
+</ul>
+</li>
+<li>Save and reboot.</li>
+</ol>
+<p>This is the part everyone rushes. It’s also the part that decides whether the install is “boring” or “an evening.”</p>
+<h2 id="2-download-proxmox-ve-91-iso--create-install-media">2) Download Proxmox VE 9.1 ISO + create install media</h2>
+<ul>
+<li>Download the Proxmox VE 9.1 ISO.</li>
+<li>Create a bootable USB — or do what I did and use <strong>iLO Virtual Media</strong>.</li>
+</ul>
+<p>Gen8 note: USB boot can be picky. iLO Virtual Media removes one variable from the equation and keeps your install path consistent.</p>
+<h2 id="3-install-proxmox-onto-the-ssd">3) Install Proxmox onto the SSD</h2>
+<p>In the installer:</p>
+<ol>
+<li>Select the SSD as the target disk.</li>
+<li>Filesystem choice:
+<ul>
+<li><strong>Ext4 + LVM-thin</strong> (simple, solid, predictable)</li>
+</ul>
+</li>
+<li>Set timezone + root password + email.</li>
+<li>Networking:
+<ul>
+<li>Prefer a <strong>static IP</strong></li>
+<li>Hostname like <code>pve.local</code> (or your internal domain)</li>
+</ul>
+</li>
+</ol>
+<p>Let it install and reboot.</p>
+<p>Happy path is:</p>
+<p><code>https://&#x3C;your-proxmox-ip>:8006</code></p>
+<h2 id="4-the-trap-host-can-ping-the-lan-but-the-ui-is-unreachable">4) The trap: host can ping the LAN, but the UI is unreachable</h2>
+<p>Here’s what I saw:</p>
+<ul>
+<li>From the Proxmox host: <strong>I can ping other machines</strong> ✅</li>
+<li>From my laptop: <strong>UI doesn’t load</strong> ❌</li>
+</ul>
+<p>This is the worst kind of failure because it <em>looks</em> like a networking problem. Your brain starts drafting theories: firewall, bridge, VLAN tagging, wrong gateway, DNS, cables, switch ports, the weather.</p>
+<p>But the fastest check is this:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">ss</span><span style="color:#79B8FF"> -lntp</span><span style="color:#F97583"> |</span><span style="color:#B392F0"> grep</span><span style="color:#79B8FF"> 8006</span></span>
+<span class="line"></span></code></pre>
+<p>If you don’t see anything listening on <code>:8006</code>, it’s not your browser and it’s not your switch. <strong>The service isn’t running.</strong></p>
+<p>In my case, <code>ss</code> showed <strong>no 8006 listener</strong>.</p>
+<p>Then I found the next clue:</p>
+<blockquote>
+<p>can’t load <code>/usr/lib/x86_64-linux-gnu/perl5/5.40/auto/PVE/RADOS/RADOS.so</code></p>
+</blockquote>
+<p>Translation: Proxmox wasn’t starting cleanly. If <code>pveproxy</code> doesn’t come up, there’s no UI. The network can be perfect and you’ll still be staring at a blank tab.</p>
+<h2 id="5-the-fix-make-the-gen8-boot-the-install-the-way-it-actually-wants">5) The fix: make the Gen8 boot the install the way it actually wants</h2>
+<p>This is the part my <strong>future self</strong> will thank me for — the next time I reinstall Proxmox on another Gen8, or when I forget everything and pretend this is “new” again.</p>
+<p>What finally gave me a stable Proxmox 9.1 install:</p>
+<ul>
+<li><strong>Update BIOS to the latest version</strong></li>
+<li>Boot the installer via <strong>iLO virtual media</strong></li>
+<li>Enter BIOS (<strong>F9</strong>)</li>
+<li>Set the SATA device to <strong>Legacy</strong> under System Options
+<ul>
+<li>reboot and go back into BIOS</li>
+</ul>
+</li>
+<li>Under <strong>Standard Boot Order (IPL)</strong> → <strong>Boot Controller Order</strong></li>
+<li>Select: <strong>PCI Embedded Intel(R) SATA controller #2</strong></li>
+<li>Ensure BIOS is in <strong>Legacy mode</strong></li>
+<li>Reinstall Proxmox</li>
+</ul>
+<p>After that, the machine booted consistently and the UI service started normally — which means port <strong>8006</strong> listens and the UI loads like it’s supposed to.</p>
+<h2 id="6-what-my-ssd-layout-looks-like-real-world-state">6) What my SSD layout looks like (real-world state)</h2>
+<p>On this box, Proxmox is using the default <strong>LVM + LVM-thin</strong> layout:</p>
+<ul>
+<li>The SSD is likely <code>/dev/sdd</code></li>
+<li><code>/dev/sdd3</code> is the LVM physical volume</li>
+<li>Volume group: <code>pve</code></li>
+<li>Logical volumes: <code>root</code>, <code>swap</code>, and <code>data</code></li>
+<li><code>data</code> is the LVM-thin pool for VM disks
+<ul>
+<li>~3.87TB thinpool</li>
+<li>basically empty (0% used)</li>
+</ul>
+</li>
+</ul>
+<p>Translation: <strong>OS and VM disk pool share the SSD</strong>, and I have plenty of runway for VMs without making storage decisions under pressure.</p>
+<h2 id="7-disable-the-subscription-repo-and-update-the-system">7) Disable the subscription repo and update the system</h2>
+<p>Before you start building anything on top, make sure updates are predictable. That starts with repos.</p>
+<h3 id="a-disableremove-the-enterprise-repo">A) Disable/remove the enterprise repo</h3>
+<p>If you’re not using a paid subscription:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">rm</span><span style="color:#79B8FF"> -f</span><span style="color:#9ECBFF"> /etc/apt/sources.list.d/pve-enterprise.list</span></span>
+<span class="line"></span></code></pre>
+<h3 id="b-ensure-the-no-subscription-repo-is-enabled">B) Ensure the no-subscription repo is enabled</h3>
+<p>Create (or overwrite) the no-subscription list:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">cat</span><span style="color:#F97583"> ></span><span style="color:#9ECBFF">/etc/apt/sources.list.d/pve-no-subscription.list</span><span style="color:#F97583"> &#x3C;&#x3C;</span><span style="color:#9ECBFF">'EOF'</span></span>
+<span class="line"><span style="color:#9ECBFF">deb http://download.proxmox.com/debian/pve bookworm pve-no-subscription</span></span>
+<span class="line"><span style="color:#9ECBFF">EOF</span></span>
+<span class="line"></span></code></pre>
+<h3 id="c-update--upgrade-the-boring-necessary-ritual">C) Update + upgrade (the boring, necessary ritual)</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">apt</span><span style="color:#9ECBFF"> update</span></span>
+<span class="line"><span style="color:#B392F0">apt</span><span style="color:#9ECBFF"> full-upgrade</span><span style="color:#79B8FF"> -y</span></span>
+<span class="line"><span style="color:#B392F0">reboot</span></span>
+<span class="line"></span></code></pre>
+<p>After reboot, confirm you’re healthy:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">ss</span><span style="color:#79B8FF"> -lntp</span><span style="color:#F97583"> |</span><span style="color:#B392F0"> grep</span><span style="color:#79B8FF"> 8006</span></span>
+<span class="line"><span style="color:#B392F0">pveversion</span></span>
+<span class="line"></span></code></pre>
+<h2 id="conclusion">Conclusion</h2>
+<p>This reinstall was a reminder that the best plans aren’t “perfect plans” — they’re plans that survive contact with reality. I knew my drive layout. I knew what I was reinstalling. And I still ran into the kind of failure that feels like networking until you do one simple check and realize: <strong>nothing is even listening.</strong></p>
+<p>That’s the real lesson: when the UI is unreachable, don’t start with theories. Start with proof. Check <strong>8006</strong>. Confirm whether the management plane is actually alive. In my case, the <code>RADOS.so</code> error was the breadcrumb, and the Gen8-specific boot/controller settings were the fix that turned a flaky reinstall into a repeatable procedure.</p>
+<p>Now the arena is quiet again — in the best way. The node boots consistently, the UI comes up, the SSD thinpool is ready, and updates are under control. From here, everything you build on top can be intentional instead of reactive. And that’s the whole point.</p> </div> <nav class="blog-post-navigation"> <a href="/homelab-arena/homelab-arena-prologue" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">Homelab Arena: Prologue</div> </a>  </nav>  </div> </article>  </main> <footer class="footer"> <div class="container"> <p>© 2026 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer> </body></html>

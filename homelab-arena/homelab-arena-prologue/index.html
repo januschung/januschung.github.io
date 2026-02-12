@@ -1,0 +1,94 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="From messy beginnings to controlled chaos — one pod, one VM, one Helm chart at a time."><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v4.16.19"><title>Homelab Arena: Prologue - Janus</title><link rel="stylesheet" href="/_astro/_page_.CFzgG4Ey.css">
+<link rel="stylesheet" href="/_astro/index.DsFTPgSQ.css"><script type="module" src="/_astro/hoisted.utjinJ1X.js"></script></head> <body class="min-h-screen flex flex-col"> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/homelab-arena">Homelab Arena</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul> <div class="mobile-controls"> <button class="search-icon-button" aria-label="Toggle search" id="search-toggle"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"> <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round"></path> </svg> </button> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> </div> <div class="header-search" id="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false}"></div>  </div> </div> </nav> </header>  <main class="flex-1">  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">Homelab Arena: Prologue</h1> <div class="blog-post-meta"> <time>February 7, 2026</time> <span class="blog-post-meta-separator">•</span> <span>5 min read</span>  </div> <div class="pill-group pill-group--top"> <span class="pill">shell</span><span class="pill">docker</span><span class="pill">k3s</span> </div> </header> <div class="blog-post-content prose"> <h2 id="prologue-welcome-to-homelab-arena">Prologue: Welcome to <em>Homelab Arena</em></h2>
+<h5 id="originally-posted-at-linkedin">originally posted at <a href="https://www.linkedin.com/pulse/prologue-welcome-homelab-arena-janus-chung-delfc/">LinkedIn</a></h5>
+<p>Everything in my homelab starts by hand.</p>
+<p>I spin up VMs, deploy containers, and tweak configs by hand. There’s a README that reminds me what I did last time, and a couple scripts that <em>mostly</em> work—until they don’t. Nothing is automated. Nothing is elegant. And honestly? That’s kind of the point right now.</p>
+<p><img src="/assets/homelab-arena/homelab-arena-prologue/banner.webp" alt="Konami World&#x27;s Heroes are ready to engage."></p>
+<!-- more -->
+<p>This is my current state: chaotic, fragile, but fully mine. Every experiment, every misstep, every “why is this not reachable?” moment ends up written down somewhere—scripts, notes, or the ever-growing README that reads like patch notes for a game that never shipped.</p>
+<p>The Arena awaits.</p>
+<p>I know I will break things. I know I will rebuild them. But for now, I fight with what I have—manual deployments, half-baked scripts, and sheer stubbornness.</p>
+<p>This is where the homelab story begins: from messy beginnings to controlled chaos… one pod, one VM, one Helm chart at a time.</p>
+<p>Welcome to <strong>Homelab Arena</strong>.</p>
+<h2 id="what-im-running-today-aka-my-current-loadout">What I’m running <em>today</em> (a.k.a. my current loadout)</h2>
+<h3 id="the-start-button-that-absolutely-is-not-automation">The “Start Button” that absolutely is not automation</h3>
+<p>Right now, I’ve got a start_all.sh script that does two very real homelab things:</p>
+<ol>
+<li>Fixes my storage mess (specifically: PersistentVolumes stuck in Released) by patching PVs to clear claimRef.</li>
+<li>Installs / upgrades apps with Helm, one by one, using shared values plus per-app overrides.</li>
+</ol>
+<p>It’s not fancy—just reliable enough to be dangerous.</p>
+<p>And the current roster includes:</p>
+<ul>
+<li>uptime-kuma</li>
+<li>stirlinng-pdf (yes, it’s spelled that way in the script 😄)</li>
+<li>snippet-box</li>
+<li>math-worksheet (project I built to generate math practice worksheet for my kids)</li>
+<li>two ghost blog for my kids</li>
+<li>job-winner (opensource project that I built and used for job hunting)</li>
+</ul>
+<p>Each one deployed manually, deliberately, and with full awareness that I’ll probably redo this later.</p>
+<h2 id="traffic-control-learning-the-hard-way">Traffic control (learning the hard way)</h2>
+<p>Traefik handles ingress and routing—but getting it there was not smooth.</p>
+<p>At this stage, TLS isn’t missing because of some grand architectural decision. It’s missing because I didn’t fully understand it yet. Certificates, challenges, annotations, entrypoints, middleware… all of it <em>looked</em> straightforward, until it wasn’t.</p>
+<p>I tried. I read docs. I copied examples. I broke things repeatedly.</p>
+<p>Eventually, I reached a truce: routing works, services are reachable, and traffic flows where I expect it to. That’s enough—for now.</p>
+<p>This isn’t me postponing automation out of discipline.<br>
+It’s me acknowledging the gap between <em>knowing the tools exist</em> and <em>actually knowing how to use them well</em>.</p>
+<p>The fundamentals come first. The polish can wait.</p>
+<h2 id="the-battlefield-notes-do-this-then-this-then-pray">The battlefield notes: “do this, then this, then pray”</h2>
+<p>My notes show the origin story:</p>
+<ul>
+<li>Started with Minikube on Ubuntu, immediately ran into the “remote access is annoying” wall.</li>
+<li>Switched to K3s, because LAN access should not require a ritual.</li>
+<li>Played with deploying a sample app and exposing it.</li>
+<li>Installed Argo CD (and also removed it at least once—because we all do that).</li>
+</ul>
+<p>If Homelab Arena has a tutorial level, this was it.</p>
+<h2 id="my-known-spells-kubernetes-reference-page">My “known spells” (Kubernetes reference page)</h2>
+<p>I keep a cheatsheet of commands I always forget five minutes after using them:</p>
+<ul>
+<li>Context checks (current-context, get-contexts)</li>
+<li>The “what is even happening” commands (describe, get all -A)</li>
+<li>Node draining (because maintenance always turns into an event)</li>
+<li>Scaling deployments to zero (a soft reboot for your dignity)</li>
+<li>Helm workflows (installing, version pinning, template previewing)</li>
+<li>A solid initContainer example for “download stuff before app starts”</li>
+</ul>
+<p>This is the stuff that turns “I’m stuck” into “okay, I’m unstuck… for now.”</p>
+<h2 id="the-practice-dummy-nginx-exposed-three-different-ways">The practice dummy: nginx, exposed three different ways</h2>
+<p>To test routing and sanity, I’ve got a classic nginx Deployment.</p>
+<p>From there, I’ve experimented with multiple exposure patterns:</p>
+<h3 id="option-a-traefik-crds-ingressroute--middleware">Option A: Traefik CRDs (IngressRoute + Middleware)</h3>
+<p>Route traffic via host + path prefix, then strip /nginx before it hits the service.</p>
+<h3 id="option-b-kubernetes-ingress--tls-annotations">Option B: Kubernetes Ingress + TLS annotations</h3>
+<p>A more “standard” Ingress object, with cert-manager annotations and a TLS secret. Also strips prefix using a Traefik middleware reference.</p>
+<h3 id="option-c-services-clusterip-vs-loadbalancer">Option C: Services (ClusterIP vs LoadBalancer)</h3>
+<p>There’s a basic ClusterIP service definition.<br>
+And there’s also a LoadBalancer service example that shows an internal IP assigned (which is very homelab, depending on how your network is set up).</p>
+<p>Basically: I’m trying things until traffic goes where I want—and learning why when it doesn’t.</p>
+<h2 id="what-this-series-is-really-about">What this series is really about</h2>
+<p><em>Homelab Arena</em> isn’t a “perfect setup” series. It’s the opposite.</p>
+<p>It’s:</p>
+<ul>
+<li>messy beginnings</li>
+<li>repeatable wins</li>
+<li>accidental disasters</li>
+<li>the slow transition from “hand-crafted chaos” to “intentional chaos”</li>
+</ul>
+<p>Each post will take one part of the lab and push it forward:</p>
+<ul>
+<li>scripts → real automation</li>
+<li>notes → actual runbooks</li>
+<li>“works on my box” → “works after reboot”</li>
+<li>“why is TLS broken again” → “TLS is boring now” (the dream)</li>
+</ul>
+<p>For now, though?</p>
+<p>I enter the Arena with my current gear:</p>
+<ul>
+<li>a patch-and-pray shell script</li>
+<li>Traefik (TLS still a work in progress)</li>
+<li>a pile of YAML</li>
+<li>and enough stubbornness to outlast my own mistakes</li>
+</ul>
+<p>Let the Arena begin. 🛠️⚔️</p> </div> <nav class="blog-post-navigation">  <a href="/homelab-arena/homelab-arena-proxmox-install" class="blog-post-nav-link next"> <div class="blog-post-nav-label">Next Post</div> <div class="blog-post-nav-title">Part 1: Proxmox 9.1 on a Gen8 — The UI Is Dead Trap</div> </a> </nav>  </div> </article>  </main> <footer class="footer"> <div class="container"> <p>© 2026 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer> </body></html>
