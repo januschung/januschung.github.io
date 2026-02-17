@@ -1,5 +1,5 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Learn how to consolidate repetitive workflows across multiple repositories using GitHub composite actions and matrix strategies to maintain a single source of truth."><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v4.16.19"><title>Creating Reusable GitHub Actions with Composite Actions - Janus</title><link rel="stylesheet" href="/_astro/_page_.B15FhcEC.css">
-<link rel="stylesheet" href="/_astro/index.DNq1axJT.css"><script type="module" src="/_astro/hoisted.utjinJ1X.js"></script></head> <body class="min-h-screen flex flex-col"> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/homelab-arena">Homelab Arena</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul> <div class="mobile-controls"> <button class="search-icon-button" aria-label="Toggle search" id="search-toggle"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"> <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round"></path> </svg> </button> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> </div> <div class="header-search" id="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false}"></div>  </div> </div> </nav> </header>  <main class="flex-1">  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">Creating Reusable GitHub Actions with Composite Actions</h1> <div class="blog-post-meta"> <time>July 7, 2023</time> <span class="blog-post-meta-separator">•</span> <span>4 min read</span>  </div> <div class="pill-group pill-group--top"> <span class="pill">shell script</span><span class="pill">github</span> </div> </header> <div class="blog-post-content prose"> <p><img src="/assets/blog/github-shared-action/roman-synkevych-wX2L8L-fGeA-unsplash.jpg" alt="Servers"></p>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Learn how to consolidate repetitive workflows across multiple repositories using GitHub composite actions and matrix strategies to maintain a single source of truth."><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v5.17.2"><title>Creating Reusable GitHub Actions with Composite Actions - Janus</title><link rel="stylesheet" href="/_astro/_page_.DyodzE1V.css">
+<link rel="stylesheet" href="/_astro/index.BFrYoEHc.css"></head> <body class="min-h-screen flex flex-col"> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/homelab-arena">Homelab Arena</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul> <div class="mobile-controls"> <button class="search-icon-button" aria-label="Toggle search" id="search-toggle"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"> <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round"></path> </svg> </button> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> </div> <div class="header-search" id="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false}"></div> <script type="module" src="/_astro/Search.astro_astro_type_script_index_0_lang.tZYucdM2.js"></script> </div> </div> </nav> </header> <script type="module">(function(){const n=document.getElementById("mobile-menu-toggle"),s=document.getElementById("nav-links"),c=document.querySelector("header"),a=document.getElementById("search-toggle"),e=document.getElementById("header-search");n&&s&&(n.addEventListener("click",()=>{const t=s.classList.toggle("nav-open");n.classList.toggle("active"),c.classList.toggle("menu-open"),t?document.body.style.overflow="hidden":document.body.style.overflow="",e&&e.classList.remove("search-open")}),s.querySelectorAll("a").forEach(t=>{t.addEventListener("click",()=>{s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow=""})}),document.addEventListener("click",t=>{!c.contains(t.target)&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow="")})),a&&e&&(a.addEventListener("click",o=>{o.stopPropagation(),e.classList.toggle("search-open"),s&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n&&n.classList.remove("active"),c&&c.classList.remove("menu-open")),e.classList.contains("search-open")&&setTimeout(()=>{const t=e.querySelector('input[type="search"]');t&&(t.focus(),t.dispatchEvent(new Event("input",{bubbles:!0})));const i=e.querySelector(".pagefind-ui__results-area");i&&(i.style.display="block")},150)}),document.addEventListener("click",o=>{e&&!e.contains(o.target)&&!a.contains(o.target)&&e.classList.contains("search-open")&&e.classList.remove("search-open")}),document.addEventListener("keydown",o=>{o.key==="Escape"&&e&&e.classList.contains("search-open")&&e.classList.remove("search-open")}))})();</script> <main class="flex-1">  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">Creating Reusable GitHub Actions with Composite Actions</h1> <div class="blog-post-meta"> <time>July 7, 2023</time> <span class="blog-post-meta-separator">•</span> <span>4 min read</span>  </div> <div class="pill-group pill-group--top"> <span class="pill">shell script</span><span class="pill">github</span> </div> </header> <div class="blog-post-content prose"> <p><img src="/assets/blog/github-shared-action/roman-synkevych-wX2L8L-fGeA-unsplash.jpg" alt="Servers"></p>
 <h5 id="originally-posted-at-linkedin-at-july-7-2023">originally posted at <a href="https://www.linkedin.com/pulse/github-shareable-action-janus-chung">LinkedIn</a> at July 7, 2023</h5>
 <h2 id="background">Background</h2>
 <p>I need to set up 3 GitHub workflows for 10 repo. For each workflow, it will run a similar bash script.</p>
@@ -31,8 +31,7 @@
 <span class="line"><span style="color:#E1E4E8">}</span></span>
 <span class="line"></span>
 <span class="line"><span style="color:#B392F0">get_response</span></span>
-<span class="line"><span style="color:#B392F0">do_something</span></span>
-<span class="line"></span></code></pre>
+<span class="line"><span style="color:#B392F0">do_something</span></span></code></pre>
 <p><em>run-secret-scanning.sh</em></p>
 <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#6A737D">#!/bin/sh</span></span>
 <span class="line"></span>
@@ -52,8 +51,7 @@
 <span class="line"><span style="color:#E1E4E8">}</span></span>
 <span class="line"></span>
 <span class="line"><span style="color:#B392F0">get_response</span></span>
-<span class="line"><span style="color:#B392F0">do_something</span></span>
-<span class="line"></span></code></pre>
+<span class="line"><span style="color:#B392F0">do_something</span></span></code></pre>
 <p><em>run-codeql-alert.sh</em></p>
 <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#6A737D">#!/bin/sh</span></span>
 <span class="line"></span>
@@ -73,8 +71,7 @@
 <span class="line"><span style="color:#E1E4E8">}</span></span>
 <span class="line"></span>
 <span class="line"><span style="color:#B392F0">get_response</span></span>
-<span class="line"><span style="color:#B392F0">do_something</span></span>
-<span class="line"></span></code></pre>
+<span class="line"><span style="color:#B392F0">do_something</span></span></code></pre>
 <p>Here is one of the three workflow, as they are more like the same:</p>
 <p><em>dependabot-workflow.yml</em></p>
 <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">'Dependabot Alert Check'</span></span>
@@ -93,8 +90,7 @@
 <span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Run Dependabot Alert Check</span></span>
 <span class="line"><span style="color:#85E89D">        shell</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">bash</span></span>
 <span class="line"><span style="color:#85E89D">        run</span><span style="color:#E1E4E8">: </span><span style="color:#F97583">|</span></span>
-<span class="line"><span style="color:#9ECBFF">          ./scripts/run-dependabot-alert.sh ${{ secret.GH_TOKEN }} ${{ github.event.repository.name }}</span></span>
-<span class="line"></span></code></pre>
+<span class="line"><span style="color:#9ECBFF">          ./scripts/run-dependabot-alert.sh ${{ secret.GH_TOKEN }} ${{ github.event.repository.name }}</span></span></code></pre>
 <p>As you can see, there are a lot of similar logic from both of the bash scripts and the workflows. It will be tedious to repeat the work across the other repos.</p>
 <p>Can I do better? Sure!</p>
 <h2 id="second-trial---create-shareable-composite-action">Second Trial - Create Shareable Composite Action</h2>
@@ -125,8 +121,7 @@
 <span class="line"><span style="color:#85E89D">      run</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">echo "${{ github.action_path }}" >> $GITHUB_PATH</span></span>
 <span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">shell</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">bash</span></span>
 <span class="line"><span style="color:#85E89D">      run</span><span style="color:#E1E4E8">: </span><span style="color:#F97583">|</span></span>
-<span class="line"><span style="color:#9ECBFF">        ${{ alert-type }}.sh ${{ inputs.gh-token }} ${{ github.event.repository.name }}</span></span>
-<span class="line"></span></code></pre>
+<span class="line"><span style="color:#9ECBFF">        ${{ alert-type }}.sh ${{ inputs.gh-token }} ${{ github.event.repository.name }}</span></span></code></pre>
 <p>Note that the bash scripts are now migrated from <code>scripts</code> folder into <code>.github/actions/alerts</code></p>
 <p>The corresponding workflow that reference the shareable composite action:</p>
 <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#79B8FF">on</span><span style="color:#E1E4E8">: [</span><span style="color:#9ECBFF">push</span><span style="color:#E1E4E8">]</span></span>
@@ -140,8 +135,7 @@
 <span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#85E89D">uses</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">januschung/shared-action-repo/.github/actions/alerts@main</span></span>
 <span class="line"><span style="color:#85E89D">        with</span><span style="color:#E1E4E8">:</span></span>
 <span class="line"><span style="color:#85E89D">          gh-token</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">${{ secrets.GH_TOKEN }}</span></span>
-<span class="line"><span style="color:#85E89D">          alert-type</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">${{ matrix.type }}</span></span>
-<span class="line"></span></code></pre>
+<span class="line"><span style="color:#85E89D">          alert-type</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">${{ matrix.type }}</span></span></code></pre>
 <p>Looking way much better now. But, can I do even better?</p>
 <h2 id="third-trial---consolidate-into-a-single-bash-script-and-a-single-action">Third Trial - Consolidate Into a Single Bash Script and a Single Action</h2>
 <p>Since all three bash scripts share 80% of the same logic, I consolidated them into a single one:</p>
@@ -185,8 +179,7 @@
 <span class="line"><span style="color:#E1E4E8">}</span></span>
 <span class="line"></span>
 <span class="line"><span style="color:#B392F0">get_response</span></span>
-<span class="line"><span style="color:#B392F0">do_something</span></span>
-<span class="line"></span></code></pre>
+<span class="line"><span style="color:#B392F0">do_something</span></span></code></pre>
 <p>The consolidated <em>action.yml</em></p>
 <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">'Alert Check'</span></span>
 <span class="line"><span style="color:#85E89D">description</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">'Run alert check'</span></span>
@@ -208,8 +201,7 @@
 <span class="line"><span style="color:#85E89D">      run</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">echo "${{ github.action_path }}" >> $GITHUB_PATH</span></span>
 <span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">shell</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">bash</span></span>
 <span class="line"><span style="color:#85E89D">      run</span><span style="color:#E1E4E8">: </span><span style="color:#F97583">|</span></span>
-<span class="line"><span style="color:#9ECBFF">        alert.sh ${{ inputs.gh-token }} ${{ github.event.repository.name }} {{ inputs.alert-type }}</span></span>
-<span class="line"></span></code></pre>
+<span class="line"><span style="color:#9ECBFF">        alert.sh ${{ inputs.gh-token }} ${{ github.event.repository.name }} {{ inputs.alert-type }}</span></span></code></pre>
 <p>I do not want to create three separate workflows from the external repo either, so I use GitHub Matrix in a single workflow:</p>
 <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#79B8FF">on</span><span style="color:#E1E4E8">: [</span><span style="color:#9ECBFF">push</span><span style="color:#E1E4E8">]</span></span>
 <span class="line"></span>
@@ -225,8 +217,7 @@
 <span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#85E89D">uses</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">januschung/shared-action-repo/.github/actions/alerts@main</span></span>
 <span class="line"><span style="color:#85E89D">        with</span><span style="color:#E1E4E8">:</span></span>
 <span class="line"><span style="color:#85E89D">          gh-token</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">${{ secrets.GH_TOKEN }}</span></span>
-<span class="line"><span style="color:#85E89D">          alert-type</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">${{ matrix.type }}</span></span>
-<span class="line"></span></code></pre>
+<span class="line"><span style="color:#85E89D">          alert-type</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">${{ matrix.type }}</span></span></code></pre>
 <p>That is it! I hope this helps if you are into similar situation in the coming future.</p>
 <h2 id="links">Links</h2>
 <p><a href="https://docs.github.com/en/actions/creating-actions/creating-a-composite-action">Composite Action</a></p>
