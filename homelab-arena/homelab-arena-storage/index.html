@@ -1,0 +1,108 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="After the Proxmox reinstall: mapping two 4TB HDDs as directory storages with stable names (data01/data02), ext4 labels for clarity, and restoring a pre-reinstall VM backup to prove the stack works."><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v5.17.2"><link rel="canonical" href="https://januschung.github.io/homelab-arena/homelab-arena-storage/"><title>Part 2: Laying the Storage Foundation - Janus</title><link rel="stylesheet" href="/_astro/about.Bvz71UVg.css">
+<link rel="stylesheet" href="/_astro/index.BFrYoEHc.css"></head> <body class="min-h-screen flex flex-col"> <span data-pagefind-filter="locale:en" class="hidden" aria-hidden="true"></span> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/homelab-arena">Homelab Arena</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul>  <div class="mobile-controls"> <button class="search-icon-button" aria-label="Toggle search" id="search-toggle"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"> <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round"></path> </svg> </button> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> </div> <div class="header-search" id="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false}"></div> <script type="module" src="/_astro/Search.astro_astro_type_script_index_0_lang.tZYucdM2.js"></script> </div>  </div> </nav> </header> <script type="module">(function(){const n=document.getElementById("mobile-menu-toggle"),s=document.getElementById("nav-links"),c=document.querySelector("header"),a=document.getElementById("search-toggle"),e=document.getElementById("header-search");n&&s&&(n.addEventListener("click",()=>{const t=s.classList.toggle("nav-open");n.classList.toggle("active"),c.classList.toggle("menu-open"),t?document.body.style.overflow="hidden":document.body.style.overflow="",e&&e.classList.remove("search-open")}),s.querySelectorAll("a").forEach(t=>{t.addEventListener("click",()=>{s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow=""})}),document.addEventListener("click",t=>{!c.contains(t.target)&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow="")})),a&&e&&(a.addEventListener("click",o=>{o.stopPropagation(),e.classList.toggle("search-open"),s&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n&&n.classList.remove("active"),c&&c.classList.remove("menu-open")),e.classList.contains("search-open")&&setTimeout(()=>{const t=e.querySelector('input[type="search"]');t&&(t.focus(),t.dispatchEvent(new Event("input",{bubbles:!0})));const i=e.querySelector(".pagefind-ui__results-area");i&&(i.style.display="block")},150)}),document.addEventListener("click",o=>{e&&!e.contains(o.target)&&!a.contains(o.target)&&e.classList.contains("search-open")&&e.classList.remove("search-open")}),document.addEventListener("keydown",o=>{o.key==="Escape"&&e&&e.classList.contains("search-open")&&e.classList.remove("search-open")}))})();</script> <main class="flex-1" data-locale-prefix>  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">Part 2: Laying the Storage Foundation</h1> <div class="blog-post-meta"> <time>March 17, 2026</time> <span class="blog-post-meta-separator">•</span> <span>5 min read</span>  </div> <div class="pill-group pill-group--top"> <span class="pill">proxmox</span><span class="pill">linux</span><span class="pill">storage</span> </div> </header> <div class="blog-post-content prose"> <h1 id="homelab-arena-part-2-laying-the-storage-foundation">Homelab Arena Part 2: Laying the Storage Foundation</h1>
+<p>Part 1 brought the server back to life.</p>
+<p>The Proxmox reinstall worked, the Gen8 boot trap was solved, and the node finally behaved like a normal hypervisor again. The UI loads, updates work, and the SSD thinpool is ready for VM disks.</p>
+<p>But the machine is still basically empty.</p>
+<p>Before restoring anything important or rebuilding services, I wanted to deal with something simpler first: <strong>the storage layout</strong>.</p>
+<p><img src="/assets/homelab-arena/homelab-arena-storage/banner.webp" alt="F by Noboru Rokuda - A manga about a rebellious young driver fighting his way to Formula One."></p>
+<!-- more -->
+<h1 id="the-hardware-situation">The hardware situation</h1>
+<p>This server currently has:</p>
+<ul>
+<li><strong>SSD</strong> → Proxmox OS + VM disks (LVM-thin)</li>
+<li><strong>2 × 4TB HDDs</strong> → bulk storage</li>
+</ul>
+<p>Those two HDDs are where most of the future data will live. There are many ways to organize storage in Proxmox — ZFS pools, LVM groups, distributed storage — but at this stage of the rebuild I didn’t need anything complicated.</p>
+<p>What I needed was a <strong>simple and predictable foundation</strong>.</p>
+<h1 id="a-naming-convention-that-stuck-with-me">A Naming Convention That Stuck With Me</h1>
+<p>One naming convention I picked up early in my career was to keep infrastructure names generic rather than descriptive.</p>
+<p>Across many systems — databases, storage arrays, backup targets — it’s common to see simple sequences like data01, data02, db01, db02, and so on. The idea is straightforward: infrastructure often outlives its original purpose, so names that describe a specific role tend to age poorly.</p>
+<p>That convention stuck with me.</p>
+<p>So for this rebuild I kept things simple and named the drives:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>data01</span></span>
+<span class="line"><span>data02</span></span></code></pre>
+<p>The names don’t imply a specific role. Today they might hold backups or restore files. Tomorrow they might store datasets, migration space, or something else entirely.</p>
+<p>The goal is simply to give the server stable storage locations that won’t need renaming later as the system evolves.</p>
+<h1 id="creating-the-storage">Creating the storage</h1>
+<p>In Proxmox I created two <strong>directory storages</strong>, one for each HDD. During this step Proxmox wipes the disk, creates a partition, formats it, and mounts it automatically.</p>
+<p>After the process completes the mountpoints look like this:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>/mnt/pve/data01</span></span>
+<span class="line"><span>/mnt/pve/data02</span></span></code></pre>
+<p>From the shell you can see the structure immediately.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">lsblk</span></span></code></pre>
+<p>Typical result:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>sdb</span></span>
+<span class="line"><span>└─sdb1 ext4 /mnt/pve/data01</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>sdc</span></span>
+<span class="line"><span>└─sdc1 ext4 /mnt/pve/data02</span></span></code></pre>
+<p>At this point the node has three storage layers:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>SSD thinpool → VM disks</span></span>
+<span class="line"><span>data01 HDD   → bulk storage</span></span>
+<span class="line"><span>data02 HDD   → bulk storage</span></span></code></pre>
+<p>Nothing fancy — just something that makes sense when logging into the machine months later.</p>
+<h1 id="labeling-the-disks">Labeling the disks</h1>
+<p>For clarity I labeled the filesystems so the disk identity matches the storage name.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">e2label</span><span style="color:#9ECBFF"> /dev/sdb1</span><span style="color:#9ECBFF"> data01</span></span>
+<span class="line"><span style="color:#B392F0">e2label</span><span style="color:#9ECBFF"> /dev/sdc1</span><span style="color:#9ECBFF"> data02</span></span></code></pre>
+<p>You can verify the labels with:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">blkid</span><span style="color:#F97583"> |</span><span style="color:#B392F0"> grep</span><span style="color:#9ECBFF"> data</span></span></code></pre>
+<p>Proxmox actually mounts the disks using <strong>UUIDs stored in <code>/etc/fstab</code></strong>, so the labels are mainly there for human clarity.</p>
+<h1 id="what-proxmox-actually-created">What Proxmox actually created</h1>
+<p>Behind the scenes the storage stack now looks like this:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>disk → partition → filesystem → mountpoint → proxmox storage</span></span></code></pre>
+<p>Example:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>/dev/sdb</span></span>
+<span class="line"><span>└─ /dev/sdb1  ext4</span></span>
+<span class="line"><span>      ↓</span></span>
+<span class="line"><span>/mnt/pve/data01</span></span></code></pre>
+<p>Proxmox also registers the storage inside:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>/etc/pve/storage.cfg</span></span></code></pre>
+<p>Example entry:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>dir: data01</span></span>
+<span class="line"><span>    path /mnt/pve/data01</span></span>
+<span class="line"><span>    content images,iso,vztmpl,backup</span></span></code></pre>
+<h1 id="storage-layout-after-setup">Storage layout after setup</h1>
+<p>Once both disks were configured, the node looked like this:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>Proxmox Node</span></span>
+<span class="line"><span>│</span></span>
+<span class="line"><span>├─ SSD</span></span>
+<span class="line"><span>│  └─ LVM-thin (pve/data)</span></span>
+<span class="line"><span>│     └─ VM disks</span></span>
+<span class="line"><span>│</span></span>
+<span class="line"><span>├─ HDD #1</span></span>
+<span class="line"><span>│  └─ /dev/sdb1 (ext4)</span></span>
+<span class="line"><span>│     └─ /mnt/pve/data01</span></span>
+<span class="line"><span>│</span></span>
+<span class="line"><span>└─ HDD #2</span></span>
+<span class="line"><span>   └─ /dev/sdc1 (ext4)</span></span>
+<span class="line"><span>      └─ /mnt/pve/data02</span></span></code></pre>
+<p>A quick check confirms the mounts:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">findmnt</span></span></code></pre>
+<h1 id="preparing-a-restore-location">Preparing a restore location</h1>
+<p>Before rebuilding anything else, I wanted to confirm something important:</p>
+<p><strong>that restoring backups still works.</strong></p>
+<p>Proxmox expects VM backup files inside a directory named <code>dump</code>, so I created that under <code>data02</code>.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">mkdir</span><span style="color:#79B8FF"> -p</span><span style="color:#9ECBFF"> /mnt/pve/data02/dump</span></span></code></pre>
+<h1 id="restoring-a-vm-from-before-the-reinstall">Restoring a VM from before the reinstall</h1>
+<p>I made a VM backup before wiping the machine. It’s time to copy it over.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">scp</span><span style="color:#9ECBFF"> vzdump-qemu-</span><span style="color:#F97583">&#x3C;</span><span style="color:#9ECBFF">VMI</span><span style="color:#E1E4E8">D</span><span style="color:#F97583">></span><span style="color:#9ECBFF">-</span><span style="color:#F97583">&#x3C;</span><span style="color:#9ECBFF">timestam</span><span style="color:#E1E4E8">p</span><span style="color:#F97583">></span><span style="color:#9ECBFF">.vma.zst</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#9ECBFF">    root@</span><span style="color:#F97583">&#x3C;</span><span style="color:#9ECBFF">proxmox-i</span><span style="color:#E1E4E8">p</span><span style="color:#F97583">></span><span style="color:#9ECBFF">:/mnt/pve/data02/dump/</span></span></code></pre>
+<p>Once the file landed there, Proxmox detected it automatically.</p>
+<p>From the UI the backup appears under:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>Datacenter → Storage → data02 → Backups</span></span></code></pre>
+<p>Restoring it takes only a few minutes.</p>
+<p>When the VM booted normally, that was the real signal that the rebuild worked. The restore didn’t just bring back a machine — it brought back the services that used to run on it before the reinstall.</p>
+<h1 id="where-the-system-stands-now">Where the system stands now</h1>
+<p>At this point the arena is quiet again — in a good way.</p>
+<p>The node is stable, storage is laid out, and restores work.</p>
+<p>The system now looks like this:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>SSD thinpool         → VM disks</span></span>
+<span class="line"><span>/mnt/pve/data01      → HDD storage</span></span>
+<span class="line"><span>/mnt/pve/data02      → HDD storage</span></span>
+<span class="line"><span>/mnt/pve/data02/dump → VM restore location</span></span></code></pre>
+<p>It’s intentionally simple.</p>
+<p>That simplicity gives the rebuilt node something it didn’t have earlier in the process: <strong>a predictable place for everything to live</strong>.</p>
+<h1 id="next">Next</h1>
+<p>With the storage foundation in place, the node is ready for the next step: creating the first fresh VM and installing a new operating system on it.</p>
+<p>The arena is open again.</p> </div> <nav class="blog-post-navigation"> <a href="/homelab-arena/homelab-arena-proxmox-install" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">Part 1: Proxmox 9.1 on a Gen8 — The UI Is Dead Trap</div> </a>  </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Posts</h2> <div class="related-posts-grid"> <a href="/homelab-arena/homelab-arena-proxmox-install" class="blog-card card-link"> <img src="/assets/homelab-arena/homelab-arena-proxmox-install/banner.webp" alt="Part 1: Proxmox 9.1 on a Gen8 — The UI Is Dead Trap" class="blog-card-image"> <h3 class="blog-card-title">Part 1: Proxmox 9.1 on a Gen8 — The UI Is Dead Trap</h3> <p class="blog-card-description"> A practical reinstall guide for Proxmox VE 9.1 on an HPE MicroServer Gen8, plus the one Gen8 boot fix that saves your future self. </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container text-primary"> <p>© 2026 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer>  </body></html>
