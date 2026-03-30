@@ -1,0 +1,289 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="A short power outage forced a migration that had already been waiting in the wings: recovering pfSense and Pi-hole configuration from the old ESXi stack, rebuilding routing on Proxmox, and moving Pi-hole from Docker in a CentOS VM into a Proxmox LXC on a new HP T740 thin client."><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v5.17.2"><link rel="canonical" href="https://januschung.github.io/homelab-arena/homelab-arena-network-rebuild/"><title>Part 3: The Network Rebuild Side Quest - Janus</title><link rel="stylesheet" href="/_astro/about.B-tUbqBu.css">
+<link rel="stylesheet" href="/_astro/index.BFrYoEHc.css"></head> <body class="min-h-screen flex flex-col"> <span data-pagefind-filter="locale:en" class="hidden" aria-hidden="true"></span> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/homelab-arena">Homelab Arena</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul>  <div class="mobile-controls"> <button class="search-icon-button" aria-label="Toggle search" id="search-toggle"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"> <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round"></path> </svg> </button> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> </div> <div class="header-search" id="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false,&#34;translations&#34;:{&#34;placeholder&#34;:&#34;Search…&#34;}}"></div> <script type="module" src="/_astro/Search.astro_astro_type_script_index_0_lang.tZYucdM2.js"></script> </div>  </div> </nav> </header> <script type="module">(function(){const n=document.getElementById("mobile-menu-toggle"),s=document.getElementById("nav-links"),c=document.querySelector("header"),a=document.getElementById("search-toggle"),e=document.getElementById("header-search");n&&s&&(n.addEventListener("click",()=>{const t=s.classList.toggle("nav-open");n.classList.toggle("active"),c.classList.toggle("menu-open"),t?document.body.style.overflow="hidden":document.body.style.overflow="",e&&e.classList.remove("search-open")}),s.querySelectorAll("a").forEach(t=>{t.addEventListener("click",()=>{s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow=""})}),document.addEventListener("click",t=>{!c.contains(t.target)&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow="")})),a&&e&&(a.addEventListener("click",o=>{o.stopPropagation(),e.classList.toggle("search-open"),s&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n&&n.classList.remove("active"),c&&c.classList.remove("menu-open")),e.classList.contains("search-open")&&setTimeout(()=>{const t=e.querySelector('input[type="search"]');t&&(t.focus(),t.dispatchEvent(new Event("input",{bubbles:!0})));const i=e.querySelector(".pagefind-ui__results-area");i&&(i.style.display="block")},150)}),document.addEventListener("click",o=>{e&&!e.contains(o.target)&&!a.contains(o.target)&&e.classList.contains("search-open")&&e.classList.remove("search-open")}),document.addEventListener("keydown",o=>{o.key==="Escape"&&e&&e.classList.contains("search-open")&&e.classList.remove("search-open")}))})();</script> <main class="flex-1" data-locale-prefix>  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">Part 3: The Network Rebuild Side Quest</h1> <div class="blog-post-meta"> <time>March 29, 2026</time> <span class="blog-post-meta-separator">•</span> <span>6 min read</span>  </div> <div class="pill-group pill-group--top"> <span class="pill">proxmox</span><span class="pill">pfsense</span><span class="pill">pihole</span><span class="pill">networking</span><span class="pill">homelab</span> </div> </header> <div class="blog-post-content prose"> <h1 id="homelab-arena-part-3-the-network-rebuild-side-quest">Homelab Arena Part 3: The Network Rebuild Side Quest</h1>
+<p>Part 2 laid the foundation.</p>
+<p>Storage was rebuilt, disks were labeled, and the node finally behaved predictably again. The arena was ready for the next step: continuing the K3s rebuild.</p>
+<p>That was the plan.</p>
+<p>Then the lights went out.</p>
+<p><img src="/assets/homelab-arena/homelab-arena-network-rebuild/banner.webp" alt="Galaxy Express 999 - An orphan journeys through the stars on a celestial steam train to trade his humanity for a mechanical body."></p>
+<!-- more -->
+<h2 id="a-side-track-that-was-always-coming">A Side Track That Was Always Coming</h2>
+<p>It turns out the Homelab Arena isn’t just about K3s after all.</p>
+<p>Part 0, 1, and 2 were focused on bringing the cluster back. But this part is different — a side track that was always going to happen eventually.</p>
+<p>The network stack had been running quietly for years:</p>
+<ul>
+<li>pfSense on ESXi</li>
+<li>Pi-hole in Docker inside a CentOS VM</li>
+</ul>
+<p>It wasn’t new, but it was stable. It did its job without needing attention.</p>
+<p>But it was also tied to older hardware, and the migration had been sitting on the list.</p>
+<p>The outage didn’t break everything.</p>
+<p>It just made the decision for me.</p>
+<h2 id="the-hardware-shift">The Hardware Shift</h2>
+<p>Old:</p>
+<ul>
+<li>HP Gen2 i5</li>
+<li>8GB RAM</li>
+<li>4-port NIC</li>
+<li>ESXi</li>
+</ul>
+<p>New:</p>
+<ul>
+<li>HP T740 thin client (Ryzen-based)</li>
+<li>8GB RAM</li>
+<li>Proxmox</li>
+</ul>
+<p>Smaller, quieter, and already prepared.</p>
+<h2 id="step-1-recover-the-configuration">Step 1: Recover the Configuration</h2>
+<p>The goal was not to fix the old system.</p>
+<p>The goal was to extract what mattered.</p>
+<h3 id="bootstrapping-esxi-for-access">Bootstrapping ESXi for Access</h3>
+<p>A fresh ESXi installation was written to a new USB drive.</p>
+<p>After booting:</p>
+<ul>
+<li>the old SSD datastore mounted automatically</li>
+<li>existing VMs appeared without reconstruction</li>
+<li>the system was usable again — temporarily</li>
+</ul>
+<p>This was enough to retrieve configuration.</p>
+<h3 id="exporting-pfsense-configuration">Exporting pfSense Configuration</h3>
+<p>Power on the pfSense VM.</p>
+<p>From the Web UI:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Diagnostics → Backup &#x26; Restore</span></span></code></pre>
+<p>Download:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>config.xml</span></span></code></pre>
+<p>This file contains:</p>
+<ul>
+<li>interface definitions</li>
+<li>firewall rules</li>
+<li>DHCP configuration</li>
+<li>NAT rules</li>
+<li>system settings</li>
+</ul>
+<p>Because pfSense ties logic to interface roles, not hardware identifiers, this file can be restored on completely different hardware and still work after reassignment.</p>
+<h3 id="extracting-pi-hole-data">Extracting Pi-hole Data</h3>
+<p>Pi-hole was running in Docker, so there is no single export.</p>
+<p>From the CentOS VM:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">/var/docker/pihole/etc-pihole/</span></span></code></pre>
+<p>Copy this directory out.</p>
+<p>Important contents:</p>
+<ul>
+<li><code>gravity.db</code></li>
+<li><code>pihole-FTL.db</code></li>
+<li><code>dhcp.leases</code></li>
+<li><code>local.list</code></li>
+<li><code>hosts/</code></li>
+<li><code>adlists.list</code></li>
+</ul>
+<p>These represent the operational state of Pi-hole.</p>
+<h2 id="step-2-build-the-new-network-foundation">Step 2: Build the New Network Foundation</h2>
+<h3 id="physical-layout">Physical Layout</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Internet</span></span>
+<span class="line"><span>   ↓</span></span>
+<span class="line"><span>nic0 (onboard)</span></span>
+<span class="line"><span>   ↓</span></span>
+<span class="line"><span>pfSense (VM)</span></span>
+<span class="line"><span>   ↓</span></span>
+<span class="line"><span>4 physical LAN ports</span></span></code></pre>
+<h3 id="logical-design">Logical Design</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>                    INTERNET</span></span>
+<span class="line"><span>                        |</span></span>
+<span class="line"><span>                     [ WAN ]</span></span>
+<span class="line"><span>                     pfSense</span></span>
+<span class="line"><span>            ┌─────────┼─────────┬─────────┐</span></span>
+<span class="line"><span>            |         |         |         |</span></span>
+<span class="line"><span>          LAN0      LAN1      LAN2      LAN3</span></span>
+<span class="line"><span>       10.0.0.1  10.0.1.1  10.0.2.1  10.0.3.1</span></span>
+<span class="line"><span>            |</span></span>
+<span class="line"><span>     Infrastructure services</span></span></code></pre>
+<h3 id="proxmox-network-configuration">Proxmox Network Configuration</h3>
+<p>Each physical interface becomes its own bridge.</p>
+<p>Edit:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">nano</span><span style="color:#9ECBFF"> /etc/network/interfaces</span></span></code></pre>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">auto</span><span style="color:#9ECBFF"> lo</span></span>
+<span class="line"><span style="color:#B392F0">iface</span><span style="color:#9ECBFF"> lo</span><span style="color:#9ECBFF"> inet</span><span style="color:#9ECBFF"> loopback</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">iface</span><span style="color:#9ECBFF"> nic0</span><span style="color:#9ECBFF"> inet</span><span style="color:#9ECBFF"> manual</span></span>
+<span class="line"><span style="color:#B392F0">iface</span><span style="color:#9ECBFF"> enp1s0f0</span><span style="color:#9ECBFF"> inet</span><span style="color:#9ECBFF"> manual</span></span>
+<span class="line"><span style="color:#B392F0">iface</span><span style="color:#9ECBFF"> enp1s0f1</span><span style="color:#9ECBFF"> inet</span><span style="color:#9ECBFF"> manual</span></span>
+<span class="line"><span style="color:#B392F0">iface</span><span style="color:#9ECBFF"> enp1s0f2</span><span style="color:#9ECBFF"> inet</span><span style="color:#9ECBFF"> manual</span></span>
+<span class="line"><span style="color:#B392F0">iface</span><span style="color:#9ECBFF"> enp1s0f3</span><span style="color:#9ECBFF"> inet</span><span style="color:#9ECBFF"> manual</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># LAN0 (primary)</span></span>
+<span class="line"><span style="color:#B392F0">auto</span><span style="color:#9ECBFF"> vmbr0</span></span>
+<span class="line"><span style="color:#B392F0">iface</span><span style="color:#9ECBFF"> vmbr0</span><span style="color:#9ECBFF"> inet</span><span style="color:#9ECBFF"> static</span></span>
+<span class="line"><span style="color:#B392F0">    address</span><span style="color:#9ECBFF"> 10.0.0.224/24</span></span>
+<span class="line"><span style="color:#B392F0">    gateway</span><span style="color:#79B8FF"> 10.0.0.1</span></span>
+<span class="line"><span style="color:#B392F0">    bridge-ports</span><span style="color:#9ECBFF"> enp1s0f0</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># LAN1</span></span>
+<span class="line"><span style="color:#B392F0">auto</span><span style="color:#9ECBFF"> vmbr1</span></span>
+<span class="line"><span style="color:#B392F0">iface</span><span style="color:#9ECBFF"> vmbr1</span><span style="color:#9ECBFF"> inet</span><span style="color:#9ECBFF"> manual</span></span>
+<span class="line"><span style="color:#B392F0">    bridge-ports</span><span style="color:#9ECBFF"> enp1s0f1</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># LAN2</span></span>
+<span class="line"><span style="color:#B392F0">auto</span><span style="color:#9ECBFF"> vmbr2</span></span>
+<span class="line"><span style="color:#B392F0">iface</span><span style="color:#9ECBFF"> vmbr2</span><span style="color:#9ECBFF"> inet</span><span style="color:#9ECBFF"> manual</span></span>
+<span class="line"><span style="color:#B392F0">    bridge-ports</span><span style="color:#9ECBFF"> enp1s0f2</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># LAN3</span></span>
+<span class="line"><span style="color:#B392F0">auto</span><span style="color:#9ECBFF"> vmbr3</span></span>
+<span class="line"><span style="color:#B392F0">iface</span><span style="color:#9ECBFF"> vmbr3</span><span style="color:#9ECBFF"> inet</span><span style="color:#9ECBFF"> manual</span></span>
+<span class="line"><span style="color:#B392F0">    bridge-ports</span><span style="color:#9ECBFF"> enp1s0f3</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># WAN</span></span>
+<span class="line"><span style="color:#B392F0">auto</span><span style="color:#9ECBFF"> vmbr5</span></span>
+<span class="line"><span style="color:#B392F0">iface</span><span style="color:#9ECBFF"> vmbr5</span><span style="color:#9ECBFF"> inet</span><span style="color:#9ECBFF"> manual</span></span>
+<span class="line"><span style="color:#B392F0">    bridge-ports</span><span style="color:#9ECBFF"> nic0</span></span></code></pre>
+<p>Apply:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">ifreload</span><span style="color:#79B8FF"> -a</span></span></code></pre>
+<h2 id="step-3-deploy-pfsense">Step 3: Deploy pfSense</h2>
+<h3 id="create-the-vm">Create the VM</h3>
+<p>Add 5 network interfaces:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>NIC</th><th>Bridge</th></tr></thead><tbody><tr><td>net0</td><td>vmbr5 (WAN)</td></tr><tr><td>net1</td><td>vmbr0</td></tr><tr><td>net2</td><td>vmbr1</td></tr><tr><td>net3</td><td>vmbr2</td></tr><tr><td>net4</td><td>vmbr3</td></tr></tbody></table>
+<h3 id="assign-interfaces">Assign Interfaces</h3>
+<p>From console:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>1) Assign Interfaces</span></span></code></pre>
+<p>Assign:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>WAN  → vtnet0</span></span>
+<span class="line"><span>LAN  → vtnet1</span></span>
+<span class="line"><span>OPT1 → vtnet2</span></span>
+<span class="line"><span>OPT2 → vtnet3</span></span>
+<span class="line"><span>OPT3 → vtnet4</span></span></code></pre>
+<h3 id="set-interface-ips">Set Interface IPs</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>LAN   → 10.0.0.1 /24</span></span>
+<span class="line"><span>OPT1  → 10.0.1.1 /24</span></span>
+<span class="line"><span>OPT2  → 10.0.2.1 /24</span></span>
+<span class="line"><span>OPT3  → 10.0.3.1 /24</span></span></code></pre>
+<p>Enable DHCP on each interface.</p>
+<h3 id="restore-configuration">Restore Configuration</h3>
+<p>Upload:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>config.xml</span></span></code></pre>
+<p>After restore:</p>
+<ul>
+<li>pfSense reboots</li>
+<li>interface mismatch warning appears</li>
+<li>reassign interfaces again</li>
+</ul>
+<p>This step is expected — hardware identifiers changed.</p>
+<h3 id="post-restore-validation">Post-Restore Validation</h3>
+<p>Check:</p>
+<ul>
+<li>WAN receives IP</li>
+<li>LAN reachable</li>
+<li>Web UI accessible</li>
+</ul>
+<p>Verify services:</p>
+<ul>
+<li>DHCP active</li>
+<li>firewall rules present</li>
+<li>system logs clean</li>
+</ul>
+<h2 id="step-4-deploy-pi-hole-as-lxc">Step 4: Deploy Pi-hole as LXC</h2>
+<h3 id="create-container">Create Container</h3>
+<ul>
+<li>Debian 12 template</li>
+<li>1 CPU</li>
+<li>512MB RAM</li>
+<li>static IP on LAN0</li>
+</ul>
+<h3 id="install-pi-hole">Install Pi-hole</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">apt</span><span style="color:#9ECBFF"> update</span><span style="color:#E1E4E8"> &#x26;&#x26; </span><span style="color:#B392F0">apt</span><span style="color:#9ECBFF"> upgrade</span></span>
+<span class="line"><span style="color:#B392F0">apt</span><span style="color:#9ECBFF"> install</span><span style="color:#79B8FF"> -y</span><span style="color:#9ECBFF"> curl</span></span>
+<span class="line"><span style="color:#B392F0">curl</span><span style="color:#79B8FF"> -sSL</span><span style="color:#9ECBFF"> https://install.pi-hole.net</span><span style="color:#F97583"> |</span><span style="color:#B392F0"> bash</span></span></code></pre>
+<h3 id="restore-data-selective">Restore Data (Selective)</h3>
+<p>Stop service:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">systemctl</span><span style="color:#9ECBFF"> stop</span><span style="color:#9ECBFF"> pihole-FTL</span></span></code></pre>
+<p>Backup clean install:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">cp</span><span style="color:#79B8FF"> -r</span><span style="color:#9ECBFF"> /etc/pihole</span><span style="color:#9ECBFF"> /etc/pihole.clean</span></span></code></pre>
+<p>Restore only necessary data:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">cp</span><span style="color:#9ECBFF"> gravity.db</span><span style="color:#9ECBFF"> /etc/pihole/</span></span>
+<span class="line"><span style="color:#B392F0">cp</span><span style="color:#9ECBFF"> pihole-FTL.db</span><span style="color:#9ECBFF"> /etc/pihole/</span></span>
+<span class="line"><span style="color:#B392F0">cp</span><span style="color:#9ECBFF"> dhcp.leases</span><span style="color:#9ECBFF"> /etc/pihole/</span></span>
+<span class="line"><span style="color:#B392F0">cp</span><span style="color:#9ECBFF"> local.list</span><span style="color:#9ECBFF"> /etc/pihole/</span></span>
+<span class="line"><span style="color:#B392F0">cp</span><span style="color:#79B8FF"> -r</span><span style="color:#9ECBFF"> hosts/</span><span style="color:#9ECBFF"> /etc/pihole/</span></span></code></pre>
+<p>Fix permissions:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">chown</span><span style="color:#79B8FF"> -R</span><span style="color:#9ECBFF"> pihole:pihole</span><span style="color:#9ECBFF"> /etc/pihole</span></span>
+<span class="line"><span style="color:#B392F0">chmod</span><span style="color:#79B8FF"> -R</span><span style="color:#79B8FF"> 755</span><span style="color:#9ECBFF"> /etc/pihole</span></span></code></pre>
+<p>Rebuild database:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">pihole</span><span style="color:#79B8FF"> -g</span></span></code></pre>
+<p>Start service:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">systemctl</span><span style="color:#9ECBFF"> start</span><span style="color:#9ECBFF"> pihole-FTL</span></span></code></pre>
+<h3 id="verify">Verify</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">pihole</span><span style="color:#9ECBFF"> status</span></span></code></pre>
+<p>Test:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">ping</span><span style="color:#79B8FF"> 10.0.0.1</span></span>
+<span class="line"><span style="color:#B392F0">ping</span><span style="color:#79B8FF"> 8.8.8.8</span></span></code></pre>
+<h3 id="critical-setting">Critical Setting</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Settings → DNS → Interface Listening Behavior</span></span>
+<span class="line"><span>→ Listen on all interfaces, permit all origins</span></span></code></pre>
+<p>This is required because requests come from multiple subnets.</p>
+<h2 id="step-5-validation">Step 5: Validation</h2>
+<p>From container:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">ping</span><span style="color:#79B8FF"> 8.8.8.8</span></span></code></pre>
+<p>From client:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">nslookup</span><span style="color:#9ECBFF"> google.com</span><span style="color:#9ECBFF"> 10.0.0.x</span></span></code></pre>
+<p>Expected:</p>
+<ul>
+<li>DNS resolves</li>
+<li>clients receive correct responses</li>
+</ul>
+<h2 id="the-new-arena">The New Arena</h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Proxmox (T740)</span></span>
+<span class="line"><span>│</span></span>
+<span class="line"><span>├─ pfSense VM</span></span>
+<span class="line"><span>│   ├─ WAN</span></span>
+<span class="line"><span>│   ├─ LAN  10.0.0.1</span></span>
+<span class="line"><span>│   ├─ OPT1 10.0.1.1</span></span>
+<span class="line"><span>│   ├─ OPT2 10.0.2.1</span></span>
+<span class="line"><span>│   └─ OPT3 10.0.3.1</span></span>
+<span class="line"><span>│</span></span>
+<span class="line"><span>└─ Pi-hole LXC</span></span></code></pre>
+<h2 id="where-this-leaves-the-arena">Where This Leaves the Arena</h2>
+<p>The old system worked.</p>
+<p>The new system is easier to rebuild.</p>
+<ul>
+<li>fewer layers</li>
+<li>clearer separation</li>
+<li>faster recovery path</li>
+<li>simpler mental model</li>
+</ul>
+<h2 id="back-to-the-main-story">Back to the Main Story</h2>
+<p>This wasn’t part of the original plan.</p>
+<p>But it was always going to happen.</p>
+<p>Now the network is stable again.</p>
+<p>Which means the arena is ready.</p>
+<h2 id="next">Next</h2>
+<p>Back to where we left off:</p>
+<blockquote>
+<p>rebuilding the K3s cluster</p>
+</blockquote>
+<p>The arena continues.</p> </div> <nav class="blog-post-navigation"> <a href="/homelab-arena/homelab-arena-storage" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">Part 2: Laying the Storage Foundation</div> </a>  </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Posts</h2> <div class="related-posts-grid"> <a href="/homelab-arena/homelab-arena-storage" class="blog-card card-link"> <img src="/assets/homelab-arena/homelab-arena-storage/banner.webp" alt="Part 2: Laying the Storage Foundation" class="blog-card-image"> <h3 class="blog-card-title">Part 2: Laying the Storage Foundation</h3> <p class="blog-card-description"> After the Proxmox reinstall: mapping two 4TB HDDs as directory storages with stable names (data01/data02), ext4 labels for clarity, and restoring a pre-reinstall VM backup to prove the stack works. </p> </a><a href="/homelab-arena/homelab-arena-proxmox-install" class="blog-card card-link"> <img src="/assets/homelab-arena/homelab-arena-proxmox-install/banner.webp" alt="Part 1: Proxmox 9.1 on a Gen8 — The UI Is Dead Trap" class="blog-card-image"> <h3 class="blog-card-title">Part 1: Proxmox 9.1 on a Gen8 — The UI Is Dead Trap</h3> <p class="blog-card-description"> A practical reinstall guide for Proxmox VE 9.1 on an HPE MicroServer Gen8, plus the one Gen8 boot fix that saves your future self. </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container text-primary"> <p>© 2026 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer>  </body></html>
