@@ -1,0 +1,181 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="A Terraform-first journey into GCP and GKE—bootstrapping remote state, building a clean foundation, and getting a minimal cluster running with a clear path toward production."><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v5.17.2"><link rel="canonical" href="https://januschung.github.io/blog/gke-bootstrap/"><title>From Zero to GKE — A Terraform-First Build with Production in Mind - Janus</title><link rel="stylesheet" href="/_astro/about.B-tUbqBu.css">
+<link rel="stylesheet" href="/_astro/index.BFrYoEHc.css"></head> <body class="min-h-screen flex flex-col"> <span data-pagefind-filter="locale:en" class="hidden" aria-hidden="true"></span> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/homelab-arena">Homelab Arena</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul>  <div class="mobile-controls"> <button class="search-icon-button" aria-label="Toggle search" id="search-toggle"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"> <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round"></path> </svg> </button> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> </div> <div class="header-search" id="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false,&#34;translations&#34;:{&#34;placeholder&#34;:&#34;Search…&#34;}}"></div> <script type="module" src="/_astro/Search.astro_astro_type_script_index_0_lang.tZYucdM2.js"></script> </div>  </div> </nav> </header> <script type="module">(function(){const n=document.getElementById("mobile-menu-toggle"),s=document.getElementById("nav-links"),c=document.querySelector("header"),a=document.getElementById("search-toggle"),e=document.getElementById("header-search");n&&s&&(n.addEventListener("click",()=>{const t=s.classList.toggle("nav-open");n.classList.toggle("active"),c.classList.toggle("menu-open"),t?document.body.style.overflow="hidden":document.body.style.overflow="",e&&e.classList.remove("search-open")}),s.querySelectorAll("a").forEach(t=>{t.addEventListener("click",()=>{s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow=""})}),document.addEventListener("click",t=>{!c.contains(t.target)&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow="")})),a&&e&&(a.addEventListener("click",o=>{o.stopPropagation(),e.classList.toggle("search-open"),s&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n&&n.classList.remove("active"),c&&c.classList.remove("menu-open")),e.classList.contains("search-open")&&setTimeout(()=>{const t=e.querySelector('input[type="search"]');t&&(t.focus(),t.dispatchEvent(new Event("input",{bubbles:!0})));const i=e.querySelector(".pagefind-ui__results-area");i&&(i.style.display="block")},150)}),document.addEventListener("click",o=>{e&&!e.contains(o.target)&&!a.contains(o.target)&&e.classList.contains("search-open")&&e.classList.remove("search-open")}),document.addEventListener("keydown",o=>{o.key==="Escape"&&e&&e.classList.contains("search-open")&&e.classList.remove("search-open")}))})();</script> <main class="flex-1" data-locale-prefix>  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">From Zero to GKE — A Terraform-First Build with Production in Mind</h1> <div class="blog-post-meta"> <time>April 7, 2026</time> <span class="blog-post-meta-separator">•</span> <span>7 min read</span>  </div> <div class="pill-group pill-group--top"> <span class="pill">gcp</span><span class="pill">gke</span><span class="pill">terraform</span><span class="pill">kubernetes</span><span class="pill">cloud</span> </div> </header> <div class="blog-post-content prose"> <h1 id="from-zero-to-gke--a-terraform-first-build-with-production-in-mind">From Zero to GKE — A Terraform-First Build with Production in Mind</h1>
+<p><img src="/assets/blog/gke-bootstrap/banner.webp" alt="gke-bootstrap layout"></p>
+<p>I’ve always wanted to keep the option of multi-cloud open.</p>
+<p>Not as a buzzword, but as a practical decision. At one point, I was close to joining a team that was deeply invested in Azure. That didn’t happen, but it made something clear: I shouldn’t anchor myself to a single platform.</p>
+<p>So this is me doing something about it.</p>
+<!-- more -->
+<p>I’m learning GCP and GKE from scratch — but with a constraint. Everything I build should have a clear path to production. Not necessarily production-ready on day one, but structured in a way that doesn’t need to be rewritten later.</p>
+<p>That changes how I approach things.</p>
+<p>Instead of clicking around the console to get something working quickly, I’m building everything with Terraform. Instead of jumping straight into Kubernetes, I’m putting structure in place first. Instead of optimizing early, I’m trying to understand the system well enough that the next step is always intentional.</p>
+<p>This is not a guide. It’s a record of how I’m figuring things out — one layer at a time — with the assumption that whatever I build today should still make sense when it grows up.</p>
+<h2 id="preparing-the-environment">Preparing the environment</h2>
+<p>Before writing any Terraform, I needed a working connection to GCP.</p>
+<p>Terraform relies on Application Default Credentials, so this step isn’t optional — it’s how the provider knows who you are and what you’re allowed to do.</p>
+<p>I kept it minimal:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">gcloud</span><span style="color:#9ECBFF"> config</span><span style="color:#9ECBFF"> set</span><span style="color:#9ECBFF"> project</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">project-i</span><span style="color:#E1E4E8">d</span><span style="color:#F97583">></span></span>
+<span class="line"><span style="color:#B392F0">gcloud</span><span style="color:#9ECBFF"> auth</span><span style="color:#9ECBFF"> application-default</span><span style="color:#9ECBFF"> login</span></span></code></pre>
+<p>That was enough for Terraform to start provisioning resources without additional configuration.</p>
+<p>There’s also a small detail specific to GKE. <code>kubectl</code> doesn’t talk to GKE directly — it relies on a plugin provided by the Google Cloud CLI. I found out this part until the cluster was ready.</p>
+<p>So be sure to install the following plugin:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">gcloud</span><span style="color:#9ECBFF"> components</span><span style="color:#9ECBFF"> install</span><span style="color:#9ECBFF"> gke-gcloud-auth-plugin</span></span></code></pre>
+<p>With that in place, I could move on to defining infrastructure.</p>
+<h2 id="starting-from-zero-including-terraform-itself">Starting from zero (including Terraform itself)</h2>
+<p>Terraform has an awkward starting point. It needs a place to store state, but that place doesn’t exist yet.</p>
+<p>A common workaround is to create a storage bucket manually and move on. That works, but it breaks the idea of infrastructure being fully reproducible.</p>
+<p>So I started with a small bootstrap layer — just enough to define the state bucket in code.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="hcl"><code><span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "google_storage_bucket"</span><span style="color:#79B8FF"> "tf_state"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  name</span><span style="color:#F97583">     =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">bucket_name</span></span>
+<span class="line"><span style="color:#E1E4E8">  location</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">location</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">  versioning</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    enabled</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> true</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">  uniform_bucket_level_access</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> true</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>This step still uses local state, and that’s intentional. It’s temporary and only exists to create the remote backend.</p>
+<p>Once the bucket is in place, Terraform moves to remote state, and from that point on, everything is tracked consistently.</p>
+<p>It’s a small detail, but it sets the tone for everything that follows.</p>
+<h2 id="building-structure-before-touching-kubernetes">Building structure before touching Kubernetes</h2>
+<p>It’s tempting to go straight to “create cluster.” I almost did. But GKE relies heavily on networking, and skipping that layer usually leads to confusion later.</p>
+<p>So I introduced a foundation layer first.</p>
+<p>This layer handles:</p>
+<ul>
+<li>enabling required APIs</li>
+<li>defining a VPC</li>
+<li>creating a subnet</li>
+<li>reserving IP ranges for pods and services</li>
+<li>preparing a service account for nodes</li>
+<li>setting up a container registry</li>
+</ul>
+<p>The subnet configuration is more important than it looks. GKE uses secondary IP ranges to separate pod and service networking, and getting this right early avoids having to revisit it later.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="hcl"><code><span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "google_compute_subnetwork"</span><span style="color:#79B8FF"> "subnet"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  ip_cidr_range</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "10.0.0.0/20"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">  secondary_ip_range</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    range_name</span><span style="color:#F97583">    =</span><span style="color:#9ECBFF"> "pods"</span></span>
+<span class="line"><span style="color:#E1E4E8">    ip_cidr_range</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "10.1.0.0/16"</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">  secondary_ip_range</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    range_name</span><span style="color:#F97583">    =</span><span style="color:#9ECBFF"> "services"</span></span>
+<span class="line"><span style="color:#E1E4E8">    ip_cidr_range</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "10.2.0.0/20"</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>What I like about this step is what it doesn’t introduce.</p>
+<p>No compute. No cluster. No external exposure.</p>
+<p>Just structure.</p>
+<p>It’s a clean checkpoint that can be applied, reviewed, and trusted before moving forward.</p>
+<h2 id="a-terraform-layout-that-doesnt-fight-you-later">A Terraform layout that doesn’t fight you later</h2>
+<p>I spent more time than expected thinking about how to organize the code.</p>
+<p>What I ended up with is intentionally simple:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>terraform/</span></span>
+<span class="line"><span>  bootstrap/</span></span>
+<span class="line"><span>  modules/</span></span>
+<span class="line"><span>  live/</span></span>
+<span class="line"><span>    dev/</span></span>
+<span class="line"><span>      foundation/</span></span>
+<span class="line"><span>      gke/</span></span></code></pre>
+<p>The key idea is separation.</p>
+<p>The foundation layer and the GKE layer live in separate Terraform states. They’re connected through remote state, but they don’t overlap.</p>
+<p>That means changes to networking don’t accidentally impact the cluster, and changes to the cluster don’t rewrite the base infrastructure.</p>
+<p>It’s not overly engineered, but it creates just enough boundary to keep things predictable.</p>
+<h2 id="creating-the-cluster-without-defaults">Creating the cluster without defaults</h2>
+<p>GKE will happily create a cluster with a default node pool. I chose not to use it.</p>
+<p>Instead, I removed the default node pool and defined my own. It’s a small decision, but it gives control over what actually runs in the cluster.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="hcl"><code><span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "google_container_cluster"</span><span style="color:#79B8FF"> "cluster"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  remove_default_node_pool</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> true</span></span>
+<span class="line"><span style="color:#E1E4E8">  initial_node_count</span><span style="color:#F97583">       =</span><span style="color:#79B8FF"> 1</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "google_container_node_pool"</span><span style="color:#79B8FF"> "nodes"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#B392F0">  node_config</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    machine_type</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "e2-small"</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">  node_count</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> 1</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>I started with a minimal x86 node. Not because it’s the final choice, but because it keeps things predictable while I’m still building the mental model.</p>
+<p>There’s enough complexity already — no need to introduce more variables too early.</p>
+<h2 id="the-moment-it-becomes-real">The moment it becomes real</h2>
+<p>After applying the cluster configuration, everything still feels abstract.</p>
+<p>Until this:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>kubectl get nodes</span></span></code></pre>
+<p>And suddenly there’s a node, marked <code>Ready</code>.</p>
+<p>That’s the moment it shifts from configuration to system.</p>
+<h2 id="putting-something-on-it">Putting something on it</h2>
+<p>A cluster without a workload is just potential.</p>
+<p>So I deployed the simplest thing possible — nginx.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">v1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Namespace</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">janus-test</span></span>
+<span class="line"><span style="color:#B392F0">---</span></span>
+<span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">apps/v1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Deployment</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">hello</span></span>
+<span class="line"><span style="color:#85E89D">  namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">janus-test</span></span>
+<span class="line"><span style="color:#85E89D">spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  replicas</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">1</span></span>
+<span class="line"><span style="color:#85E89D">  selector</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    matchLabels</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      app</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">hello</span></span>
+<span class="line"><span style="color:#85E89D">  template</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      labels</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">        app</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">hello</span></span>
+<span class="line"><span style="color:#85E89D">    spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      containers</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">        - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">hello</span></span>
+<span class="line"><span style="color:#85E89D">          image</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">nginx</span></span>
+<span class="line"><span style="color:#85E89D">          ports</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">            - </span><span style="color:#85E89D">containerPort</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">80</span></span>
+<span class="line"><span style="color:#B392F0">---</span></span>
+<span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">v1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Service</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">hello</span></span>
+<span class="line"><span style="color:#85E89D">  namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">janus-test</span></span>
+<span class="line"><span style="color:#85E89D">spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  type</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">LoadBalancer</span></span>
+<span class="line"><span style="color:#85E89D">  selector</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    app</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">hello</span></span>
+<span class="line"><span style="color:#85E89D">  ports</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">port</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">80</span></span>
+<span class="line"><span style="color:#85E89D">      targetPort</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">80</span></span></code></pre>
+<p>GKE handles the rest. A public endpoint appears, backed by the cluster.</p>
+<h3 id="a-quick-request-test">A quick request test:</h3>
+<ol>
+<li>Get the external-ip:</li>
+</ol>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>kubectl get svc -n janus-test</span></span></code></pre>
+<ol start="2">
+<li>Make the request:</li>
+</ol>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>curl http://&#x3C;external-ip></span></span></code></pre>
+<p>And it responds.</p>
+<p>No ingress. No domain. No TLS. Just a direct path from the internet to a container.</p>
+<p>Simple, but complete.</p>
+<h2 id="what-stood-out">What stood out</h2>
+<p>A few things became clearer through this process.</p>
+<p>The control plane is almost invisible. You don’t manage it, and you don’t need to. Most of the meaningful decisions happen around node pools and networking.</p>
+<p>The cluster itself is less interesting than expected. The node pool defines behavior — architecture, capacity, scheduling. That’s where the real control lives.</p>
+<p>And GKE does a lot quietly. Creating a LoadBalancer service results in real infrastructure being provisioned behind the scenes. It feels seamless, but there’s quite a bit happening under the hood.</p>
+<h2 id="what-i-deliberately-avoided">What I deliberately avoided</h2>
+<p>There’s a long list of things I didn’t touch yet:</p>
+<ul>
+<li>private clusters</li>
+<li>NAT configuration</li>
+<li>ingress controllers</li>
+<li>TLS and domains</li>
+<li>autoscaling</li>
+<li>identity integration</li>
+</ul>
+<p>Not because they’re optional, but because they add layers.</p>
+<p>For now, I wanted a clear understanding of the fundamentals before stacking more complexity on top.</p>
+<p>This is the point where the cluster stops being theoretical.</p>
+<p>It exists. It runs workloads. It responds to requests.</p>
+<p>And more importantly, it can be rebuilt — entirely from code.</p>
+<p>That’s the baseline I was aiming for.</p> </div> <nav class="blog-post-navigation"> <a href="/blog/how-to-build-slack-bot-like-doraemon" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">How to Build a Slack Bot Like Doraemon</div> </a>  </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Posts</h2> <div class="related-posts-grid"> <a href="/blog/eks-arm-migration" class="blog-card card-link"> <img src="/assets/blog/eks-arm-migration/banner.webp" alt="From x86 to ARM in production: the EKS migration story" class="blog-card-image"> <h3 class="blog-card-title">From x86 to ARM in production: the EKS migration story</h3> <p class="blog-card-description"> We migrated our EKS workloads from x86 to ARM in production with zero downtime. Here&#39;s how we simplified our architecture story end-to-end and saved cost without trading away reliability. </p> </a><a href="/blog/build-promote" class="blog-card card-link"> <img src="/assets/blog/build-promote/banner.jpg" alt="Build Once. Promote Forward. Ship Daily." class="blog-card-image"> <h3 class="blog-card-title">Build Once. Promote Forward. Ship Daily.</h3> <p class="blog-card-description"> How we eliminated rebuild-per-environment pipelines and went from shipping every two weeks to shipping daily. A real-world story of building once, validating once, and promoting the same artifact through environments. </p> </a><a href="/blog/remote-secret-tunnel" class="blog-card card-link"> <img src="/assets/blog/remote-secret-tunnel/banner.jpg" alt="Developing and Testing K3s Apps Locally" class="blog-card-image"> <h3 class="blog-card-title">Developing and Testing K3s Apps Locally</h3> <p class="blog-card-description"> When building Kubernetes-aware tools — whether a CLI, dashboard, or internal Python service — you often need your local environment to talk directly to the cluster API. </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container text-primary"> <p>© 2026 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer>  </body></html>
