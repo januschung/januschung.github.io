@@ -1,0 +1,213 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Turning the Ubuntu template into real VMs and a joined k3s cluster: shared token, static IPs, DNS aligned with the Pi-hole/pfSense LAN from Part 3, and Ansible installing the control plane before the workers."><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v5.17.2"><link rel="canonical" href="https://januschung.github.io/homelab-arena/homelab-arena-terraform-ansible/"><title>Part 5: Terraform, Ansible, and k3s on Proxmox - Janus</title><link rel="stylesheet" href="/_astro/about.CdqPxALF.css">
+<link rel="stylesheet" href="/_astro/index.BFrYoEHc.css"></head> <body class="min-h-screen flex flex-col"> <span data-pagefind-filter="locale:en" class="hidden" aria-hidden="true"></span> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/homelab-arena">Homelab Arena</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul>  <div class="mobile-controls"> <button class="search-icon-button" aria-label="Toggle search" id="search-toggle"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"> <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round"></path> </svg> </button> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> </div> <div class="header-search" id="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false,&#34;translations&#34;:{&#34;placeholder&#34;:&#34;Search…&#34;}}"></div> <script type="module" src="/_astro/Search.astro_astro_type_script_index_0_lang.tZYucdM2.js"></script> </div>  </div> </nav> </header> <script type="module">(function(){const n=document.getElementById("mobile-menu-toggle"),s=document.getElementById("nav-links"),c=document.querySelector("header"),a=document.getElementById("search-toggle"),e=document.getElementById("header-search");n&&s&&(n.addEventListener("click",()=>{const t=s.classList.toggle("nav-open");n.classList.toggle("active"),c.classList.toggle("menu-open"),t?document.body.style.overflow="hidden":document.body.style.overflow="",e&&e.classList.remove("search-open")}),s.querySelectorAll("a").forEach(t=>{t.addEventListener("click",()=>{s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow=""})}),document.addEventListener("click",t=>{!c.contains(t.target)&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow="")})),a&&e&&(a.addEventListener("click",o=>{o.stopPropagation(),e.classList.toggle("search-open"),s&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n&&n.classList.remove("active"),c&&c.classList.remove("menu-open")),e.classList.contains("search-open")&&setTimeout(()=>{const t=e.querySelector('input[type="search"]');t&&(t.focus(),t.dispatchEvent(new Event("input",{bubbles:!0})));const i=e.querySelector(".pagefind-ui__results-area");i&&(i.style.display="block")},150)}),document.addEventListener("click",o=>{e&&!e.contains(o.target)&&!a.contains(o.target)&&e.classList.contains("search-open")&&e.classList.remove("search-open")}),document.addEventListener("keydown",o=>{o.key==="Escape"&&e&&e.classList.contains("search-open")&&e.classList.remove("search-open")}))})();</script> <main class="flex-1" data-locale-prefix>  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">Part 5: Terraform, Ansible, and k3s on Proxmox</h1> <div class="blog-post-meta"> <time>April 18, 2026</time> <span class="blog-post-meta-separator">•</span> <span>9 min read</span>  </div> <div class="pill-group pill-group--top"> <span class="pill">proxmox</span><span class="pill">terraform</span><span class="pill">ansible</span><span class="pill">k3s</span><span class="pill">pihole</span> </div> </header> <div class="blog-post-content prose"> <h2 id="homelab-arena-part-5-terraform-ansible-and-k3s-on-proxmox">Homelab Arena Part 5: Terraform, Ansible, and k3s on Proxmox</h2>
+<p>Part 3 rebuilt the network.</p>
+<p>Part 4 gave me a clean Ubuntu cloud template I could trust.</p>
+<p>Part 5 is where those two pieces finally stop feeling like preparation and start feeling like a platform.</p>
+<p><img src="/assets/homelab-arena/homelab-arena-terraform-ansible/banner.webp" alt="Terranigma - A young traverses a dying world, resurrecting everything to restore Earth from its underworld stasis in this action RPG masterpiece."></p>
+<p>This is the moment the template turns into real machines. Terraform clones the VMs. Cloud-init gives them fixed identity on the LAN. Ansible installs k3s in the only order that makes sense: control plane first, then workers. And the whole thing ends with the one command that tells you whether the plan actually worked:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#9ECBFF"> get</span><span style="color:#9ECBFF"> nodes</span></span></code></pre>
+<p>That was the outcome I was chasing the whole time.</p>
+<h2 id="the-lesson-i-carried-forward">The lesson I carried forward</h2>
+<p>One of the more awkward parts of my earlier OCI k3s rebuild was token handling.</p>
+<p>The workers needed a join token that only existed after the control plane was already alive. So the automation had to dance around that fact: wait for the server, fetch the token, pass it along, then let the workers join. It worked, but it always felt like I was working around the system instead of designing it cleanly.</p>
+<p>I did not want to repeat that here.</p>
+<p>So in this version, Terraform creates the cluster token up front. The server uses it. The workers use it. Nobody has to log into the master to retrieve anything later.</p>
+<p>That change sounds small, but it removes a surprising amount of friction.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="hcl"><code><span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "random_password"</span><span style="color:#79B8FF"> "k3s_cluster_token"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  length</span><span style="color:#F97583">  =</span><span style="color:#79B8FF"> 48</span></span>
+<span class="line"><span style="color:#E1E4E8">  special</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> false</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>Once I had that, the rest of the flow became much easier to reason about.</p>
+<h2 id="how-the-pieces-fit-together">How the pieces fit together</h2>
+<p>At a high level, this part is pretty simple:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>cloud template  -->  terraform apply  -->  VMs (master + workers)</span></span>
+<span class="line"><span>                            |</span></span>
+<span class="line"><span>                            v</span></span>
+<span class="line"><span>                  network_dns --> cloud-init --> guest resolvers</span></span>
+<span class="line"><span>                            |</span></span>
+<span class="line"><span>                            v</span></span>
+<span class="line"><span>                  ansible site.yml  -->  k3s (servers, then agents)</span></span></code></pre>
+<p>That simplicity is part of the payoff.</p>
+<p>The Ubuntu template from Part 4 gives me a clean starting point. Terraform is responsible for creating the machines. Cloud-init handles first-boot identity and networking. Ansible takes over once the VMs exist and installs the cluster in sequence.</p>
+<p>Each layer has a job. None of them have to do too much.</p>
+<h2 id="using-the-network-prepared-by-the-network-server-from-part-3">Using the network prepared by the Network Server from Part 3</h2>
+<p>Part 3 matters a lot more here than it might seem at first.</p>
+<p>That network rebuild was not just cleanup. It was the point where the homelab started behaving like one system again. pfSense became the router, Pi-hole handled LAN DNS, and the Proxmox host finally lived inside a layout that made sense.</p>
+<p>So when I started building the k3s nodes, I did not want them to come up in some disconnected bubble. I wanted them to inherit that same network logic.</p>
+<p>Terraform is not managing Pi-hole directly. It is not opening the UI or writing DNS records through an API. What it does do is tell each VM, through cloud-init, which resolvers to use.</p>
+<p>In this repo, that starts with <code>network_dns</code>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="hcl"><code><span class="line"><span style="color:#B392F0">variable</span><span style="color:#79B8FF"> "network_dns"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  type</span><span style="color:#F97583">        =</span><span style="color:#F97583"> list</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">string</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">  default</span><span style="color:#F97583">     =</span><span style="color:#E1E4E8"> [</span><span style="color:#9ECBFF">"10.0.0.98"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"1.1.1.1"</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#E1E4E8">  description</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "DNS servers for cloud-init."</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>And that value gets pushed straight into the guest initialization block:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="hcl"><code><span class="line"><span style="color:#B392F0">initialization</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#B392F0">  dns</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    servers</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">dns_servers</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">  ip_config</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#B392F0">    ipv4</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">      address</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "</span><span style="color:#F97583">${</span><span style="color:#E1E4E8">var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">ipv4_address</span><span style="color:#F97583">}</span><span style="color:#9ECBFF">/</span><span style="color:#F97583">${</span><span style="color:#E1E4E8">var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">ipv4_prefix</span><span style="color:#F97583">}</span><span style="color:#9ECBFF">"</span></span>
+<span class="line"><span style="color:#E1E4E8">      gateway</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">ipv4_gateway</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">  user_account</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    username</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">ci_user</span></span>
+<span class="line"><span style="color:#E1E4E8">    keys</span><span style="color:#F97583">     =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">ssh_public_keys</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>That is the part I like most: the k3s VMs come up already using the same DNS direction the rest of the homelab was designed around. Pi-hole first, public resolver second. Nothing special, just consistent.</p>
+<h2 id="one-terraform-module-reused-properly">One Terraform module, reused properly</h2>
+<p>At the Proxmox layer, the master and workers are not really different kinds of machines.</p>
+<p>They all come from the same Ubuntu template. They all need CPU, memory, storage, a bridge, static networking, and SSH access. The main differences are hostname, VM ID, IP address, and whether the node is tagged as control plane or worker.</p>
+<p>That made a single reusable module the obvious choice.</p>
+<p>The master is one instance of that module:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="hcl"><code><span class="line"><span style="color:#B392F0">module</span><span style="color:#79B8FF"> "k3s_master"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  source</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "../../modules/proxmox_ubuntu_node"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">  name</span><span style="color:#F97583">               =</span><span style="color:#9ECBFF"> "k3s-master"</span></span>
+<span class="line"><span style="color:#E1E4E8">  proxmox_node_name</span><span style="color:#F97583">  =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">pm_node</span></span>
+<span class="line"><span style="color:#E1E4E8">  vm_id</span><span style="color:#F97583">              =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">master_vm_id</span></span>
+<span class="line"><span style="color:#E1E4E8">  template_vmid</span><span style="color:#F97583">      =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">pm_template_vmid</span></span>
+<span class="line"><span style="color:#E1E4E8">  clone_datastore_id</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">pm_disk_storage</span></span>
+<span class="line"><span style="color:#E1E4E8">  network_bridge</span><span style="color:#F97583">     =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">pm_bridge</span></span>
+<span class="line"><span style="color:#E1E4E8">  ipv4_address</span><span style="color:#F97583">       =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">master_ipv4</span></span>
+<span class="line"><span style="color:#E1E4E8">  ipv4_prefix</span><span style="color:#F97583">        =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">ipv4_prefix</span></span>
+<span class="line"><span style="color:#E1E4E8">  ipv4_gateway</span><span style="color:#F97583">       =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">network_gateway</span></span>
+<span class="line"><span style="color:#E1E4E8">  dns_servers</span><span style="color:#F97583">        =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">network_dns</span></span>
+<span class="line"><span style="color:#E1E4E8">  ssh_public_keys</span><span style="color:#F97583">    =</span><span style="color:#E1E4E8"> [</span><span style="color:#79B8FF">trimspace</span><span style="color:#E1E4E8">(var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">ssh_public_key)]</span></span>
+<span class="line"><span style="color:#E1E4E8">  tags</span><span style="color:#F97583">               =</span><span style="color:#E1E4E8"> [</span><span style="color:#9ECBFF">"k3s"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"control-plane"</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">  cpu_cores</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">master_cpu_cores</span></span>
+<span class="line"><span style="color:#E1E4E8">  memory_mb</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">master_memory_mb</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>And the workers are just that same shape, expanded with <code>for_each</code>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="hcl"><code><span class="line"><span style="color:#B392F0">module</span><span style="color:#79B8FF"> "k3s_workers"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  source</span><span style="color:#F97583">   =</span><span style="color:#9ECBFF"> "../../modules/proxmox_ubuntu_node"</span></span>
+<span class="line"><span style="color:#E1E4E8">  for_each</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">worker_nodes</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">  name</span><span style="color:#F97583">               =</span><span style="color:#E1E4E8"> each</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">key</span></span>
+<span class="line"><span style="color:#E1E4E8">  proxmox_node_name</span><span style="color:#F97583">  =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">pm_node</span></span>
+<span class="line"><span style="color:#E1E4E8">  vm_id</span><span style="color:#F97583">              =</span><span style="color:#E1E4E8"> each</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">value</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">vm_id</span></span>
+<span class="line"><span style="color:#E1E4E8">  template_vmid</span><span style="color:#F97583">      =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">pm_template_vmid</span></span>
+<span class="line"><span style="color:#E1E4E8">  clone_datastore_id</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">pm_disk_storage</span></span>
+<span class="line"><span style="color:#E1E4E8">  network_bridge</span><span style="color:#F97583">     =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">pm_bridge</span></span>
+<span class="line"><span style="color:#E1E4E8">  ipv4_address</span><span style="color:#F97583">       =</span><span style="color:#E1E4E8"> each</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">value</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">ipv4</span></span>
+<span class="line"><span style="color:#E1E4E8">  ipv4_prefix</span><span style="color:#F97583">        =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">ipv4_prefix</span></span>
+<span class="line"><span style="color:#E1E4E8">  ipv4_gateway</span><span style="color:#F97583">       =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">network_gateway</span></span>
+<span class="line"><span style="color:#E1E4E8">  dns_servers</span><span style="color:#F97583">        =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">network_dns</span></span>
+<span class="line"><span style="color:#E1E4E8">  ssh_public_keys</span><span style="color:#F97583">    =</span><span style="color:#E1E4E8"> [</span><span style="color:#79B8FF">trimspace</span><span style="color:#E1E4E8">(var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">ssh_public_key)]</span></span>
+<span class="line"><span style="color:#E1E4E8">  tags</span><span style="color:#F97583">               =</span><span style="color:#E1E4E8"> [</span><span style="color:#9ECBFF">"k3s"</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"worker"</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">  cpu_cores</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">worker_cpu_cores</span></span>
+<span class="line"><span style="color:#E1E4E8">  memory_mb</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">worker_memory_mb</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>That is a much better place to be than copying VM blocks over and over.</p>
+<p>If I want more workers, I do not fork infrastructure code. I update the worker map.</p>
+<h2 id="predictable-addresses-from-the-start">Predictable addresses from the start</h2>
+<p>I did not want this cluster relying on “whatever DHCP gave me today.”</p>
+<p>That is fine for throwaway testing. It is not fine when the control plane address matters, when agents need a stable join target, and when you want DNS and inventory to line up without guesswork.</p>
+<p>So the control plane gets a fixed IP, and the workers live in an explicit map:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="hcl"><code><span class="line"><span style="color:#B392F0">variable</span><span style="color:#79B8FF"> "master_ipv4"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  type</span><span style="color:#F97583">        =</span><span style="color:#F97583"> string</span></span>
+<span class="line"><span style="color:#E1E4E8">  default</span><span style="color:#F97583">     =</span><span style="color:#9ECBFF"> "10.0.1.150"</span></span>
+<span class="line"><span style="color:#E1E4E8">  description</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "k3s server static IP."</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">variable</span><span style="color:#79B8FF"> "worker_nodes"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  type</span><span style="color:#F97583"> =</span><span style="color:#F97583"> map</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">object</span><span style="color:#E1E4E8">({</span></span>
+<span class="line"><span style="color:#E1E4E8">    vm_id </span><span style="color:#F97583">=</span><span style="color:#F97583"> number</span></span>
+<span class="line"><span style="color:#E1E4E8">    ipv4  </span><span style="color:#F97583">=</span><span style="color:#F97583"> string</span></span>
+<span class="line"><span style="color:#E1E4E8">  }))</span></span>
+<span class="line"><span style="color:#E1E4E8">  description</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "Worker host key => { vm_id, ipv4 }. Defaults match 10.0.1.151–155."</span></span>
+<span class="line"><span style="color:#E1E4E8">  default</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#9ECBFF">    "k3s-worker-1"</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> { vm_id </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> 9151</span><span style="color:#E1E4E8">, ipv4 </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> "10.0.1.151"</span><span style="color:#E1E4E8"> }</span></span>
+<span class="line"><span style="color:#9ECBFF">    "k3s-worker-2"</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> { vm_id </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> 9152</span><span style="color:#E1E4E8">, ipv4 </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> "10.0.1.152"</span><span style="color:#E1E4E8"> }</span></span>
+<span class="line"><span style="color:#9ECBFF">    "k3s-worker-3"</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> { vm_id </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> 9153</span><span style="color:#E1E4E8">, ipv4 </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> "10.0.1.153"</span><span style="color:#E1E4E8"> }</span></span>
+<span class="line"><span style="color:#9ECBFF">    "k3s-worker-4"</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> { vm_id </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> 9154</span><span style="color:#E1E4E8">, ipv4 </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> "10.0.1.154"</span><span style="color:#E1E4E8"> }</span></span>
+<span class="line"><span style="color:#9ECBFF">    "k3s-worker-5"</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> { vm_id </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> 9155</span><span style="color:#E1E4E8">, ipv4 </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> "10.0.1.155"</span><span style="color:#E1E4E8"> }</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>That makes the whole setup easier to reason about.</p>
+<p>The master always lives where I expect it to. The workers are easy to count, resize, or remove. And Terraform, cloud-init, and Ansible all stay aligned around the same addresses.</p>
+<h2 id="terraform-creates-what-ansible-will-need-later">Terraform creates what Ansible will need later</h2>
+<p>Once the VMs are defined, Terraform is not just building infrastructure. It is also preparing the values the next layer will need.</p>
+<p>That is the clean part of this design.</p>
+<p>After <code>terraform apply</code>, I can pull the cluster token directly from output:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">terraform</span><span style="color:#9ECBFF"> output</span><span style="color:#79B8FF"> -raw</span><span style="color:#9ECBFF"> k3s_cluster_token</span></span></code></pre>
+<p>That value can go into Ansible group vars, or I can pass it in once from the command line.</p>
+<p>Either way, the secret is already known before any install step starts.</p>
+<p>That turns the workflow into something very straightforward:</p>
+<ol>
+<li>Terraform clones the VMs</li>
+<li>Terraform already knows the cluster token</li>
+<li>Ansible installs the k3s server</li>
+<li>Ansible installs the agents using the same token</li>
+</ol>
+<p>No extra lookup step. No scraping a file from the master. No awkward wait loop.</p>
+<h2 id="ansible-handles-the-order-that-actually-matters">Ansible handles the order that actually matters</h2>
+<p>Once the machines are up, Ansible takes over.</p>
+<p>This is where I wanted the automation to stay boring in the best possible way.</p>
+<p>The playbook does not try to be clever. It just enforces the order that has to happen anyway: control plane first, then agents.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#B392F0">---</span></span>
+<span class="line"><span style="color:#6A737D"># Order: control plane first so agents can join an API that exists.</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Install k3s control plane</span></span>
+<span class="line"><span style="color:#85E89D">  hosts</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">k3s_servers</span></span>
+<span class="line"><span style="color:#85E89D">  gather_facts</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span>
+<span class="line"><span style="color:#85E89D">  pre_tasks</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Require k3s_cluster_token (from Terraform or Vault)</span></span>
+<span class="line"><span style="color:#85E89D">      ansible.builtin.assert</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">        that</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">          - </span><span style="color:#9ECBFF">k3s_cluster_token is defined</span></span>
+<span class="line"><span style="color:#E1E4E8">          - </span><span style="color:#9ECBFF">(k3s_cluster_token | length) > 0</span></span>
+<span class="line"><span style="color:#85E89D">        fail_msg</span><span style="color:#E1E4E8">: </span><span style="color:#F97583">>-</span></span>
+<span class="line"><span style="color:#9ECBFF">          Define k3s_cluster_token (copy ansible/inventory/group_vars/all/secrets.yml.example to secrets.yml</span></span>
+<span class="line"><span style="color:#9ECBFF">          and set the value from: terraform output -raw k3s_cluster_token).</span></span>
+<span class="line"><span style="color:#85E89D">  roles</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">role</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">k3s_server</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Install k3s agents</span></span>
+<span class="line"><span style="color:#85E89D">  hosts</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">k3s_agents</span></span>
+<span class="line"><span style="color:#85E89D">  gather_facts</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span>
+<span class="line"><span style="color:#85E89D">  pre_tasks</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Require k3s_cluster_token and k3s_server_url</span></span>
+<span class="line"><span style="color:#85E89D">      ansible.builtin.assert</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">        that</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">          - </span><span style="color:#9ECBFF">k3s_cluster_token is defined</span></span>
+<span class="line"><span style="color:#E1E4E8">          - </span><span style="color:#9ECBFF">(k3s_cluster_token | length) > 0</span></span>
+<span class="line"><span style="color:#E1E4E8">          - </span><span style="color:#9ECBFF">k3s_server_url is defined</span></span>
+<span class="line"><span style="color:#E1E4E8">          - </span><span style="color:#9ECBFF">(k3s_server_url | length) > 0</span></span>
+<span class="line"><span style="color:#85E89D">        fail_msg</span><span style="color:#E1E4E8">: </span><span style="color:#F97583">>-</span></span>
+<span class="line"><span style="color:#9ECBFF">          Set k3s_cluster_token (inventory/group_vars/all/secrets.yml) and k3s_server_url (inventory/group_vars/k3s_agents.yml).</span></span>
+<span class="line"><span style="color:#85E89D">  roles</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">role</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">k3s_agent</span></span></code></pre>
+<p>That is the separation I wanted all along:</p>
+<ul>
+<li>Terraform handles infrastructure</li>
+<li>cloud-init handles first boot identity and networking</li>
+<li>Ansible handles configuration and install order</li>
+<li>k3s is just the software being laid down on top</li>
+</ul>
+<p>When each piece stays in its lane, the whole thing becomes easier to debug and easier to extend.</p>
+<h2 id="the-proof-that-it-worked">The proof that it worked</h2>
+<p>At the end of all of this, there is only one result I actually care about.</p>
+<p>Not the HCL.
+Not the playbook.
+Not the outputs.</p>
+<p>The result is whether the cluster comes up cleanly.</p>
+<p>So the final check is still the simplest one:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#9ECBFF"> get</span><span style="color:#9ECBFF"> nodes</span></span></code></pre>
+<p>And when it works, it looks like this:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>NAME           STATUS   ROLES           AGE   VERSION</span></span>
+<span class="line"><span>k3s-master     Ready    control-plane   5m    v1.34.6+k3s1</span></span>
+<span class="line"><span>k3s-worker-1   Ready    &#x3C;none>          5m    v1.34.6+k3s1</span></span></code></pre>
+<p>That is the moment where the rebuild stops feeling theoretical.</p>
+<p>After the storage work, the network rebuild, and the template cleanup, this was the first point where it genuinely felt like I had a platform again.</p>
+<h2 id="next-gitops">Next: GitOps</h2>
+<p>With the first k3s cluster standing on Proxmox, the next step is not just adding more nodes.</p>
+<p>The next step is changing how the cluster gets managed.</p>
+<p>That is where Argo CD comes in.</p>
+<p>Part 6 is where the project starts moving away from “installing things by hand” and toward declaring the cluster state in Git and letting the platform own its own drift.</p> </div> <nav class="blog-post-navigation"> <a href="/homelab-arena/homelab-arena-cloud-template" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">Part 4: Creating the First Ubuntu Cloud Template</div> </a>  </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Posts</h2> <div class="related-posts-grid"> <a href="/homelab-arena/homelab-arena-cloud-template" class="blog-card card-link"> <img src="/assets/homelab-arena/homelab-arena-cloud-template/banner.webp" alt="Part 4: Creating the First Ubuntu Cloud Template" class="blog-card-image"> <h3 class="blog-card-title">Part 4: Creating the First Ubuntu Cloud Template</h3> <p class="blog-card-description"> Turning the storage foundation into a reusable Ubuntu 24.04 cloud-init template, setting the stage for Terraform-driven infrastructure. </p> </a><a href="/homelab-arena/homelab-arena-network-rebuild" class="blog-card card-link"> <img src="/assets/homelab-arena/homelab-arena-network-rebuild/banner.webp" alt="Part 3: The Network Rebuild Side Quest" class="blog-card-image"> <h3 class="blog-card-title">Part 3: The Network Rebuild Side Quest</h3> <p class="blog-card-description"> A short power outage forced a migration that had already been waiting in the wings: recovering pfSense and Pi-hole configuration from the old ESXi stack, rebuilding routing on Proxmox, and moving Pi-hole from Docker in a CentOS VM into a Proxmox LXC on a new HP T740 thin client. </p> </a><a href="/homelab-arena/homelab-arena-storage" class="blog-card card-link"> <img src="/assets/homelab-arena/homelab-arena-storage/banner.webp" alt="Part 2: Laying the Storage Foundation" class="blog-card-image"> <h3 class="blog-card-title">Part 2: Laying the Storage Foundation</h3> <p class="blog-card-description"> After the Proxmox reinstall: mapping two 4TB HDDs as directory storages with stable names (data01/data02), ext4 labels for clarity, and restoring a pre-reinstall VM backup to prove the stack works. </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container text-primary"> <p>© 2026 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer>  </body></html>
