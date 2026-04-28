@@ -1,0 +1,105 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Moving a Terraform-first GKE setup from local execution to CI, and organizing shared and environment stacks to make the system repeatable and extensible."><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v5.17.2"><link rel="canonical" href="https://januschung.github.io/blog/gke-ci-structure/"><title>GKE - Part 3: From Local Terraform to CI: Structuring Shared and Nonprod Stacks for GKE - Janus</title><link rel="stylesheet" href="/_astro/about.CdqPxALF.css">
+<link rel="stylesheet" href="/_astro/index.BFrYoEHc.css"></head> <body class="min-h-screen flex flex-col"> <span data-pagefind-filter="locale:en" class="hidden" aria-hidden="true"></span> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/homelab-arena">Homelab Arena</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul>  <div class="mobile-controls"> <button class="search-icon-button" aria-label="Toggle search" id="search-toggle"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"> <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round"></path> </svg> </button> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> </div> <div class="header-search" id="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false,&#34;translations&#34;:{&#34;placeholder&#34;:&#34;Search…&#34;}}"></div> <script type="module" src="/_astro/Search.astro_astro_type_script_index_0_lang.tZYucdM2.js"></script> </div>  </div> </nav> </header> <script type="module">(function(){const n=document.getElementById("mobile-menu-toggle"),s=document.getElementById("nav-links"),c=document.querySelector("header"),a=document.getElementById("search-toggle"),e=document.getElementById("header-search");n&&s&&(n.addEventListener("click",()=>{const t=s.classList.toggle("nav-open");n.classList.toggle("active"),c.classList.toggle("menu-open"),t?document.body.style.overflow="hidden":document.body.style.overflow="",e&&e.classList.remove("search-open")}),s.querySelectorAll("a").forEach(t=>{t.addEventListener("click",()=>{s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow=""})}),document.addEventListener("click",t=>{!c.contains(t.target)&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow="")})),a&&e&&(a.addEventListener("click",o=>{o.stopPropagation(),e.classList.toggle("search-open"),s&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n&&n.classList.remove("active"),c&&c.classList.remove("menu-open")),e.classList.contains("search-open")&&setTimeout(()=>{const t=e.querySelector('input[type="search"]');t&&(t.focus(),t.dispatchEvent(new Event("input",{bubbles:!0})));const i=e.querySelector(".pagefind-ui__results-area");i&&(i.style.display="block")},150)}),document.addEventListener("click",o=>{e&&!e.contains(o.target)&&!a.contains(o.target)&&e.classList.contains("search-open")&&e.classList.remove("search-open")}),document.addEventListener("keydown",o=>{o.key==="Escape"&&e&&e.classList.contains("search-open")&&e.classList.remove("search-open")}))})();</script> <main class="flex-1" data-locale-prefix>  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">GKE - Part 3: From Local Terraform to CI: Structuring Shared and Nonprod Stacks for GKE</h1> <div class="blog-post-meta"> <time>April 28, 2026</time> <span class="blog-post-meta-separator">•</span> <span>5 min read</span>  </div> <div class="pill-group pill-group--top"> <span class="pill">gcp</span><span class="pill">gke</span><span class="pill">terraform</span><span class="pill">kubernetes</span><span class="pill">github-actions</span> </div> </header> <div class="blog-post-content prose"> <h1 id="from-local-terraform-to-ci-structuring-shared-and-nonprod-stacks-for-gke">From Local Terraform to CI: Structuring Shared and Nonprod Stacks for GKE</h1>
+<p><img src="/assets/blog/gke-ci-structure/banner.webp" alt="gke ci structure"></p>
+<p>By the end of the previous step, the cluster had a defined shape.</p>
+<p>Nodes were private, outbound traffic was routed through NAT, and inbound traffic flowed through a Gateway instead of individual services. A hostname pointed to that Gateway, and a simple workload confirmed that the path from DNS to container was working.</p>
+<p>That was enough to validate the cluster itself.</p>
+<p>What was still missing was how the rest of the system should be organized so that it could be applied consistently, and not just from a single laptop session.</p>
+<h2 id="from-local-execution-to-ci">From local execution to CI</h2>
+<p>Up to this point, Terraform was being run locally using Application Default Credentials.</p>
+<p>That worked, and it was the simplest way to get started. But it also meant that:</p>
+<ul>
+<li>the ability to apply infrastructure depended on a local environment</li>
+<li>permissions were tied to a human user rather than a defined role</li>
+<li>there was no clear boundary between shared resources and environment-specific ones</li>
+</ul>
+<p>The cluster was working, but the system around it was not yet structured in a way that could be reused or operated by something other than a local session.</p>
+<p>The next step was to move Terraform execution into CI and make the structure explicit.</p>
+<h2 id="structuring-shared-and-nonprod-stacks">Structuring shared and nonprod stacks</h2>
+<p>As more components were added, especially DNS and artifact storage, it became clear that not everything belonged to the same environment.</p>
+<p>Some resources are naturally shared:</p>
+<ul>
+<li>DNS zones</li>
+<li>artifact registries</li>
+</ul>
+<p>Others are tied to an environment:</p>
+<ul>
+<li>project services</li>
+<li>networking</li>
+<li>the GKE cluster</li>
+</ul>
+<p>The separation between shared and non-production stacks was not just about organization. It defined ownership and made it clear which resources could be reused across environments and which ones could change independently.</p>
+<p>The structure reflects that:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Manual bootstrap</span></span>
+<span class="line"><span>  |</span></span>
+<span class="line"><span>  +-- state buckets</span></span>
+<span class="line"><span>  +-- Terraform runner service accounts</span></span>
+<span class="line"><span>  +-- GitHub OIDC / Workload Identity Federation</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>Live stacks</span></span>
+<span class="line"><span>  |</span></span>
+<span class="line"><span>  +-- shared/dns-zone</span></span>
+<span class="line"><span>  +-- shared/artifact-registry</span></span>
+<span class="line"><span>  |</span></span>
+<span class="line"><span>  +-- nonprod/project-services</span></span>
+<span class="line"><span>        |</span></span>
+<span class="line"><span>        v</span></span>
+<span class="line"><span>      nonprod/foundation</span></span>
+<span class="line"><span>        |</span></span>
+<span class="line"><span>        v</span></span>
+<span class="line"><span>      nonprod/gke</span></span></code></pre>
+<p>Each Terraform root represents a deployable unit with its own state.</p>
+<p>This is an extension of the earlier separation between foundation and GKE, but applied more broadly. Instead of treating the system as a single graph, dependencies are made explicit and applied in order.</p>
+<h2 id="keeping-bootstrap-separate">Keeping bootstrap separate</h2>
+<p>Bootstrap remains a separate concern.</p>
+<p>Terraform needs a backend, service accounts, and identity configuration before it can run reliably. These pieces are created once and change infrequently, so they are applied manually rather than through CI.</p>
+<p>This layer includes:</p>
+<ul>
+<li>remote state buckets</li>
+<li>Terraform runner service accounts</li>
+<li>Workload Identity Federation setup</li>
+</ul>
+<p>Keeping bootstrap out of CI reduces complexity and makes the dependency chain clearer.</p>
+<h2 id="running-terraform-through-github-actions">Running Terraform through GitHub Actions</h2>
+<p>With the structure in place, Terraform execution was moved into GitHub Actions.</p>
+<p>Instead of using a service account key, Workload Identity Federation is used so that GitHub can exchange its OIDC token for short-lived credentials. This allows workflows to impersonate a Terraform runner service account without storing long-lived secrets.</p>
+<p>A minimal workflow looks like this:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">permissions</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  id-token</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">write</span></span>
+<span class="line"><span style="color:#85E89D">  contents</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">read</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">steps</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#85E89D">uses</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">actions/checkout@v4</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#85E89D">uses</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">google-github-actions/auth@v2</span></span>
+<span class="line"><span style="color:#85E89D">    with</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      workload_identity_provider</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">${{ vars.GCP_WIF_PROVIDER }}</span></span>
+<span class="line"><span style="color:#85E89D">      service_account</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">${{ vars.GCP_SA_NONPROD }}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#85E89D">uses</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">hashicorp/setup-terraform@v3</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#85E89D">run</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">terraform init -input=false</span></span>
+<span class="line"><span style="color:#85E89D">    working-directory</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">gcp/live/nonprod/foundation</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#85E89D">run</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">terraform plan -input=false</span></span>
+<span class="line"><span style="color:#85E89D">    working-directory</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">gcp/live/nonprod/foundation</span></span></code></pre>
+<p>Each stack has its own workflow. The logic is the same, but the working directory and service account differ depending on what is being applied.</p>
+<p>This changed how Terraform was executed: from a local user session to a service-account-backed workflow.</p>
+<p>At this stage, workflows were triggered manually. This made it possible to validate each stack independently before introducing more automation.</p>
+<h2 id="validation-through-behavior">Validation through behavior</h2>
+<p>Validation followed the same approach used earlier with the cluster.</p>
+<p>The goal was to observe behavior rather than assume correctness.</p>
+<p>On the infrastructure side:</p>
+<ul>
+<li>Gateway routing was verified by sending requests directly to the external IP with a host header</li>
+<li>DNS issues exposed incorrect zone boundaries rather than problems in Kubernetes</li>
+<li>workloads confirmed that networking and image pulls were functioning as expected</li>
+</ul>
+<p>On the CI side, initial failures were useful.</p>
+<p>Errors such as missing permissions or inability to generate access tokens pointed directly to gaps in IAM configuration. Fixing these clarified which identity was running Terraform and what permissions it required.</p>
+<h2 id="outcome">Outcome</h2>
+<p>The system did not gain new features through this change.</p>
+<p>Instead, the way it is operated became more defined.</p>
+<p>Terraform is no longer tied to a local environment. Each stack has a clear boundary and can be applied independently. Authentication is handled through short-lived credentials rather than stored keys. Shared resources and environment resources are separated in a way that reflects how they are used.</p>
+<p>The cluster remains the same.</p>
+<p>What changed is how it is managed, and how that management can be repeated without relying on a specific machine or user session.</p> </div> <nav class="blog-post-navigation"> <a href="/blog/gke-private-node" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">GKE — Part 2: Private Nodes, Gateway API, and a More Realistic Cluster Shape</div> </a>  </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Posts</h2> <div class="related-posts-grid"> <a href="/blog/gke-private-node" class="blog-card card-link"> <img src="/assets/blog/gke-private-node/banner.webp" alt="GKE — Part 2: Private Nodes, Gateway API, and a More Realistic Cluster Shape" class="blog-card-image"> <h3 class="blog-card-title">GKE — Part 2: Private Nodes, Gateway API, and a More Realistic Cluster Shape</h3> <p class="blog-card-description"> Evolving a Terraform-managed GKE cluster from a public proof of concept into a more structured setup with private nodes and a defined entry point. </p> </a><a href="/blog/gke-bootstrap" class="blog-card card-link"> <img src="/assets/blog/gke-bootstrap/banner.webp" alt="From Zero to GKE — A Terraform-First Build with Production in Mind" class="blog-card-image"> <h3 class="blog-card-title">From Zero to GKE — A Terraform-First Build with Production in Mind</h3> <p class="blog-card-description"> A Terraform-first journey into GCP and GKE—bootstrapping remote state, building a clean foundation, and getting a minimal cluster running with a clear path toward production. </p> </a><a href="/blog/eks-arm-migration" class="blog-card card-link"> <img src="/assets/blog/eks-arm-migration/banner.webp" alt="From x86 to ARM in production: the EKS migration story" class="blog-card-image"> <h3 class="blog-card-title">From x86 to ARM in production: the EKS migration story</h3> <p class="blog-card-description"> We migrated our EKS workloads from x86 to ARM in production with zero downtime. Here&#39;s how we simplified our architecture story end-to-end and saved cost without trading away reliability. </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container text-primary"> <p>© 2026 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer>  </body></html>

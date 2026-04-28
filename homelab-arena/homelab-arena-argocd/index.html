@@ -1,0 +1,185 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Moving from a working k3s cluster to a self-managed platform by introducing Argo CD, wildcard DNS, and the first GitOps workflow."><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v5.17.2"><link rel="canonical" href="https://januschung.github.io/homelab-arena/homelab-arena-argocd/"><title>Part 6: Handing the Cluster Over to Argo CD - Janus</title><link rel="stylesheet" href="/_astro/about.CdqPxALF.css">
+<link rel="stylesheet" href="/_astro/index.BFrYoEHc.css"></head> <body class="min-h-screen flex flex-col"> <span data-pagefind-filter="locale:en" class="hidden" aria-hidden="true"></span> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/homelab-arena">Homelab Arena</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul>  <div class="mobile-controls"> <button class="search-icon-button" aria-label="Toggle search" id="search-toggle"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"> <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round"></path> </svg> </button> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> </div> <div class="header-search" id="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false,&#34;translations&#34;:{&#34;placeholder&#34;:&#34;Search…&#34;}}"></div> <script type="module" src="/_astro/Search.astro_astro_type_script_index_0_lang.tZYucdM2.js"></script> </div>  </div> </nav> </header> <script type="module">(function(){const n=document.getElementById("mobile-menu-toggle"),s=document.getElementById("nav-links"),c=document.querySelector("header"),a=document.getElementById("search-toggle"),e=document.getElementById("header-search");n&&s&&(n.addEventListener("click",()=>{const t=s.classList.toggle("nav-open");n.classList.toggle("active"),c.classList.toggle("menu-open"),t?document.body.style.overflow="hidden":document.body.style.overflow="",e&&e.classList.remove("search-open")}),s.querySelectorAll("a").forEach(t=>{t.addEventListener("click",()=>{s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow=""})}),document.addEventListener("click",t=>{!c.contains(t.target)&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow="")})),a&&e&&(a.addEventListener("click",o=>{o.stopPropagation(),e.classList.toggle("search-open"),s&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n&&n.classList.remove("active"),c&&c.classList.remove("menu-open")),e.classList.contains("search-open")&&setTimeout(()=>{const t=e.querySelector('input[type="search"]');t&&(t.focus(),t.dispatchEvent(new Event("input",{bubbles:!0})));const i=e.querySelector(".pagefind-ui__results-area");i&&(i.style.display="block")},150)}),document.addEventListener("click",o=>{e&&!e.contains(o.target)&&!a.contains(o.target)&&e.classList.contains("search-open")&&e.classList.remove("search-open")}),document.addEventListener("keydown",o=>{o.key==="Escape"&&e&&e.classList.contains("search-open")&&e.classList.remove("search-open")}))})();</script> <main class="flex-1" data-locale-prefix>  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">Part 6: Handing the Cluster Over to Argo CD</h1> <div class="blog-post-meta"> <time>April 27, 2026</time> <span class="blog-post-meta-separator">•</span> <span>5 min read</span>  </div> <div class="pill-group pill-group--top"> <span class="pill">k3s</span><span class="pill">argocd</span><span class="pill">gitops</span><span class="pill">pihole</span><span class="pill">homelab</span> </div> </header> <div class="blog-post-content prose"> <h2 id="homelab-arena-part-6-handing-the-cluster-over-to-argo-cd">Homelab Arena Part 6: Handing the Cluster Over to Argo CD</h2>
+<p><img src="/assets/homelab-arena/homelab-arena-argocd/banner.webp" alt="The Octopus Racer is hitting the track at the Homelab Arena!"></p>
+<p>Part 5 ended with a working k3s cluster.</p>
+<p>The nodes were up, the control plane was stable, and the foundation finally felt predictable again.</p>
+<p>That was the goal.</p>
+<p>But a cluster that only exists is not enough.</p>
+<p>The next step is not about installing more components. It is about deciding how the cluster should be managed going forward.</p>
+<p>Up to this point, everything still depended on me.</p>
+<p>Commands, playbooks, and a bit of memory.</p>
+<p>That is the part I wanted to change.</p>
+<p>This is where Argo CD enters the arena.</p>
+<h2 id="one-repository-clear-boundaries">One repository, clear boundaries</h2>
+<p>Everything still lives in one repository.</p>
+<p>That was intentional.</p>
+<p>At this scale, splitting Terraform, Ansible, and Kubernetes manifests across multiple repos introduces more friction than it removes. Keeping everything together makes the system easier to understand and easier to rebuild.</p>
+<p>Each layer still has a clear responsibility.</p>
+<ul>
+<li>Terraform creates the machines</li>
+<li>Ansible installs the cluster and bootstraps Argo CD</li>
+<li>Argo CD owns the desired state after that</li>
+</ul>
+<p>The structure reflects that separation:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>homelab/</span></span>
+<span class="line"><span>├── ansible/</span></span>
+<span class="line"><span>├── terraform/</span></span>
+<span class="line"><span>├── argocd/</span></span>
+<span class="line"><span>│   ├── bootstrap/</span></span>
+<span class="line"><span>│   └── platform/</span></span>
+<span class="line"><span>└── docs/</span></span></code></pre>
+<p>Nothing overlaps. Each layer builds on top of the previous one.</p>
+<h2 id="how-control-moves-to-argo-cd">How control moves to Argo CD</h2>
+<p>The interesting part is not installing Argo CD.</p>
+<p>The interesting part is how control moves to it.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>Ansible</span></span>
+<span class="line"><span>  ├── installs Argo CD</span></span>
+<span class="line"><span>  ├── creates repo credentials</span></span>
+<span class="line"><span>  └── applies root Application</span></span>
+<span class="line"><span>          ↓</span></span>
+<span class="line"><span>Argo CD</span></span>
+<span class="line"><span>  └── reads argocd/bootstrap from Git</span></span>
+<span class="line"><span>          ↓</span></span>
+<span class="line"><span>Bootstrap layer</span></span>
+<span class="line"><span>  ├── project definition</span></span>
+<span class="line"><span>  └── platform application</span></span>
+<span class="line"><span>          ↓</span></span>
+<span class="line"><span>Platform apps</span></span>
+<span class="line"><span>  ├── Argo CD</span></span>
+<span class="line"><span>  └── Sealed Secrets</span></span></code></pre>
+<p>Ansible gets Argo CD running.</p>
+<p>Argo CD takes over everything after that.</p>
+<p>That handoff is the whole point.</p>
+<h2 id="from-individual-dns-records-to-a-platform">From individual DNS records to a platform</h2>
+<p>In Part 3, DNS was still managed one entry at a time.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>app1.c.home</span></span>
+<span class="line"><span>app2.c.home</span></span>
+<span class="line"><span>grafana.c.home</span></span></code></pre>
+<p>That works, but it does not scale once the cluster starts hosting multiple services.</p>
+<p>Instead of thinking in terms of individual applications, the cluster needs a simple pattern.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>*.c.home → Traefik</span></span></code></pre>
+<p>Everything routes through the same entry point.</p>
+<p>Pi-hole handles this with a wildcard rule.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">sudo</span><span style="color:#9ECBFF"> pihole-FTL</span><span style="color:#79B8FF"> --config</span><span style="color:#9ECBFF"> misc.etc_dnsmasq_d</span><span style="color:#79B8FF"> true</span></span>
+<span class="line"><span style="color:#B392F0">sudo</span><span style="color:#9ECBFF"> systemctl</span><span style="color:#9ECBFF"> restart</span><span style="color:#9ECBFF"> pihole-FTL</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">sudo</span><span style="color:#9ECBFF"> tee</span><span style="color:#9ECBFF"> /etc/dnsmasq.d/05-wildcard.conf</span><span style="color:#F97583"> ></span><span style="color:#9ECBFF">/dev/null</span><span style="color:#F97583"> &#x3C;&#x3C;</span><span style="color:#9ECBFF">'EOF'</span></span>
+<span class="line"><span style="color:#9ECBFF">address=/.c.home/10.0.1.150</span></span>
+<span class="line"><span style="color:#9ECBFF">EOF</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">sudo</span><span style="color:#9ECBFF"> systemctl</span><span style="color:#9ECBFF"> restart</span><span style="color:#9ECBFF"> pihole-FTL</span></span></code></pre>
+<p>Verify:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">dig</span><span style="color:#9ECBFF"> argocd.c.home</span><span style="color:#9ECBFF"> @10.0.0.88</span><span style="color:#9ECBFF"> +short</span></span>
+<span class="line"><span style="color:#B392F0">dig</span><span style="color:#9ECBFF"> test.c.home</span><span style="color:#9ECBFF"> @10.0.0.88</span><span style="color:#9ECBFF"> +short</span></span></code></pre>
+<p>At this point, any <code>*.c.home</code> hostname resolves to the cluster.</p>
+<p>That is enough to give Argo CD a proper address.</p>
+<h2 id="installing-argo-cd">Installing Argo CD</h2>
+<p>Argo CD is installed using Helm as part of the Ansible bootstrap.</p>
+<p>The configuration stays minimal.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">configs</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  params</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    server.insecure</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"true"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">server</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  ingress</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    enabled</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span>
+<span class="line"><span style="color:#85E89D">    ingressClassName</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">traefik</span></span>
+<span class="line"><span style="color:#85E89D">    hostname</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd.c.home</span></span>
+<span class="line"><span style="color:#85E89D">    tls</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">false</span></span>
+<span class="line"><span style="color:#85E89D">    servicePort</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">80</span></span></code></pre>
+<p>Traefik handles routing.</p>
+<p>Argo CD runs behind it without needing to manage TLS or external exposure directly.</p>
+<h2 id="connecting-to-a-private-repository">Connecting to a private repository</h2>
+<p>The repository is private.</p>
+<p>That means Argo CD needs credentials before it can reconcile anything from Git.</p>
+<p>A GitHub Personal Access Token over HTTPS is enough.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">v1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Secret</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd-repo-argocd-homelab</span></span>
+<span class="line"><span style="color:#85E89D">  namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd</span></span>
+<span class="line"><span style="color:#85E89D">  labels</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    argocd.argoproj.io/secret-type</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">repository</span></span>
+<span class="line"><span style="color:#85E89D">stringData</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  type</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">git</span></span>
+<span class="line"><span style="color:#85E89D">  url</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">https://github.com/&#x3C;user>/&#x3C;repo>.git</span></span>
+<span class="line"><span style="color:#85E89D">  username</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">git</span></span>
+<span class="line"><span style="color:#85E89D">  password</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">&#x3C;github-token></span></span></code></pre>
+<p>Passed in at runtime:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">ansible-playbook</span><span style="color:#9ECBFF"> playbooks/bootstrap_argocd.yml</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  -e</span><span style="color:#9ECBFF"> "argocd_github_https_token=ghp_..."</span></span></code></pre>
+<p>That is enough for Argo CD to clone the repository.</p>
+<h2 id="first-access">First access</h2>
+<p>After installation, the initial admin password can be retrieved with:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> argocd</span><span style="color:#9ECBFF"> get</span><span style="color:#9ECBFF"> secret</span><span style="color:#9ECBFF"> argocd-initial-admin-secret</span><span style="color:#79B8FF"> -o</span><span style="color:#9ECBFF"> jsonpath="{.data.password}"</span><span style="color:#F97583"> |</span><span style="color:#B392F0"> base64</span><span style="color:#79B8FF"> -d</span><span style="color:#E1E4E8">; </span><span style="color:#79B8FF">echo</span></span></code></pre>
+<p>Username:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>admin</span></span></code></pre>
+<p>This is only needed once.</p>
+<p>What matters more is whether Argo CD can read the repository and start reconciling the cluster.</p>
+<h2 id="the-root-application">The root Application</h2>
+<p>Argo CD does not manage anything until it is told where to look.</p>
+<p>That happens through a single Application.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argoproj.io/v1alpha1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Application</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">bootstrap-argocd</span></span>
+<span class="line"><span style="color:#85E89D">  namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd</span></span>
+<span class="line"><span style="color:#85E89D">spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  project</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">default</span></span>
+<span class="line"><span style="color:#85E89D">  source</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    repoURL</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">https://github.com/&#x3C;user>/&#x3C;repo>.git</span></span>
+<span class="line"><span style="color:#85E89D">    targetRevision</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">main</span></span>
+<span class="line"><span style="color:#85E89D">    path</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd/bootstrap</span></span>
+<span class="line"><span style="color:#85E89D">  destination</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    server</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">https://kubernetes.default.svc</span></span>
+<span class="line"><span style="color:#85E89D">    namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd</span></span>
+<span class="line"><span style="color:#85E89D">  syncPolicy</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    automated</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      prune</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span>
+<span class="line"><span style="color:#85E89D">      selfHeal</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span></code></pre>
+<p>This is the handoff.</p>
+<p>Ansible applies this once.</p>
+<p>From that point forward, Argo CD reads from Git and keeps the cluster in sync.</p>
+<h2 id="defining-the-platform-boundary">Defining the platform boundary</h2>
+<p>Even in a homelab, the platform layer needs a boundary.</p>
+<p>Argo CD Projects provide that.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">clusterResourceWhitelist</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#85E89D">group</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">'*'</span></span>
+<span class="line"><span style="color:#85E89D">    kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">'*'</span></span></code></pre>
+<p>Platform applications need permission to create cluster-level resources.</p>
+<p>CRDs, ClusterRoles, and ClusterRoleBindings all live outside a namespace.</p>
+<p>Allowing them explicitly keeps the behavior predictable.</p>
+<p>The project becomes the boundary of this arena.</p>
+<h2 id="the-first-platform-application">The first platform application</h2>
+<p>With the project in place, the first application is straightforward.</p>
+<p>Sealed Secrets.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argoproj.io/v1alpha1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Application</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">sealed-secrets</span></span>
+<span class="line"><span style="color:#85E89D">  namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd</span></span>
+<span class="line"><span style="color:#85E89D">spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  project</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">platform</span></span>
+<span class="line"><span style="color:#85E89D">  source</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    repoURL</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">https://bitnami-labs.github.io/sealed-secrets</span></span>
+<span class="line"><span style="color:#85E89D">    chart</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">sealed-secrets</span></span>
+<span class="line"><span style="color:#85E89D">    targetRevision</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">2.18.5</span></span>
+<span class="line"><span style="color:#85E89D">  destination</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    server</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">https://kubernetes.default.svc</span></span>
+<span class="line"><span style="color:#85E89D">    namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">kube-system</span></span></code></pre>
+<p>It solves the next problem immediately.</p>
+<p>How to store secrets in Git without exposing them.</p>
+<h2 id="where-the-arena-stands-now">Where the arena stands now</h2>
+<p>Argo CD is no longer accessed through a raw IP address or a temporary port-forward.</p>
+<p>It lives at:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>https://argocd.c.home</span></span></code></pre>
+<p>That small change matters.</p>
+<p>The cluster now has:</p>
+<ul>
+<li>a stable entry point</li>
+<li>a Git-backed source of truth</li>
+<li>a controller that reconciles state</li>
+<li>its first platform application</li>
+</ul>
+<p>Part 5 gave me a cluster.</p>
+<p>Part 6 gives the cluster a way to manage itself.</p> </div> <nav class="blog-post-navigation"> <a href="/homelab-arena/homelab-arena-terraform-ansible" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">Part 5: Terraform, Ansible, and k3s on Proxmox</div> </a>  </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Posts</h2> <div class="related-posts-grid"> <a href="/homelab-arena/homelab-arena-terraform-ansible" class="blog-card card-link"> <img src="/assets/homelab-arena/homelab-arena-terraform-ansible/banner.webp" alt="Part 5: Terraform, Ansible, and k3s on Proxmox" class="blog-card-image"> <h3 class="blog-card-title">Part 5: Terraform, Ansible, and k3s on Proxmox</h3> <p class="blog-card-description"> Turning the Ubuntu template into real VMs and a joined k3s cluster: shared token, static IPs, DNS aligned with the Pi-hole/pfSense LAN from Part 3, and Ansible installing the control plane before the workers. </p> </a><a href="/homelab-arena/homelab-arena-network-rebuild" class="blog-card card-link"> <img src="/assets/homelab-arena/homelab-arena-network-rebuild/banner.webp" alt="Part 3: The Network Rebuild Side Quest" class="blog-card-image"> <h3 class="blog-card-title">Part 3: The Network Rebuild Side Quest</h3> <p class="blog-card-description"> A short power outage forced a migration that had already been waiting in the wings: recovering pfSense and Pi-hole configuration from the old ESXi stack, rebuilding routing on Proxmox, and moving Pi-hole from Docker in a CentOS VM into a Proxmox LXC on a new HP T740 thin client. </p> </a><a href="/homelab-arena/homelab-arena-prologue" class="blog-card card-link"> <img src="/assets/homelab-arena/homelab-arena-prologue/banner.webp" alt="Homelab Arena: Prologue" class="blog-card-image"> <h3 class="blog-card-title">Homelab Arena: Prologue</h3> <p class="blog-card-description"> From messy beginnings to controlled chaos — one pod, one VM, one Helm chart at a time. </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container text-primary"> <p>© 2026 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer>  </body></html>
