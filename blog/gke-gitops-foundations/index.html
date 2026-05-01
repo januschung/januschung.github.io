@@ -12,7 +12,7 @@
 <li>platform controllers run on the system node pool</li>
 <li>the sample app runs on the spot node pool</li>
 </ul>
-<p>This post does not cover installing <code>Argo CD</code> from scratch. For that bootstrap flow, check <a href="../homelab-arena/homelab-arena-argocd">Homelab Arena Part 6</a>. Here, Argo CD already exists, is self-managed, and is being used to install the next layer of platform components.</p>
+<p>This post does not cover installing <code>Argo CD</code> from scratch. For that bootstrap flow, check <a href="../../homelab-arena/homelab-arena-argocd">Homelab Arena Part 6</a>. Here, Argo CD already exists, is self-managed, and is being used to install the next layer of platform components.</p>
 <h2 id="where-this-starts">Where this starts</h2>
 <p>In the earlier GKE work, the cluster moved away from direct service exposure. Instead of using a <code>LoadBalancer</code> service per application, Gateway API became the entry point for inbound traffic. That gave the cluster a cleaner edge, but DNS still had a manual step: create a hostname, copy the Gateway IP, and create an <code>A</code> record by hand.</p>
 <p>That was fine for proving the Gateway worked. It was not good enough for a GitOps platform.</p>
