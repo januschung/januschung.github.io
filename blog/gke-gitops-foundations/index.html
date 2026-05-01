@@ -1,0 +1,635 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Adding the platform services that turn Gateway API from a manually wired entry point into a DNS and TLS managed edge for GKE."><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v5.17.2"><link rel="canonical" href="https://januschung.github.io/blog/gke-gitops-foundations/"><title>GKE - Part 4: ExternalDNS, cert-manager, and Real URLs for the GitOps Platform - Janus</title><link rel="stylesheet" href="/_astro/about.CdqPxALF.css">
+<link rel="stylesheet" href="/_astro/index.BFrYoEHc.css"></head> <body class="min-h-screen flex flex-col"> <span data-pagefind-filter="locale:en" class="hidden" aria-hidden="true"></span> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/homelab-arena">Homelab Arena</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul>  <div class="mobile-controls"> <button class="search-icon-button" aria-label="Toggle search" id="search-toggle"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"> <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round"></path> </svg> </button> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> </div> <div class="header-search" id="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false,&#34;translations&#34;:{&#34;placeholder&#34;:&#34;Search…&#34;}}"></div> <script type="module" src="/_astro/Search.astro_astro_type_script_index_0_lang.tZYucdM2.js"></script> </div>  </div> </nav> </header> <script type="module">(function(){const n=document.getElementById("mobile-menu-toggle"),s=document.getElementById("nav-links"),c=document.querySelector("header"),a=document.getElementById("search-toggle"),e=document.getElementById("header-search");n&&s&&(n.addEventListener("click",()=>{const t=s.classList.toggle("nav-open");n.classList.toggle("active"),c.classList.toggle("menu-open"),t?document.body.style.overflow="hidden":document.body.style.overflow="",e&&e.classList.remove("search-open")}),s.querySelectorAll("a").forEach(t=>{t.addEventListener("click",()=>{s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow=""})}),document.addEventListener("click",t=>{!c.contains(t.target)&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow="")})),a&&e&&(a.addEventListener("click",o=>{o.stopPropagation(),e.classList.toggle("search-open"),s&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n&&n.classList.remove("active"),c&&c.classList.remove("menu-open")),e.classList.contains("search-open")&&setTimeout(()=>{const t=e.querySelector('input[type="search"]');t&&(t.focus(),t.dispatchEvent(new Event("input",{bubbles:!0})));const i=e.querySelector(".pagefind-ui__results-area");i&&(i.style.display="block")},150)}),document.addEventListener("click",o=>{e&&!e.contains(o.target)&&!a.contains(o.target)&&e.classList.contains("search-open")&&e.classList.remove("search-open")}),document.addEventListener("keydown",o=>{o.key==="Escape"&&e&&e.classList.contains("search-open")&&e.classList.remove("search-open")}))})();</script> <main class="flex-1" data-locale-prefix>  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">GKE - Part 4: ExternalDNS, cert-manager, and Real URLs for the GitOps Platform</h1> <div class="blog-post-meta"> <time>May 1, 2026</time> <span class="blog-post-meta-separator">•</span> <span>15 min read</span>  </div> <div class="pill-group pill-group--top"> <span class="pill">gcp</span><span class="pill">gke</span><span class="pill">kubernetes</span><span class="pill">gitops</span><span class="pill">argocd</span><span class="pill">gateway-api</span><span class="pill">external-dns</span><span class="pill">cert-manager</span><span class="pill">terraform</span> </div> </header> <div class="blog-post-content prose"> <h1 id="gke---part-4-externaldns-cert-manager-and-real-urls-for-the-gitops-platform">GKE - Part 4: ExternalDNS, cert-manager, and Real URLs for the GitOps Platform</h1>
+<p><img src="/assets/blog/gke-gitops-foundations/banner.webp" alt="gke external dns cert manager"></p>
+<p>A heads up before getting into the details: this is a longer step.</p>
+<p>The previous parts built the cluster shape. This part starts turning that cluster into a platform. The goal is no longer just to prove that a pod can run or that a Gateway can receive traffic. The goal is to make the edge of the cluster behave like something that can be reused: DNS records created automatically, certificates issued automatically, and platform tools available at real hostnames instead of temporary IP addresses.</p>
+<p>By the end of this step:</p>
+<ul>
+<li>ExternalDNS manages Cloud DNS records from Gateway API resources</li>
+<li>cert-manager issues Let’s Encrypt certificates using Cloud DNS DNS-01</li>
+<li>Argo CD is reachable at a real HTTPS URL</li>
+<li>a sample application is exposed through Gateway API with DNS and TLS</li>
+<li>platform controllers run on the system node pool</li>
+<li>the sample app runs on the spot node pool</li>
+</ul>
+<p>This post does not cover installing <code>Argo CD</code> from scratch. For that bootstrap flow, check <a href="../homelab-arena/homelab-arena-argocd">Homelab Arena Part 6</a>. Here, Argo CD already exists, is self-managed, and is being used to install the next layer of platform components.</p>
+<h2 id="where-this-starts">Where this starts</h2>
+<p>In the earlier GKE work, the cluster moved away from direct service exposure. Instead of using a <code>LoadBalancer</code> service per application, Gateway API became the entry point for inbound traffic. That gave the cluster a cleaner edge, but DNS still had a manual step: create a hostname, copy the Gateway IP, and create an <code>A</code> record by hand.</p>
+<p>That was fine for proving the Gateway worked. It was not good enough for a GitOps platform.</p>
+<p>The previous structure also separated shared resources from environment-specific resources. DNS zones live in the shared layer, while the GKE cluster, node pools, and environment resources live under nonprod or prod. Terraform is applied through CI with environment-specific roots, so this new layer follows the same pattern.</p>
+<p>The GitOps repository also already has an important design decision: nonprod and prod each have their own Argo CD instance. Each instance reads from its own folder in the repo, which lets nonprod act as the staging ground for platform changes before prod is touched.</p>
+<p>That matters here. <code>external-dns</code> and <code>cert-manager</code> are core platform services. A bad config can break DNS or certificate issuance. Having a nonprod Argo CD means those changes can be tested against the nonprod cluster first, using the same GitOps workflow, without modifying production.</p>
+<h2 id="why-two-argo-cd-instances">Why two Argo CD instances</h2>
+<p>The platform uses two Argo CD instances:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>GKE nonprod Argo CD</span></span>
+<span class="line"><span>GKE prod Argo CD</span></span></code></pre>
+<p>This is intentional.</p>
+<p>At first, one Argo CD might sound simpler. It is one UI, one set of secrets, and one place to manage applications. But once Argo CD starts managing platform components, that simplicity becomes a risk. If the same controller manages both nonprod and prod, then a mistake in a platform app definition can reach both environments from the same control plane.</p>
+<p>Keeping them separate gives a few useful properties:</p>
+<ul>
+<li>nonprod issues do not directly affect prod</li>
+<li>platform upgrades can be tested in nonprod first</li>
+<li>repo credentials and SSO settings can differ by environment</li>
+<li>prod can remain slower and more conservative</li>
+<li>nonprod can move faster while the platform is still evolving</li>
+</ul>
+<p>The upgrade flow becomes much safer:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>upgrade external-dns in nonprod</span></span>
+<span class="line"><span>validate DNS behavior</span></span>
+<span class="line"><span>promote the same change to prod</span></span></code></pre>
+<p>or:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>upgrade cert-manager in nonprod</span></span>
+<span class="line"><span>issue a staging certificate</span></span>
+<span class="line"><span>issue a production certificate</span></span>
+<span class="line"><span>then repeat in prod</span></span></code></pre>
+<p>This is the same reason I want Argo CD itself to be self-managed, but not shared across every environment. The controller is part of the platform, and platform changes need a place to prove themselves.</p>
+<h2 id="the-platform-node-pool">The platform node pool</h2>
+<p>The cluster has multiple node pool types prepared:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>system</span></span>
+<span class="line"><span>regular</span></span>
+<span class="line"><span>spot</span></span></code></pre>
+<p>That distinction becomes useful in this step.</p>
+<p>Components like external-dns and cert-manager are not normal application workloads. They are platform controllers. If external-dns is unavailable, DNS automation stops. If cert-manager is unavailable, certificate issuance and renewal stop. They do not need many resources, but they should not be scheduled onto the most disposable capacity by accident.</p>
+<p>So the platform components use the system pool:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">nodeSelector</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  janus.io/pool</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">system</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">tolerations</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#85E89D">key</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"janus.io/system"</span></span>
+<span class="line"><span style="color:#85E89D">    operator</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Equal"</span></span>
+<span class="line"><span style="color:#85E89D">    value</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"true"</span></span>
+<span class="line"><span style="color:#85E89D">    effect</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"NoSchedule"</span></span></code></pre>
+<p>The sample app, on the other hand, can use the spot pool:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">nodeSelector</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  janus.io/pool</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">spot</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">tolerations</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#85E89D">key</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"janus.io/spot"</span></span>
+<span class="line"><span style="color:#85E89D">    operator</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Equal"</span></span>
+<span class="line"><span style="color:#85E89D">    value</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"true"</span></span>
+<span class="line"><span style="color:#85E89D">    effect</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"NoSchedule"</span></span></code></pre>
+<p>That gives the platform a useful split:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>system pool: cluster services and controllers</span></span>
+<span class="line"><span>spot pool: cheap, interruptible workloads</span></span>
+<span class="line"><span>regular pool: workloads that should not be on spot</span></span></code></pre>
+<p>This is not just about saving money. It makes the scheduling intent visible in the manifests.</p>
+<h2 id="shared-dns-zone">Shared DNS zone</h2>
+<p>The shared DNS zone is created by Terraform:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="json"><code><span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#79B8FF">  "project_id"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"google-project-id"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  "region"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"us-central1"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  "zone_name"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"g-example-com"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  "dns_name"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"g.example.com."</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  "description"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Delegated public zone for GKE-managed subdomains"</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>The zone is shared, but the actors that update it should not be shared.</p>
+<p>For nonprod, external-dns gets its own Google service account:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>external-dns-nonprod@google-project-id.iam.gserviceaccount.com</span></span></code></pre>
+<p>cert-manager gets its own identity too:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>cert-manager-nonprod@google-project-id.iam.gserviceaccount.com</span></span></code></pre>
+<p>That separation matters. external-dns and cert-manager both need to write DNS records, but they do it for different reasons.</p>
+<p>external-dns creates application records:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>argocd.nonprod.g.example.com -> Gateway IP</span></span>
+<span class="line"><span>hello.g.example.com -> Gateway IP</span></span></code></pre>
+<p>cert-manager creates temporary ACME challenge records:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>_acme-challenge.&#x3C;hostname> -> challenge token</span></span></code></pre>
+<p>They both touch DNS, but they are separate controllers and should have separate identities.</p>
+<h2 id="terraform-access-for-external-dns">Terraform access for external-dns</h2>
+<p>The external-dns access module creates a Google service account, grants DNS access, and binds the Kubernetes service account to the Google service account through GKE Workload Identity.</p>
+<p>The module looks like this:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="hcl"><code><span class="line"><span style="color:#B392F0">locals</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  gsa_email</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">create_gsa </span><span style="color:#F97583">?</span><span style="color:#E1E4E8"> google_service_account</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">external_dns[</span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8">]</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">email </span><span style="color:#F97583">:</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">existing_gsa_email</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "google_service_account"</span><span style="color:#79B8FF"> "external_dns"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  count</span><span style="color:#F97583">        =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">create_gsa </span><span style="color:#F97583">?</span><span style="color:#79B8FF"> 1</span><span style="color:#F97583"> :</span><span style="color:#79B8FF"> 0</span></span>
+<span class="line"><span style="color:#E1E4E8">  project</span><span style="color:#F97583">      =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">project_id</span></span>
+<span class="line"><span style="color:#E1E4E8">  account_id</span><span style="color:#F97583">   =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">gsa_account_id</span></span>
+<span class="line"><span style="color:#E1E4E8">  display_name</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">gsa_display_name</span></span>
+<span class="line"><span style="color:#E1E4E8">  description</span><span style="color:#F97583">  =</span><span style="color:#9ECBFF"> "Google service account used by external-dns via GKE Workload Identity."</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "google_dns_managed_zone_iam_member"</span><span style="color:#79B8FF"> "external_dns_zone_access"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  project</span><span style="color:#F97583">      =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">dns_project_id</span></span>
+<span class="line"><span style="color:#E1E4E8">  managed_zone</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">dns_zone_name</span></span>
+<span class="line"><span style="color:#E1E4E8">  role</span><span style="color:#F97583">         =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">dns_role</span></span>
+<span class="line"><span style="color:#E1E4E8">  member</span><span style="color:#F97583">       =</span><span style="color:#9ECBFF"> "serviceAccount:</span><span style="color:#F97583">${</span><span style="color:#E1E4E8">local</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">gsa_email</span><span style="color:#F97583">}</span><span style="color:#9ECBFF">"</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "google_project_iam_member"</span><span style="color:#79B8FF"> "external_dns_project_access"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  project</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">dns_project_id</span></span>
+<span class="line"><span style="color:#E1E4E8">  role</span><span style="color:#F97583">    =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">dns_role</span></span>
+<span class="line"><span style="color:#E1E4E8">  member</span><span style="color:#F97583">  =</span><span style="color:#9ECBFF"> "serviceAccount:</span><span style="color:#F97583">${</span><span style="color:#E1E4E8">local</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">gsa_email</span><span style="color:#F97583">}</span><span style="color:#9ECBFF">"</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "google_service_account_iam_member"</span><span style="color:#79B8FF"> "workload_identity_user"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  service_account_id</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "projects/</span><span style="color:#F97583">${</span><span style="color:#E1E4E8">var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">project_id</span><span style="color:#F97583">}</span><span style="color:#9ECBFF">/serviceAccounts/</span><span style="color:#F97583">${</span><span style="color:#E1E4E8">local</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">gsa_email</span><span style="color:#F97583">}</span><span style="color:#9ECBFF">"</span></span>
+<span class="line"><span style="color:#E1E4E8">  role</span><span style="color:#F97583">               =</span><span style="color:#9ECBFF"> "roles/iam.workloadIdentityUser"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">  member</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "serviceAccount:</span><span style="color:#F97583">${</span><span style="color:#E1E4E8">var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">project_id</span><span style="color:#F97583">}</span><span style="color:#9ECBFF">.svc.id.goog[</span><span style="color:#F97583">${</span><span style="color:#E1E4E8">var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">k8s_namespace</span><span style="color:#F97583">}</span><span style="color:#9ECBFF">/</span><span style="color:#F97583">${</span><span style="color:#E1E4E8">var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">k8s_service_account_name</span><span style="color:#F97583">}</span><span style="color:#9ECBFF">]"</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>The project-level DNS grant is important. At first, it seemed like a managed-zone-level IAM binding should be enough. In practice, the Google provider used by external-dns lists zones first, then matches records to a zone. Without the project-level permission, external-dns can authenticate but still fail with a <code>403</code> while listing zones.</p>
+<p>The nonprod live stack passes values like this:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="json"><code><span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#79B8FF">  "project_id"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"google-project-id"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  "region"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"us-central1"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  "dns_project_id"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"google-project-id"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  "dns_zone_name"</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"g-example-com"</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>The important distinction is still there even if both values are currently the same project:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>project_id     = project where the GKE cluster and GSA live</span></span>
+<span class="line"><span>dns_project_id = project where the Cloud DNS zone lives</span></span></code></pre>
+<p>If prod later lives in a different project but still writes to a shared DNS project, the same module can be reused.</p>
+<h2 id="installing-external-dns-with-argo-cd">Installing external-dns with Argo CD</h2>
+<p>external-dns is installed as a platform app through Argo CD.</p>
+<p>The Argo CD <code>Application</code> points at the GitOps repo path:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argoproj.io/v1alpha1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Application</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">external-dns</span></span>
+<span class="line"><span style="color:#85E89D">  namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd</span></span>
+<span class="line"><span style="color:#85E89D">spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  project</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">default</span></span>
+<span class="line"><span style="color:#85E89D">  source</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    repoURL</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">THE_REPO_URL</span></span>
+<span class="line"><span style="color:#85E89D">    targetRevision</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">HEAD</span></span>
+<span class="line"><span style="color:#85E89D">    path</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">gke/nonprod/platform/external-dns</span></span>
+<span class="line"><span style="color:#85E89D">    helm</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      valueFiles</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">        - </span><span style="color:#9ECBFF">values.yaml</span></span>
+<span class="line"><span style="color:#85E89D">  destination</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    server</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">https://kubernetes.default.svc</span></span>
+<span class="line"><span style="color:#85E89D">    namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">kube-system</span></span>
+<span class="line"><span style="color:#85E89D">  syncPolicy</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    automated</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      prune</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span>
+<span class="line"><span style="color:#85E89D">      selfHeal</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span></code></pre>
+<p>The wrapper chart uses the upstream chart as a dependency:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">v2</span></span>
+<span class="line"><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">external-dns</span></span>
+<span class="line"><span style="color:#85E89D">version</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">0.1.0</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">dependencies</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">external-dns</span></span>
+<span class="line"><span style="color:#85E89D">    version</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">1.20.0</span></span>
+<span class="line"><span style="color:#85E89D">    repository</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">https://kubernetes-sigs.github.io/external-dns/</span></span></code></pre>
+<p>Because this is a wrapper chart, the values are nested under <code>external-dns:</code>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">external-dns</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  provider</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">google</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">  nodeSelector</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    janus.io/pool</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">system</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">  tolerations</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">key</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"janus.io/system"</span></span>
+<span class="line"><span style="color:#85E89D">      operator</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Equal"</span></span>
+<span class="line"><span style="color:#85E89D">      value</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"true"</span></span>
+<span class="line"><span style="color:#85E89D">      effect</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"NoSchedule"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">  serviceAccount</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    create</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span>
+<span class="line"><span style="color:#85E89D">    name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">external-dns</span></span>
+<span class="line"><span style="color:#85E89D">    annotations</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      iam.gke.io/gcp-service-account</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">external-dns-nonprod@google-project-id.iam.gserviceaccount.com</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">  sources</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#9ECBFF">gateway-httproute</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">  domainFilters</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#9ECBFF">g.example.com</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">  policy</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">upsert-only</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">  registry</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">txt</span></span>
+<span class="line"><span style="color:#85E89D">  txtOwnerId</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">nonprod-gke</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">  interval</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">1m</span></span>
+<span class="line"><span style="color:#85E89D">  logLevel</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">info</span></span></code></pre>
+<p>There are a few important details here.</p>
+<p>First, the source is <code>gateway-httproute</code>. This makes external-dns read hostnames from Gateway API <code>HTTPRoute</code> resources instead of looking for classic Ingress resources.</p>
+<p>Second, the domain filter is the actual managed zone:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">domainFilters</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#9ECBFF">g.example.com</span></span></code></pre>
+<p>It is tempting to set this to narrower names like:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>qa.g.example.com</span></span>
+<span class="line"><span>stg.g.example.com</span></span>
+<span class="line"><span>nonprod.g.example.com</span></span></code></pre>
+<p>But those only work as domain filters if they are actual managed zones. In this setup, the managed zone is <code>g.example.com</code>. Later, stricter boundaries can be added by creating delegated child zones with Terraform. For now, the controller needs to match the parent zone.</p>
+<p>Third, <code>txtOwnerId</code> should be unique per cluster or environment:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">txtOwnerId</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">nonprod-gke</span></span></code></pre>
+<p>external-dns uses TXT records to track ownership. Nonprod and prod should not share the same owner ID.</p>
+<h2 id="terraform-access-for-cert-manager">Terraform access for cert-manager</h2>
+<p>cert-manager also needs DNS access, but for a different reason. Since the goal is to use Let’s Encrypt with DNS-01 validation, cert-manager needs to create and clean up ACME challenge TXT records in Cloud DNS.</p>
+<p>A separate access module keeps the identity separate from external-dns:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="hcl"><code><span class="line"><span style="color:#B392F0">locals</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  gsa_email</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">create_gsa </span><span style="color:#F97583">?</span><span style="color:#E1E4E8"> google_service_account</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">cert_manager[</span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8">]</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">email </span><span style="color:#F97583">:</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">existing_gsa_email</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "google_service_account"</span><span style="color:#79B8FF"> "cert_manager"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  count</span><span style="color:#F97583">        =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">create_gsa </span><span style="color:#F97583">?</span><span style="color:#79B8FF"> 1</span><span style="color:#F97583"> :</span><span style="color:#79B8FF"> 0</span></span>
+<span class="line"><span style="color:#E1E4E8">  project</span><span style="color:#F97583">      =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">project_id</span></span>
+<span class="line"><span style="color:#E1E4E8">  account_id</span><span style="color:#F97583">   =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">gsa_account_id</span></span>
+<span class="line"><span style="color:#E1E4E8">  display_name</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">gsa_display_name</span></span>
+<span class="line"><span style="color:#E1E4E8">  description</span><span style="color:#F97583">  =</span><span style="color:#9ECBFF"> "Google service account used by cert-manager via GKE Workload Identity."</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "google_project_iam_member"</span><span style="color:#79B8FF"> "cert_manager_dns_access"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  project</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">dns_project_id</span></span>
+<span class="line"><span style="color:#E1E4E8">  role</span><span style="color:#F97583">    =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">dns_role</span></span>
+<span class="line"><span style="color:#E1E4E8">  member</span><span style="color:#F97583">  =</span><span style="color:#9ECBFF"> "serviceAccount:</span><span style="color:#F97583">${</span><span style="color:#E1E4E8">local</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">gsa_email</span><span style="color:#F97583">}</span><span style="color:#9ECBFF">"</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "google_service_account_iam_member"</span><span style="color:#79B8FF"> "workload_identity_user"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  service_account_id</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "projects/</span><span style="color:#F97583">${</span><span style="color:#E1E4E8">var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">project_id</span><span style="color:#F97583">}</span><span style="color:#9ECBFF">/serviceAccounts/</span><span style="color:#F97583">${</span><span style="color:#E1E4E8">local</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">gsa_email</span><span style="color:#F97583">}</span><span style="color:#9ECBFF">"</span></span>
+<span class="line"><span style="color:#E1E4E8">  role</span><span style="color:#F97583">               =</span><span style="color:#9ECBFF"> "roles/iam.workloadIdentityUser"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">  member</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "serviceAccount:</span><span style="color:#F97583">${</span><span style="color:#E1E4E8">var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">project_id</span><span style="color:#F97583">}</span><span style="color:#9ECBFF">.svc.id.goog[</span><span style="color:#F97583">${</span><span style="color:#E1E4E8">var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">k8s_namespace</span><span style="color:#F97583">}</span><span style="color:#9ECBFF">/</span><span style="color:#F97583">${</span><span style="color:#E1E4E8">var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">k8s_service_account_name</span><span style="color:#F97583">}</span><span style="color:#9ECBFF">]"</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>The nonprod module instance uses:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="hcl"><code><span class="line"><span style="color:#B392F0">module</span><span style="color:#79B8FF"> "cert_manager_access"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  source</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "../../../modules/cert-manager-access"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">  project_id</span><span style="color:#F97583">     =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">project_id</span></span>
+<span class="line"><span style="color:#E1E4E8">  dns_project_id</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">dns_project_id</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">  gsa_account_id</span><span style="color:#F97583">           =</span><span style="color:#9ECBFF"> "cert-manager-nonprod"</span></span>
+<span class="line"><span style="color:#E1E4E8">  gsa_display_name</span><span style="color:#F97583">         =</span><span style="color:#9ECBFF"> "cert-manager nonprod"</span></span>
+<span class="line"><span style="color:#E1E4E8">  k8s_namespace</span><span style="color:#F97583">            =</span><span style="color:#9ECBFF"> "cert-manager"</span></span>
+<span class="line"><span style="color:#E1E4E8">  k8s_service_account_name</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "cert-manager"</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>That binds this Kubernetes service account:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>cert-manager/cert-manager</span></span></code></pre>
+<p>to this Google service account:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>cert-manager-nonprod@google-project-id.iam.gserviceaccount.com</span></span></code></pre>
+<h2 id="installing-cert-manager-with-argo-cd">Installing cert-manager with Argo CD</h2>
+<p>cert-manager is also installed as a platform app.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argoproj.io/v1alpha1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Application</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">cert-manager</span></span>
+<span class="line"><span style="color:#85E89D">  namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd</span></span>
+<span class="line"><span style="color:#85E89D">spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  project</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">default</span></span>
+<span class="line"><span style="color:#85E89D">  source</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    repoURL</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">THE_REPO_URL</span></span>
+<span class="line"><span style="color:#85E89D">    targetRevision</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">HEAD</span></span>
+<span class="line"><span style="color:#85E89D">    path</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">gke/nonprod/platform/cert-manager</span></span>
+<span class="line"><span style="color:#85E89D">    helm</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      valueFiles</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">        - </span><span style="color:#9ECBFF">values.yaml</span></span>
+<span class="line"><span style="color:#85E89D">  destination</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    server</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">https://kubernetes.default.svc</span></span>
+<span class="line"><span style="color:#85E89D">    namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">cert-manager</span></span>
+<span class="line"><span style="color:#85E89D">  syncPolicy</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    automated</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      prune</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span>
+<span class="line"><span style="color:#85E89D">      selfHeal</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span>
+<span class="line"><span style="color:#85E89D">    syncOptions</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">CreateNamespace=true</span></span></code></pre>
+<p>The wrapper chart:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">v2</span></span>
+<span class="line"><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">cert-manager</span></span>
+<span class="line"><span style="color:#85E89D">version</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">0.1.0</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">dependencies</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">cert-manager</span></span>
+<span class="line"><span style="color:#85E89D">    version</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">v1.20.2</span></span>
+<span class="line"><span style="color:#85E89D">    repository</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">oci://quay.io/jetstack/charts</span></span></code></pre>
+<p>The values file keeps the controller on the system node pool and annotates the service account for Workload Identity:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">cert-manager</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  crds</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    enabled</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">  serviceAccount</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    annotations</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      iam.gke.io/gcp-service-account</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">cert-manager-nonprod@google-project-id.iam.gserviceaccount.com</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">  global</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    leaderElection</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">cert-manager</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">  nodeSelector</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    janus.io/pool</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">system</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">  tolerations</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">key</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"janus.io/system"</span></span>
+<span class="line"><span style="color:#85E89D">      operator</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Equal"</span></span>
+<span class="line"><span style="color:#85E89D">      value</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"true"</span></span>
+<span class="line"><span style="color:#85E89D">      effect</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"NoSchedule"</span></span></code></pre>
+<h2 id="clusterissuers">ClusterIssuers</h2>
+<p>cert-manager needs issuers that describe how certificates should be requested.</p>
+<p>For nonprod, there are two <code>ClusterIssuer</code> resources:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>letsencrypt-staging</span></span>
+<span class="line"><span>letsencrypt-prod</span></span></code></pre>
+<p>The staging issuer is used first to validate the flow without burning production rate limits or debugging against real certificates. Once DNS-01 works, the certificate can be changed to the production issuer.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">cert-manager.io/v1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">ClusterIssuer</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">letsencrypt-staging</span></span>
+<span class="line"><span style="color:#85E89D">spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  acme</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    email</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">platform@example.com</span></span>
+<span class="line"><span style="color:#85E89D">    server</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">https://acme-staging-v02.api.letsencrypt.org/directory</span></span>
+<span class="line"><span style="color:#85E89D">    privateKeySecretRef</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">letsencrypt-staging-private-key</span></span>
+<span class="line"><span style="color:#85E89D">    solvers</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#85E89D">selector</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">          dnsZones</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">            - </span><span style="color:#9ECBFF">g.example.com</span></span>
+<span class="line"><span style="color:#85E89D">        dns01</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">          cloudDNS</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">            project</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">google-project-id</span></span>
+<span class="line"><span style="color:#B392F0">---</span></span>
+<span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">cert-manager.io/v1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">ClusterIssuer</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">letsencrypt-prod</span></span>
+<span class="line"><span style="color:#85E89D">spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  acme</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    email</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">platform@example.com</span></span>
+<span class="line"><span style="color:#85E89D">    server</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">https://acme-v02.api.letsencrypt.org/directory</span></span>
+<span class="line"><span style="color:#85E89D">    privateKeySecretRef</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">letsencrypt-prod-private-key</span></span>
+<span class="line"><span style="color:#85E89D">    solvers</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#85E89D">selector</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">          dnsZones</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">            - </span><span style="color:#9ECBFF">g.example.com</span></span>
+<span class="line"><span style="color:#85E89D">        dns01</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">          cloudDNS</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">            project</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">google-project-id</span></span></code></pre>
+<p>These are cluster-wide. There is no need to create one issuer per Gateway or per application.</p>
+<p>The model is:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>ClusterIssuer = reusable issuing policy</span></span>
+<span class="line"><span>Certificate   = hostname-specific request</span></span>
+<span class="line"><span>Gateway       = consumes the TLS secret</span></span></code></pre>
+<p>Because Gateway API is being used directly, the certificate is explicit. This is a little different from older Ingress setups, where cert-manager annotations on an Ingress could create a Certificate indirectly through ingress-shim.</p>
+<p>With Gateway API, the clearer pattern is:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Certificate -> Secret -> Gateway listener</span></span></code></pre>
+<h2 id="giving-argo-cd-a-real-url">Giving Argo CD a real URL</h2>
+<p>Once external-dns and cert-manager are working, Argo CD can move from a cluster-internal service or temporary access path to a real hostname:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>https://argocd.nonprod.g.example.com</span></span></code></pre>
+<p>The Argo CD installation itself is not the focus of this post. The important part here is the edge configuration around it.</p>
+<p>The Argo CD chart values need to know the external URL and that TLS is terminated before traffic reaches the Argo CD server:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">argo-cd</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  global</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    domain</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd.nonprod.g.example.com</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">  configs</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    params</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      server.insecure</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">    cm</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      url</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">https://argocd.nonprod.g.example.com</span></span></code></pre>
+<p>Then the platform adds a Certificate, Gateway, and HTTPRoute in the <code>argocd</code> namespace.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">cert-manager.io/v1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Certificate</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd-nonprod-g-example-com</span></span>
+<span class="line"><span style="color:#85E89D">  namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd</span></span>
+<span class="line"><span style="color:#85E89D">spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  secretName</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd-nonprod-g-example-com-tls</span></span>
+<span class="line"><span style="color:#85E89D">  issuerRef</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">letsencrypt-prod</span></span>
+<span class="line"><span style="color:#85E89D">    kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">ClusterIssuer</span></span>
+<span class="line"><span style="color:#85E89D">  dnsNames</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#9ECBFF">argocd.nonprod.g.example.com</span></span>
+<span class="line"><span style="color:#B392F0">---</span></span>
+<span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">gateway.networking.k8s.io/v1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Gateway</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd-nonprod-gateway</span></span>
+<span class="line"><span style="color:#85E89D">  namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd</span></span>
+<span class="line"><span style="color:#85E89D">spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  gatewayClassName</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">gke-l7-global-external-managed</span></span>
+<span class="line"><span style="color:#85E89D">  listeners</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">https</span></span>
+<span class="line"><span style="color:#85E89D">      protocol</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">HTTPS</span></span>
+<span class="line"><span style="color:#85E89D">      port</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">443</span></span>
+<span class="line"><span style="color:#85E89D">      hostname</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd.nonprod.g.example.com</span></span>
+<span class="line"><span style="color:#85E89D">      tls</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">        mode</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Terminate</span></span>
+<span class="line"><span style="color:#85E89D">        certificateRefs</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">          - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd-nonprod-g-example-com-tls</span></span>
+<span class="line"><span style="color:#B392F0">---</span></span>
+<span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">gateway.networking.k8s.io/v1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">HTTPRoute</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd-nonprod-route</span></span>
+<span class="line"><span style="color:#85E89D">  namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd</span></span>
+<span class="line"><span style="color:#85E89D">spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  parentRefs</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd-nonprod-gateway</span></span>
+<span class="line"><span style="color:#85E89D">  hostnames</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#9ECBFF">argocd.nonprod.g.example.com</span></span>
+<span class="line"><span style="color:#85E89D">  rules</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">backendRefs</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">        - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd-server</span></span>
+<span class="line"><span style="color:#85E89D">          port</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">80</span></span></code></pre>
+<p>At this point, the public edge for Argo CD is no longer hand wired.</p>
+<p>The <code>HTTPRoute</code> gives external-dns a hostname to publish. The Gateway gives GKE a load balancer and HTTPS listener. The Certificate gives cert-manager a request to issue a Let’s Encrypt certificate. The TLS secret produced by cert-manager is referenced by the Gateway.</p>
+<h2 id="sample-app-exposing-a-real-url-on-the-spot-pool">Sample app: exposing a real URL on the spot pool</h2>
+<p>The other validation is a simple application scheduled onto the spot pool. This proves that normal workloads can still use the cheaper capacity while platform controllers stay on the system pool.</p>
+<p>This is the <code>all.yaml</code> I would use for the public Gateway API version of the sample.</p>
+<p>During early testing, set the issuer to <code>letsencrypt-staging</code>. After the flow works, change it to <code>letsencrypt-prod</code>.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">v1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Namespace</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">janus-test</span></span>
+<span class="line"><span style="color:#B392F0">---</span></span>
+<span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">apps/v1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Deployment</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">hello</span></span>
+<span class="line"><span style="color:#85E89D">  namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">janus-test</span></span>
+<span class="line"><span style="color:#85E89D">spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  replicas</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">1</span></span>
+<span class="line"><span style="color:#85E89D">  selector</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    matchLabels</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      app</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">hello</span></span>
+<span class="line"><span style="color:#85E89D">  template</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      labels</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">        app</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">hello</span></span>
+<span class="line"><span style="color:#85E89D">    spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      nodeSelector</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">        janus.io/pool</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">spot</span></span>
+<span class="line"><span style="color:#85E89D">      tolerations</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">        - </span><span style="color:#85E89D">key</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"janus.io/spot"</span></span>
+<span class="line"><span style="color:#85E89D">          operator</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"Equal"</span></span>
+<span class="line"><span style="color:#85E89D">          value</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"true"</span></span>
+<span class="line"><span style="color:#85E89D">          effect</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"NoSchedule"</span></span>
+<span class="line"><span style="color:#85E89D">      containers</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">        - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">hello</span></span>
+<span class="line"><span style="color:#85E89D">          image</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">us-docker.pkg.dev/google-samples/containers/gke/hello-app:1.0</span></span>
+<span class="line"><span style="color:#85E89D">          ports</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">            - </span><span style="color:#85E89D">containerPort</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">8080</span></span>
+<span class="line"><span style="color:#B392F0">---</span></span>
+<span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">v1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Service</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">hello</span></span>
+<span class="line"><span style="color:#85E89D">  namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">janus-test</span></span>
+<span class="line"><span style="color:#85E89D">spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  selector</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    app</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">hello</span></span>
+<span class="line"><span style="color:#85E89D">  ports</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">http</span></span>
+<span class="line"><span style="color:#85E89D">      port</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">80</span></span>
+<span class="line"><span style="color:#85E89D">      targetPort</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">8080</span></span>
+<span class="line"><span style="color:#85E89D">      protocol</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">TCP</span></span>
+<span class="line"><span style="color:#B392F0">---</span></span>
+<span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">cert-manager.io/v1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Certificate</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">hello-g-example-com</span></span>
+<span class="line"><span style="color:#85E89D">  namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">janus-test</span></span>
+<span class="line"><span style="color:#85E89D">spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  secretName</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">hello-g-example-com-tls</span></span>
+<span class="line"><span style="color:#85E89D">  issuerRef</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">letsencrypt-prod</span></span>
+<span class="line"><span style="color:#85E89D">    kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">ClusterIssuer</span></span>
+<span class="line"><span style="color:#85E89D">  dnsNames</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#9ECBFF">hello.g.example.com</span></span>
+<span class="line"><span style="color:#B392F0">---</span></span>
+<span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">gateway.networking.k8s.io/v1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Gateway</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">hello-gke-gateway</span></span>
+<span class="line"><span style="color:#85E89D">  namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">janus-test</span></span>
+<span class="line"><span style="color:#85E89D">spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  gatewayClassName</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">gke-l7-global-external-managed</span></span>
+<span class="line"><span style="color:#85E89D">  listeners</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">https</span></span>
+<span class="line"><span style="color:#85E89D">      protocol</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">HTTPS</span></span>
+<span class="line"><span style="color:#85E89D">      port</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">443</span></span>
+<span class="line"><span style="color:#85E89D">      hostname</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">hello.g.example.com</span></span>
+<span class="line"><span style="color:#85E89D">      tls</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">        mode</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Terminate</span></span>
+<span class="line"><span style="color:#85E89D">        certificateRefs</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">          - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">hello-g-example-com-tls</span></span>
+<span class="line"><span style="color:#B392F0">---</span></span>
+<span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">gateway.networking.k8s.io/v1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">HTTPRoute</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">hello-route</span></span>
+<span class="line"><span style="color:#85E89D">  namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">janus-test</span></span>
+<span class="line"><span style="color:#85E89D">spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  parentRefs</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">hello-gke-gateway</span></span>
+<span class="line"><span style="color:#85E89D">  hostnames</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#9ECBFF">hello.g.example.com</span></span>
+<span class="line"><span style="color:#85E89D">  rules</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">matches</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">        - </span><span style="color:#85E89D">path</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">            type</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">PathPrefix</span></span>
+<span class="line"><span style="color:#85E89D">            value</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">/</span></span>
+<span class="line"><span style="color:#85E89D">      backendRefs</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">        - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">hello</span></span>
+<span class="line"><span style="color:#85E89D">          port</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">80</span></span></code></pre>
+<p>The important pieces are the relationship between the resources:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>HTTPRoute hostname -> external-dns creates A record</span></span>
+<span class="line"><span>Certificate dnsNames -> cert-manager creates TLS secret</span></span>
+<span class="line"><span>Gateway listener -> uses TLS secret and routes to HTTPRoute</span></span>
+<span class="line"><span>Deployment -> runs on spot pool</span></span></code></pre>
+<p>If the TLS secret does not exist yet, the Gateway may temporarily report an invalid listener. That is expected until cert-manager finishes issuing the certificate.</p>
+<h2 id="validation">Validation</h2>
+<p>The first thing to watch is external-dns:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> kube-system</span><span style="color:#9ECBFF"> logs</span><span style="color:#9ECBFF"> deploy/external-dns</span><span style="color:#79B8FF"> -f</span></span></code></pre>
+<p>A successful run creates both the ownership TXT record and the A record:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Add records: a-hello.g.example.com. TXT ["heritage=external-dns,external-dns/owner=nonprod-gke,external-dns/resource=httproute/janus-test/hello-route"] 300</span></span>
+<span class="line"><span>Add records: hello.g.example.com. A [33.120.22.122] 300</span></span></code></pre>
+<p>Then check the Gateway:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> janus-test</span><span style="color:#9ECBFF"> get</span><span style="color:#9ECBFF"> gateway</span></span></code></pre>
+<p>Expected:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>NAME                CLASS                            ADDRESS         PROGRAMMED</span></span>
+<span class="line"><span>jc-qa-gke-gateway   gke-l7-global-external-managed   33.120.22.122   True</span></span></code></pre>
+<p>If local DNS has not caught up yet, test directly with <code>--resolve</code>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">curl</span><span style="color:#79B8FF"> -vk</span><span style="color:#79B8FF"> --resolve</span><span style="color:#9ECBFF"> hello.g.example.com:443:33.120.22.122</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#9ECBFF">  https://hello.g.example.com/</span></span></code></pre>
+<p>The useful part of the response is not just that it returns <code>200</code>. It also proves TLS and routing are both working:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Server certificate:</span></span>
+<span class="line"><span>  subject: CN=hello.g.example.com</span></span>
+<span class="line"><span>  issuer: C=US; O=(STAGING) Let's Encrypt; CN=(STAGING) Riddling Rhubarb R12</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>HTTP/2 200</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>Hello, world!</span></span>
+<span class="line"><span>Version: 1.0.0</span></span></code></pre>
+<p>Once this works with staging, switching to production is just changing the <code>issuerRef</code>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">issuerRef</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">letsencrypt-prod</span></span>
+<span class="line"><span style="color:#85E89D">  kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">ClusterIssuer</span></span></code></pre>
+<h2 id="what-changed">What changed</h2>
+<p>The previous cluster could run workloads and receive traffic through Gateway API.</p>
+<p>This version can manage the public edge through GitOps.</p>
+<p>The difference is significant:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Before:</span></span>
+<span class="line"><span>Gateway gets IP</span></span>
+<span class="line"><span>manual DNS record</span></span>
+<span class="line"><span>manual certificate thinking</span></span>
+<span class="line"><span>curl to test</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>After:</span></span>
+<span class="line"><span>HTTPRoute declares hostname</span></span>
+<span class="line"><span>external-dns creates DNS record</span></span>
+<span class="line"><span>Certificate declares desired TLS cert</span></span>
+<span class="line"><span>cert-manager issues Let's Encrypt cert</span></span>
+<span class="line"><span>Gateway terminates HTTPS</span></span></code></pre>
+<p>Argo CD now has a real URL:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>https://argocd.nonprod.g.example.com</span></span></code></pre>
+<p>A sample app can also be exposed with a real URL and a real certificate, while running on spot capacity.</p>
+<p>The platform services themselves run on the system pool, keeping the cluster controllers away from the more disposable workload pool.</p>
+<h2 id="final-shape">Final shape</h2>
+<p>The platform layer now looks like this:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>kube-system</span></span>
+<span class="line"><span>  external-dns</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>cert-manager</span></span>
+<span class="line"><span>  cert-manager controller</span></span>
+<span class="line"><span>  letsencrypt-staging ClusterIssuer</span></span>
+<span class="line"><span>  letsencrypt-prod ClusterIssuer</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>argocd</span></span>
+<span class="line"><span>  Argo CD</span></span>
+<span class="line"><span>  Certificate</span></span>
+<span class="line"><span>  Gateway</span></span>
+<span class="line"><span>  HTTPRoute</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>janus-test</span></span>
+<span class="line"><span>  sample app on spot node pool</span></span>
+<span class="line"><span>  Certificate</span></span>
+<span class="line"><span>  Gateway</span></span>
+<span class="line"><span>  HTTPRoute</span></span></code></pre>
+<p>And the responsibility split is clearer:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Terraform:</span></span>
+<span class="line"><span>  Cloud DNS zone</span></span>
+<span class="line"><span>  Google service accounts</span></span>
+<span class="line"><span>  IAM permissions</span></span>
+<span class="line"><span>  Workload Identity bindings</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>Argo CD:</span></span>
+<span class="line"><span>  external-dns</span></span>
+<span class="line"><span>  cert-manager</span></span>
+<span class="line"><span>  ClusterIssuers</span></span>
+<span class="line"><span>  Gateway resources</span></span>
+<span class="line"><span>  Certificate resources</span></span>
+<span class="line"><span>  application manifests</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>GKE Gateway:</span></span>
+<span class="line"><span>  load balancer</span></span>
+<span class="line"><span>  HTTPS listener</span></span>
+<span class="line"><span>  routing into Services</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>external-dns:</span></span>
+<span class="line"><span>  A records and TXT ownership records</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>cert-manager:</span></span>
+<span class="line"><span>  ACME account</span></span>
+<span class="line"><span>  DNS-01 challenge records</span></span>
+<span class="line"><span>  TLS secrets</span></span></code></pre>
+<h2 id="next">Next</h2>
+<p>With DNS and certificates in place, the next platform decision is access.</p>
+<p>Argo CD can now be reached through a real public hostname with TLS. That makes SSO and RBAC the next immediate concern. After that, I want to add the private access path for internal platform tools, likely with the Tailscale operator.</p>
+<p>The important milestone here is that the cluster no longer depends on manually copying Gateway IPs into DNS or manually thinking about certificates. The edge is now declared in Kubernetes and reconciled by platform controllers.</p>
+<p>That is the point where the cluster starts to feel less like a demo and more like a platform.</p> </div> <nav class="blog-post-navigation"> <a href="/blog/gke-ci-structure" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">GKE - Part 3: From Local Terraform to CI: Structuring Shared and Nonprod Stacks for GKE</div> </a>  </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Posts</h2> <div class="related-posts-grid"> <a href="/blog/gke-ci-structure" class="blog-card card-link"> <img src="/assets/blog/gke-ci-structure/banner.webp" alt="GKE - Part 3: From Local Terraform to CI: Structuring Shared and Nonprod Stacks for GKE" class="blog-card-image"> <h3 class="blog-card-title">GKE - Part 3: From Local Terraform to CI: Structuring Shared and Nonprod Stacks for GKE</h3> <p class="blog-card-description"> Moving a Terraform-first GKE setup from local execution to CI, and organizing shared and environment stacks to make the system repeatable and extensible. </p> </a><a href="/blog/gke-private-node" class="blog-card card-link"> <img src="/assets/blog/gke-private-node/banner.webp" alt="GKE — Part 2: Private Nodes, Gateway API, and a More Realistic Cluster Shape" class="blog-card-image"> <h3 class="blog-card-title">GKE — Part 2: Private Nodes, Gateway API, and a More Realistic Cluster Shape</h3> <p class="blog-card-description"> Evolving a Terraform-managed GKE cluster from a public proof of concept into a more structured setup with private nodes and a defined entry point. </p> </a><a href="/blog/gke-bootstrap" class="blog-card card-link"> <img src="/assets/blog/gke-bootstrap/banner.webp" alt="From Zero to GKE — A Terraform-First Build with Production in Mind" class="blog-card-image"> <h3 class="blog-card-title">From Zero to GKE — A Terraform-First Build with Production in Mind</h3> <p class="blog-card-description"> A Terraform-first journey into GCP and GKE—bootstrapping remote state, building a clean foundation, and getting a minimal cluster running with a clear path toward production. </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container text-primary"> <p>© 2026 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer>  </body></html>
