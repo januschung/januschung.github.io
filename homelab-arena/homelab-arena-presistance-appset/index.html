@@ -1,0 +1,223 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Turning a k3s cluster into a repeatable application platform using Argo CD ApplicationSet, shared Helm charts, NFS persistence, and host-level backups."><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v5.17.2"><link rel="canonical" href="https://januschung.github.io/homelab-arena/homelab-arena-presistance-appset/"><title>Part 7: From Cluster to Platform — ApplicationSet, Storage, and Backups - Janus</title><link rel="stylesheet" href="/_astro/about.CdqPxALF.css">
+<link rel="stylesheet" href="/_astro/index.BFrYoEHc.css"></head> <body class="min-h-screen flex flex-col"> <span data-pagefind-filter="locale:en" class="hidden" aria-hidden="true"></span> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/homelab-arena">Homelab Arena</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul>  <div class="mobile-controls"> <button class="search-icon-button" aria-label="Toggle search" id="search-toggle"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"> <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round"></path> </svg> </button> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> </div> <div class="header-search" id="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false,&#34;translations&#34;:{&#34;placeholder&#34;:&#34;Search…&#34;}}"></div> <script type="module" src="/_astro/Search.astro_astro_type_script_index_0_lang.tZYucdM2.js"></script> </div>  </div> </nav> </header> <script type="module">(function(){const n=document.getElementById("mobile-menu-toggle"),s=document.getElementById("nav-links"),c=document.querySelector("header"),a=document.getElementById("search-toggle"),e=document.getElementById("header-search");n&&s&&(n.addEventListener("click",()=>{const t=s.classList.toggle("nav-open");n.classList.toggle("active"),c.classList.toggle("menu-open"),t?document.body.style.overflow="hidden":document.body.style.overflow="",e&&e.classList.remove("search-open")}),s.querySelectorAll("a").forEach(t=>{t.addEventListener("click",()=>{s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow=""})}),document.addEventListener("click",t=>{!c.contains(t.target)&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow="")})),a&&e&&(a.addEventListener("click",o=>{o.stopPropagation(),e.classList.toggle("search-open"),s&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n&&n.classList.remove("active"),c&&c.classList.remove("menu-open")),e.classList.contains("search-open")&&setTimeout(()=>{const t=e.querySelector('input[type="search"]');t&&(t.focus(),t.dispatchEvent(new Event("input",{bubbles:!0})));const i=e.querySelector(".pagefind-ui__results-area");i&&(i.style.display="block")},150)}),document.addEventListener("click",o=>{e&&!e.contains(o.target)&&!a.contains(o.target)&&e.classList.contains("search-open")&&e.classList.remove("search-open")}),document.addEventListener("keydown",o=>{o.key==="Escape"&&e&&e.classList.contains("search-open")&&e.classList.remove("search-open")}))})();</script> <main class="flex-1" data-locale-prefix>  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">Part 7: From Cluster to Platform — ApplicationSet, Storage, and Backups</h1> <div class="blog-post-meta"> <time>May 3, 2026</time> <span class="blog-post-meta-separator">•</span> <span>5 min read</span>  </div> <div class="pill-group pill-group--top"> <span class="pill">k3s</span><span class="pill">argocd</span><span class="pill">gitops</span><span class="pill">nfs</span><span class="pill">helm</span> </div> </header> <div class="blog-post-content prose"> <hr>
+<h2 id="homelab-arena-part-7-from-cluster-to-platform--applicationset-storage-and-backups">Homelab Arena Part 7: From Cluster to Platform — ApplicationSet, Storage, and Backups</h2>
+<p>Part 6 ended with a cluster that could manage itself.</p>
+<p>Argo CD had taken over the desired state. The repository had become the source of truth. The control plane no longer depended on manual steps.</p>
+<p>That was the first half of the problem.</p>
+<p>A cluster that manages itself is useful, but it is still not a platform. Applications can be deployed, but there is no consistent way to define persistence, no standard deployment pattern, and no clear backup strategy.</p>
+<p>This part focuses on defining those pieces.</p>
+<p><img src="/assets/homelab-arena/homelab-arena-persistance-appset/banner.webp" alt="Mirco Machine - Homelab Arena Special Edition"></p>
+<hr>
+<h2 id="the-missing-layer-how-applications-live">The missing layer: how applications live</h2>
+<p>Up to this point, deploying an application still required decisions:</p>
+<ul>
+<li>where does the data live</li>
+<li>how is it exposed</li>
+<li>how is it backed up</li>
+</ul>
+<p>Each app solved this slightly differently.</p>
+<p>That inconsistency does not scale.</p>
+<p>The goal here is to introduce a single pattern that answers all three questions in a predictable way.</p>
+<hr>
+<h2 id="reusing-the-disk-layout">Reusing the disk layout</h2>
+<p>The disk layout from Part 2 becomes important now:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Proxmox Node</span></span>
+<span class="line"><span>├─ SSD</span></span>
+<span class="line"><span>│  └─ VM disks</span></span>
+<span class="line"><span>├─ HDD #1</span></span>
+<span class="line"><span>│  └─ /mnt/pve/data01</span></span>
+<span class="line"><span>└─ HDD #2</span></span>
+<span class="line"><span>   └─ /mnt/pve/data02</span></span></code></pre>
+<p>Each disk has a clear role:</p>
+<ul>
+<li>SSD runs the cluster</li>
+<li>HDD #1 stores live application data</li>
+<li>HDD #2 stores backups</li>
+</ul>
+<p>Instead of mixing concerns, storage is separated from compute.</p>
+<hr>
+<h2 id="nfs-as-the-persistence-layer">NFS as the persistence layer</h2>
+<p>The directory:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>/mnt/pve/data01/k3s-nfs</span></span></code></pre>
+<p>is exposed to the cluster via NFS.</p>
+<p>This becomes the shared persistence layer:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Pods → PVC → NFS → HDD #1</span></span></code></pre>
+<p>The key change is conceptual.</p>
+<p>Persistence is no longer tied to a node. It is tied to the cluster.</p>
+<p>Applications can move. Data stays.</p>
+<hr>
+<h2 id="dynamic-provisioning-with-nfs-subdir">Dynamic provisioning with nfs-subdir</h2>
+<p>Manually managing volumes does not scale.</p>
+<p>Instead, the cluster uses:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>nfs-subdir-external-provisioner</span></span></code></pre>
+<p>The flow becomes:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Application requests PVC</span></span>
+<span class="line"><span>→ provisioner creates directory on NFS</span></span>
+<span class="line"><span>→ pod mounts it</span></span></code></pre>
+<p>Each application gets its own folder automatically.</p>
+<p>Storage becomes declarative instead of operational.</p>
+<hr>
+<h2 id="one-chart-many-apps">One chart, many apps</h2>
+<p>The next step is standardizing deployments.</p>
+<p>Instead of creating a chart per application, a single shared chart is used.</p>
+<p>It contains only four templates:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>deployment.yaml</span></span>
+<span class="line"><span>service.yaml</span></span>
+<span class="line"><span>ingress.yaml</span></span>
+<span class="line"><span>pvc.yaml</span></span></code></pre>
+<p>Each template has a clear responsibility.</p>
+<p>The chart defines <em>how</em> applications run.
+The values define <em>what</em> runs.</p>
+<p>This removes duplication and enforces consistency across all apps.</p>
+<hr>
+<h2 id="applicationset-turning-structure-into-deployments">ApplicationSet: turning structure into deployments</h2>
+<p>Managing one Argo CD Application per app does not scale.</p>
+<p>Instead, a single ApplicationSet generates applications automatically.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argoproj.io/v1alpha1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">ApplicationSet</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">simple-chart-apps</span></span>
+<span class="line"><span style="color:#85E89D">  namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd</span></span>
+<span class="line"><span style="color:#85E89D">spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  generators</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">git</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">        repoURL</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">https://github.com/&#x3C;user>/&#x3C;repo>.git</span></span>
+<span class="line"><span style="color:#85E89D">        revision</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">HEAD</span></span>
+<span class="line"><span style="color:#85E89D">        directories</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">          - </span><span style="color:#85E89D">path</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd/simple-chart/apps/*</span></span>
+<span class="line"><span style="color:#85E89D">  template</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">'{{path.basename}}'</span></span>
+<span class="line"><span style="color:#85E89D">    spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      project</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">simple-chart</span></span>
+<span class="line"><span style="color:#85E89D">      source</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">        repoURL</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">https://github.com/&#x3C;user>/&#x3C;repo>.git</span></span>
+<span class="line"><span style="color:#85E89D">        targetRevision</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">HEAD</span></span>
+<span class="line"><span style="color:#85E89D">        path</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd/simple-chart/chart</span></span>
+<span class="line"><span style="color:#85E89D">        helm</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">          valueFiles</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">            - </span><span style="color:#9ECBFF">values.yaml</span></span>
+<span class="line"><span style="color:#E1E4E8">            - </span><span style="color:#9ECBFF">../apps/{{path.basename}}/values.yaml</span></span>
+<span class="line"><span style="color:#85E89D">      destination</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">        server</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">https://kubernetes.default.svc</span></span>
+<span class="line"><span style="color:#85E89D">        namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">'{{path.basename}}'</span></span>
+<span class="line"><span style="color:#85E89D">      syncPolicy</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">        automated</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">          prune</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span>
+<span class="line"><span style="color:#85E89D">          selfHeal</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span>
+<span class="line"><span style="color:#85E89D">        syncOptions</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">          - </span><span style="color:#9ECBFF">CreateNamespace=true</span></span></code></pre>
+<h3 id="how-it-works">How it works</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Git repository</span></span>
+<span class="line"><span>  └── apps/</span></span>
+<span class="line"><span>       ├── family-blog/</span></span>
+<span class="line"><span>       ├── uptime-kuma/</span></span>
+<span class="line"><span>       └── it-tools/</span></span>
+<span class="line"><span>            ↓</span></span>
+<span class="line"><span>ApplicationSet scans directories</span></span>
+<span class="line"><span>            ↓</span></span>
+<span class="line"><span>Argo CD generates Applications</span></span>
+<span class="line"><span>            ↓</span></span>
+<span class="line"><span>Helm renders shared chart</span></span>
+<span class="line"><span>            ↓</span></span>
+<span class="line"><span>Kubernetes creates resources</span></span></code></pre>
+<p>The directory structure defines the applications.</p>
+<p>Argo CD turns that structure into running workloads.</p>
+<hr>
+<h2 id="repository-layout">Repository layout</h2>
+<p>This pattern depends on a clear structure:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>argocd/</span></span>
+<span class="line"><span>├── bootstrap/</span></span>
+<span class="line"><span>├── platform/</span></span>
+<span class="line"><span>└── simple-chart/</span></span>
+<span class="line"><span>    ├── chart/</span></span>
+<span class="line"><span>    │   ├── Chart.yaml</span></span>
+<span class="line"><span>    │   └── templates/</span></span>
+<span class="line"><span>    └── apps/</span></span>
+<span class="line"><span>        ├── family-blog/</span></span>
+<span class="line"><span>        ├── uptime-kuma/</span></span>
+<span class="line"><span>        └── it-tools/</span></span></code></pre>
+<p>The separation is intentional:</p>
+<ul>
+<li><code>chart/</code> defines the template</li>
+<li><code>apps/</code> defines the instances</li>
+</ul>
+<hr>
+<h2 id="example-a-complete-application">Example: a complete application</h2>
+<p>A single file defines an application:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">nameOverride</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">it-tools</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">image</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  repository</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">corentinth/it-tools</span></span>
+<span class="line"><span style="color:#85E89D">  tag</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"2024.10.22-7ca5933"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">service</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  port</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">80</span></span>
+<span class="line"><span style="color:#85E89D">  targetPort</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">80</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">ingress</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  host</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">tools.c.home</span></span></code></pre>
+<p>That file is enough for Argo CD to deploy the app.</p>
+<p>No additional manifests are required.</p>
+<hr>
+<h2 id="migrating-applications">Migrating applications</h2>
+<p>With this pattern in place, migrating applications becomes mechanical.</p>
+<ul>
+<li>two blogs</li>
+<li>uptime-kuma</li>
+<li>it-tools</li>
+</ul>
+<p>Each application follows the same structure.</p>
+<p>Stateful apps request storage.
+Stateless apps do not.</p>
+<p>The system supports both without special cases.</p>
+<hr>
+<h2 id="backups-outside-the-cluster">Backups: outside the cluster</h2>
+<p>Persistence introduces a second concern.</p>
+<p>Data must survive failure.</p>
+<p>All application data lives here:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>/mnt/pve/data01/k3s-nfs</span></span></code></pre>
+<p>Backups run here:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>/mnt/pve/data02/backups/k3s-nfs</span></span></code></pre>
+<p>A simple rsync job copies data from the live disk to the backup disk.</p>
+<p>This runs on the Proxmox host, not inside Kubernetes.</p>
+<p>That decision is deliberate.</p>
+<p>If the cluster fails, backups should still work.</p>
+<hr>
+<h2 id="what-this-changes">What this changes</h2>
+<p>Before this:</p>
+<ul>
+<li>apps were deployed individually</li>
+<li>storage was inconsistent</li>
+<li>backups were undefined</li>
+</ul>
+<p>After this:</p>
+<ul>
+<li>apps follow a standard pattern</li>
+<li>storage is predictable</li>
+<li>backups are reliable</li>
+</ul>
+<p>The cluster now has structure.</p>
+<hr>
+<h2 id="what-this-unlocks">What this unlocks</h2>
+<p>With this foundation:</p>
+<ul>
+<li>adding an app becomes a values file</li>
+<li>upgrading apps becomes a version change</li>
+<li>observability can be added consistently</li>
+<li>restore flows become predictable</li>
+</ul>
+<p>This is where the system starts behaving like a platform.</p>
+<hr>
+<h2 id="closing">Closing</h2>
+<p>Part 6 introduced control.</p>
+<p>Part 7 defines how workloads exist within that control.</p>
+<p>Applications are now:</p>
+<ul>
+<li>defined in Git</li>
+<li>deployed automatically</li>
+<li>persisted consistently</li>
+<li>backed up predictably</li>
+</ul>
+<p>The cluster is no longer just running applications.</p>
+<p>It is starting to behave like infrastructure.</p> </div> <nav class="blog-post-navigation"> <a href="/homelab-arena/homelab-arena-argocd" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">Part 6: Handing the Cluster Over to Argo CD</div> </a>  </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Posts</h2> <div class="related-posts-grid"> <a href="/homelab-arena/homelab-arena-argocd" class="blog-card card-link"> <img src="/assets/homelab-arena/homelab-arena-argocd/banner.webp" alt="Part 6: Handing the Cluster Over to Argo CD" class="blog-card-image"> <h3 class="blog-card-title">Part 6: Handing the Cluster Over to Argo CD</h3> <p class="blog-card-description"> Moving from a working k3s cluster to a self-managed platform by introducing Argo CD, wildcard DNS, and the first GitOps workflow. </p> </a><a href="/homelab-arena/homelab-arena-terraform-ansible" class="blog-card card-link"> <img src="/assets/homelab-arena/homelab-arena-terraform-ansible/banner.webp" alt="Part 5: Terraform, Ansible, and k3s on Proxmox" class="blog-card-image"> <h3 class="blog-card-title">Part 5: Terraform, Ansible, and k3s on Proxmox</h3> <p class="blog-card-description"> Turning the Ubuntu template into real VMs and a joined k3s cluster: shared token, static IPs, DNS aligned with the Pi-hole/pfSense LAN from Part 3, and Ansible installing the control plane before the workers. </p> </a><a href="/homelab-arena/homelab-arena-prologue" class="blog-card card-link"> <img src="/assets/homelab-arena/homelab-arena-prologue/banner.webp" alt="Homelab Arena: Prologue" class="blog-card-image"> <h3 class="blog-card-title">Homelab Arena: Prologue</h3> <p class="blog-card-description"> From messy beginnings to controlled chaos — one pod, one VM, one Helm chart at a time. </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container text-primary"> <p>© 2026 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer>  </body></html>
