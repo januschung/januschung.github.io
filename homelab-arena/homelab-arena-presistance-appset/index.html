@@ -18,7 +18,6 @@
 <p>Each app solved this slightly differently.</p>
 <p>That inconsistency does not scale.</p>
 <p>The goal here is to introduce a single pattern that answers all three questions in a predictable way.</p>
-<hr>
 <h2 id="reusing-the-disk-layout">Reusing the disk layout</h2>
 <p>The disk layout from Part 2 becomes important now:</p>
 <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Proxmox Node</span></span>
@@ -35,7 +34,6 @@
 <li>HDD #2 stores backups</li>
 </ul>
 <p>Instead of mixing concerns, storage is separated from compute.</p>
-<hr>
 <h2 id="nfs-as-the-persistence-layer">NFS as the persistence layer</h2>
 <p>The directory:</p>
 <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>/mnt/pve/data01/k3s-nfs</span></span></code></pre>
@@ -45,7 +43,6 @@
 <p>The key change is conceptual.</p>
 <p>Persistence is no longer tied to a node. It is tied to the cluster.</p>
 <p>Applications can move. Data stays.</p>
-<hr>
 <h2 id="dynamic-provisioning-with-nfs-subdir">Dynamic provisioning with nfs-subdir</h2>
 <p>Manually managing volumes does not scale.</p>
 <p>Instead, the cluster uses:</p>
@@ -56,7 +53,6 @@
 <span class="line"><span>→ pod mounts it</span></span></code></pre>
 <p>Each application gets its own folder automatically.</p>
 <p>Storage becomes declarative instead of operational.</p>
-<hr>
 <h2 id="one-chart-many-apps">One chart, many apps</h2>
 <p>The next step is standardizing deployments.</p>
 <p>Instead of creating a chart per application, a single shared chart is used.</p>
@@ -69,7 +65,6 @@
 <p>The chart defines <em>how</em> applications run.
 The values define <em>what</em> runs.</p>
 <p>This removes duplication and enforces consistency across all apps.</p>
-<hr>
 <h2 id="applicationset-turning-structure-into-deployments">ApplicationSet: turning structure into deployments</h2>
 <p>Managing one Argo CD Application per app does not scale.</p>
 <p>Instead, a single ApplicationSet generates applications automatically.</p>
@@ -123,7 +118,6 @@ The values define <em>what</em> runs.</p>
 <span class="line"><span>Kubernetes creates resources</span></span></code></pre>
 <p>The directory structure defines the applications.</p>
 <p>Argo CD turns that structure into running workloads.</p>
-<hr>
 <h2 id="repository-layout">Repository layout</h2>
 <p>This pattern depends on a clear structure:</p>
 <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>argocd/</span></span>
@@ -142,7 +136,6 @@ The values define <em>what</em> runs.</p>
 <li><code>chart/</code> defines the template</li>
 <li><code>apps/</code> defines the instances</li>
 </ul>
-<hr>
 <h2 id="example-a-complete-application">Example: a complete application</h2>
 <p>A single file defines an application:</p>
 <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">nameOverride</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">it-tools</span></span>
@@ -159,7 +152,6 @@ The values define <em>what</em> runs.</p>
 <span class="line"><span style="color:#85E89D">  host</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">tools.c.home</span></span></code></pre>
 <p>That file is enough for Argo CD to deploy the app.</p>
 <p>No additional manifests are required.</p>
-<hr>
 <h2 id="migrating-applications">Migrating applications</h2>
 <p>With this pattern in place, migrating applications becomes mechanical.</p>
 <ul>
@@ -171,7 +163,6 @@ The values define <em>what</em> runs.</p>
 <p>Stateful apps request storage.
 Stateless apps do not.</p>
 <p>The system supports both without special cases.</p>
-<hr>
 <h2 id="backups-outside-the-cluster">Backups: outside the cluster</h2>
 <p>Persistence introduces a second concern.</p>
 <p>Data must survive failure.</p>
@@ -183,7 +174,6 @@ Stateless apps do not.</p>
 <p>This runs on the Proxmox host, not inside Kubernetes.</p>
 <p>That decision is deliberate.</p>
 <p>If the cluster fails, backups should still work.</p>
-<hr>
 <h2 id="what-this-changes">What this changes</h2>
 <p>Before this:</p>
 <ul>
@@ -198,7 +188,6 @@ Stateless apps do not.</p>
 <li>backups are reliable</li>
 </ul>
 <p>The cluster now has structure.</p>
-<hr>
 <h2 id="what-this-unlocks">What this unlocks</h2>
 <p>With this foundation:</p>
 <ul>
@@ -208,7 +197,6 @@ Stateless apps do not.</p>
 <li>restore flows become predictable</li>
 </ul>
 <p>This is where the system starts behaving like a platform.</p>
-<hr>
 <h2 id="closing">Closing</h2>
 <p>Part 6 introduced control.</p>
 <p>Part 7 defines how workloads exist within that control.</p>
