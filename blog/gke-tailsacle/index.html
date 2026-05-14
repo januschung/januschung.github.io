@@ -1,0 +1,301 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Installing the Tailscale Kubernetes operator on GKE, exposing Argo CD privately through Tailscale Ingress, and documenting the setup so I do not have to rediscover it next time."><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v5.17.2"><link rel="canonical" href="https://januschung.github.io/blog/gke-tailsacle/"><title>GKE - Part 5: Private Platform Access with the Tailscale Kubernetes Operator - Janus</title><link rel="stylesheet" href="/_astro/about.CdqPxALF.css">
+<link rel="stylesheet" href="/_astro/index.BFrYoEHc.css"></head> <body class="min-h-screen flex flex-col"> <span data-pagefind-filter="locale:en" class="hidden" aria-hidden="true"></span> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/homelab-arena">Homelab Arena</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul>  <div class="mobile-controls"> <button class="search-icon-button" aria-label="Toggle search" id="search-toggle"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"> <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round"></path> </svg> </button> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> </div> <div class="header-search" id="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false,&#34;translations&#34;:{&#34;placeholder&#34;:&#34;Search…&#34;}}"></div> <script type="module" src="/_astro/Search.astro_astro_type_script_index_0_lang.tZYucdM2.js"></script> </div>  </div> </nav> </header> <script type="module">(function(){const n=document.getElementById("mobile-menu-toggle"),s=document.getElementById("nav-links"),c=document.querySelector("header"),a=document.getElementById("search-toggle"),e=document.getElementById("header-search");n&&s&&(n.addEventListener("click",()=>{const t=s.classList.toggle("nav-open");n.classList.toggle("active"),c.classList.toggle("menu-open"),t?document.body.style.overflow="hidden":document.body.style.overflow="",e&&e.classList.remove("search-open")}),s.querySelectorAll("a").forEach(t=>{t.addEventListener("click",()=>{s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow=""})}),document.addEventListener("click",t=>{!c.contains(t.target)&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow="")})),a&&e&&(a.addEventListener("click",o=>{o.stopPropagation(),e.classList.toggle("search-open"),s&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n&&n.classList.remove("active"),c&&c.classList.remove("menu-open")),e.classList.contains("search-open")&&setTimeout(()=>{const t=e.querySelector('input[type="search"]');t&&(t.focus(),t.dispatchEvent(new Event("input",{bubbles:!0})));const i=e.querySelector(".pagefind-ui__results-area");i&&(i.style.display="block")},150)}),document.addEventListener("click",o=>{e&&!e.contains(o.target)&&!a.contains(o.target)&&e.classList.contains("search-open")&&e.classList.remove("search-open")}),document.addEventListener("keydown",o=>{o.key==="Escape"&&e&&e.classList.contains("search-open")&&e.classList.remove("search-open")}))})();</script> <main class="flex-1" data-locale-prefix>  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">GKE - Part 5: Private Platform Access with the Tailscale Kubernetes Operator</h1> <div class="blog-post-meta"> <time>May 13, 2026</time> <span class="blog-post-meta-separator">•</span> <span>10 min read</span>  </div> <div class="pill-group pill-group--top"> <span class="pill">gcp</span><span class="pill">gke</span><span class="pill">kubernetes</span><span class="pill">gitops</span><span class="pill">argocd</span><span class="pill">tailscale</span><span class="pill">vpn</span><span class="pill">platform</span> </div> </header> <div class="blog-post-content prose"> <h1 id="gke---part-5-private-platform-access-with-the-tailscale-kubernetes-operator">GKE - Part 5: Private Platform Access with the Tailscale Kubernetes Operator</h1>
+<p><img src="/assets/blog/gke-tailscale/banner.webp" alt="gke private node layout"></p>
+<p>This part is about adding a private access path to the GKE nonprod cluster with the Tailscale Kubernetes operator.</p>
+<p>I had done a similar setup before on EKS, but when I needed to repeat it on GKE, I realized I had forgotten enough small details that I had to go back through the docs again. This post is the runbook I wish I had kept the first time.</p>
+<p>The goal is simple:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Install the Tailscale Kubernetes operator with Argo CD</span></span>
+<span class="line"><span>Expose Argo CD privately through Tailscale Ingress</span></span>
+<span class="line"><span>Document the exact setup for the next time I need it</span></span></code></pre>
+<p>By the end of this step:</p>
+<ul>
+<li>Tailscale OAuth credentials are created in the admin console</li>
+<li>the Tailscale Kubernetes operator is installed through the existing GitOps flow</li>
+<li>the Helm chart version is pinned from the official chart index</li>
+<li>Argo CD is exposed through a private <code>.ts.net</code> URL</li>
+<li>a simple test workload confirms that Tailscale Ingress works on GKE</li>
+</ul>
+<p>The final Argo CD URL for this setup is:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>https://argocd-nonprod-g.tailnet-name.ts.net/</span></span></code></pre>
+<h2 id="why-tailscale-here">Why Tailscale here</h2>
+<p>There are several ways to provide private access to Kubernetes services.</p>
+<p>I could use a traditional VPN, private load balancers, a public ingress locked down with SSO, a bastion host, or temporary port forwarding. All of those can work, but each option adds a different kind of operational cost.</p>
+<p>Tailscale is attractive because it gives the team a private network that is easy to join, easy to leave, and easy to reason about. Once a user is on the tailnet and has the right access policy, internal services can be reached by name.</p>
+<p>For Kubernetes, the operator makes this cleaner. Instead of running Tailscale sidecars manually or creating one-off access paths, the operator watches Kubernetes resources and creates the Tailscale proxy resources needed to expose workloads.</p>
+<p>For this first GKE setup, I only care about one primary use case:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Expose Argo CD privately to the team.</span></span></code></pre>
+<p>The same pattern can later be reused for other internal tools:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Grafana</span></span>
+<span class="line"><span>internal admin APIs</span></span>
+<span class="line"><span>temporary test apps</span></span>
+<span class="line"><span>preview environments</span></span>
+<span class="line"><span>platform dashboards</span></span></code></pre>
+<h2 id="what-the-tailscale-operator-needs">What the Tailscale operator needs</h2>
+<p>The Tailscale Kubernetes operator needs permission to create and manage devices in the tailnet.</p>
+<p>The standard setup uses OAuth client credentials from the Tailscale admin console. The operator uses those credentials to authenticate to the Tailscale API, create auth keys, and register the proxy devices it manages.</p>
+<p>The rough flow is:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Tailscale admin console:</span></span>
+<span class="line"><span>  create tags</span></span>
+<span class="line"><span>  create OAuth client</span></span>
+<span class="line"><span>  grant required scopes</span></span>
+<span class="line"><span>  attach operator tag</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>Kubernetes:</span></span>
+<span class="line"><span>  create tailscale namespace</span></span>
+<span class="line"><span>  store OAuth client ID and secret</span></span>
+<span class="line"><span>  install the operator with Helm through Argo CD</span></span>
+<span class="line"><span>  expose workloads with Tailscale Ingress</span></span></code></pre>
+<p>Tailscale also supports a workload identity federation path. I am not using that for this first version. For the initial GitOps setup, OAuth client credentials are the straightforward option and match how I originally approached this on EKS.</p>
+<h2 id="step-1-update-the-tailscale-acl-tags">Step 1: update the Tailscale ACL tags</h2>
+<p>In the Tailscale admin console, open the access control policy file.</p>
+<p>The operator needs one tag for itself and another tag for the devices it creates:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="json"><code><span class="line"><span style="color:#9ECBFF">"tagOwners"</span><span style="color:#E1E4E8">: {</span></span>
+<span class="line"><span style="color:#79B8FF">  "tag:k8s-operator"</span><span style="color:#E1E4E8">: [],</span></span>
+<span class="line"><span style="color:#79B8FF">  "tag:k8s"</span><span style="color:#E1E4E8">: [</span><span style="color:#9ECBFF">"tag:k8s-operator"</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>The meaning is:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>tag:k8s-operator:</span></span>
+<span class="line"><span>  used by the Kubernetes operator itself</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>tag:k8s:</span></span>
+<span class="line"><span>  used by proxy devices created by the operator</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>tag:k8s-operator owns tag:k8s:</span></span>
+<span class="line"><span>  the operator is allowed to create devices with tag:k8s</span></span></code></pre>
+<p>This is easy to miss. If the operator cannot own the tag used by its proxy devices, the Kubernetes resources may look fine while the Tailscale side refuses to create or authorize those devices.</p>
+<p>For the first pass, I am keeping the default tag model:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>tag:k8s-operator</span></span>
+<span class="line"><span>tag:k8s</span></span></code></pre>
+<p>Later, I can introduce environment-specific tags if I need different access policies per cluster or environment:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>tag:gke-nonprod</span></span>
+<span class="line"><span>tag:gke-prod</span></span>
+<span class="line"><span>tag:platform</span></span></code></pre>
+<p>For the first GKE nonprod installation, the default tags are enough.</p>
+<h2 id="step-2-create-the-tailscale-oauth-client">Step 2: create the Tailscale OAuth client</h2>
+<p>In the Tailscale admin console, go to:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Settings</span></span>
+<span class="line"><span>Trust credentials</span></span>
+<span class="line"><span>OAuth clients</span></span>
+<span class="line"><span>Generate OAuth client</span></span></code></pre>
+<p>Create an OAuth client for the Kubernetes operator.</p>
+<p>The client needs these write scopes:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Devices Core: write</span></span>
+<span class="line"><span>Auth Keys: write</span></span>
+<span class="line"><span>Services: write</span></span></code></pre>
+<p>It also needs this tag:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>tag:k8s-operator</span></span></code></pre>
+<p>After creating the client, save both values:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>client_id</span></span>
+<span class="line"><span>client_secret</span></span></code></pre>
+<p>The client secret is only shown once, so this is the point where I slow down and store it properly before closing the page.</p>
+<p>For GitOps, I do not want this secret committed as plain YAML. The immediate manual version is a Kubernetes Secret. The better GitOps version is a SealedSecret or an ExternalSecret.</p>
+<h2 id="step-3-create-the-secret">Step 3: create the secret</h2>
+<p>The operator needs the OAuth <code>client_id</code> and <code>client_secret</code>. Since this setup is managed by Argo CD, I store them as a SealedSecret in the Tailscale templates folder.</p>
+<p>First, generate the normal Secret manifest locally:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#9ECBFF"> create</span><span style="color:#9ECBFF"> secret</span><span style="color:#9ECBFF"> generic</span><span style="color:#9ECBFF"> operator-oauth</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --namespace</span><span style="color:#9ECBFF"> tailscale</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --from-literal=client_id=</span><span style="color:#9ECBFF">'YOUR_CLIENT_ID'</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --from-literal=client_secret=</span><span style="color:#9ECBFF">'YOUR_CLIENT_SECRET'</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --dry-run=client</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  -o</span><span style="color:#9ECBFF"> yaml</span><span style="color:#F97583"> ></span><span style="color:#9ECBFF"> operator-oauth.secret.yaml</span></span></code></pre>
+<p>Then seal it:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">kubeseal</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --namespace</span><span style="color:#9ECBFF"> tailscale</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --name</span><span style="color:#9ECBFF"> operator-oauth</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --format</span><span style="color:#9ECBFF"> yaml</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#F97583">  &#x3C;</span><span style="color:#9ECBFF"> operator-oauth.secret.yaml</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#F97583">  ></span><span style="color:#9ECBFF"> apps/infra/tailscale/templates/operator-oauth.sealedsecret.yaml</span></span></code></pre>
+<p>Now the operator credentials can follow the same GitOps path as the rest of the platform configuration.</p>
+<h2 id="step-4-pin-the-helm-chart-version">Step 4: pin the Helm chart version</h2>
+<p>This is one of the details I wanted to document because I knew I would forget it.</p>
+<p>The Tailscale stable Helm chart repository is:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>https://pkgs.tailscale.com/helmcharts</span></span></code></pre>
+<p>The chart index is available at:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>https://pkgs.tailscale.com/helmcharts/index.yaml</span></span></code></pre>
+<p>There are a few ways to check the latest version.</p>
+<p>With Helm:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">helm</span><span style="color:#9ECBFF"> repo</span><span style="color:#9ECBFF"> add</span><span style="color:#9ECBFF"> tailscale</span><span style="color:#9ECBFF"> https://pkgs.tailscale.com/helmcharts</span></span>
+<span class="line"><span style="color:#B392F0">helm</span><span style="color:#9ECBFF"> repo</span><span style="color:#9ECBFF"> update</span></span>
+<span class="line"><span style="color:#B392F0">helm</span><span style="color:#9ECBFF"> search</span><span style="color:#9ECBFF"> repo</span><span style="color:#9ECBFF"> tailscale/tailscale-operator</span><span style="color:#79B8FF"> --versions</span><span style="color:#F97583"> |</span><span style="color:#B392F0"> head</span></span></code></pre>
+<p>With <code>curl</code> and <code>yq</code>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">curl</span><span style="color:#79B8FF"> -s</span><span style="color:#9ECBFF"> https://pkgs.tailscale.com/helmcharts/index.yaml</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#F97583">  |</span><span style="color:#B392F0"> yq</span><span style="color:#9ECBFF"> '.entries."tailscale-operator"[0].version'</span></span></code></pre>
+<p>At the time I wrote this, the latest stable chart version in the index was:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>1.96.5</span></span></code></pre>
+<p>The chart version and app version are aligned:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>chart version: 1.96.5</span></span>
+<span class="line"><span>app version:   v1.96.5</span></span></code></pre>
+<p>In Argo CD, I pin the chart version instead of tracking an unbounded latest value:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">targetRevision</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">1.96.5</span></span></code></pre>
+<p>The important habit is not the exact version number. The important habit is checking the chart index, pinning the version, and making upgrades deliberate.</p>
+<p>Before committing the Argo CD change, I also check the chart values for the exact version I am installing:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">helm</span><span style="color:#9ECBFF"> show</span><span style="color:#9ECBFF"> values</span><span style="color:#9ECBFF"> tailscale/tailscale-operator</span><span style="color:#79B8FF"> --version</span><span style="color:#79B8FF"> 1.96.5</span></span></code></pre>
+<p>That command is the source of truth for value names. If the chart values change in a future release, I want to catch that before Argo CD tries to sync it.</p>
+<p>In my Argo CD setup, the operator is installed from the upstream Tailscale chart, while extra manifests such as the SealedSecret live in the Git repo. The important chart values are the OAuth secret references and the operator hostname:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">helm</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  releaseName</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">tailscale-operator</span></span>
+<span class="line"><span style="color:#85E89D">  valuesObject</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    oauth</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      clientIdSecret</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">        name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">operator-oauth</span></span>
+<span class="line"><span style="color:#85E89D">        key</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">client_id</span></span>
+<span class="line"><span style="color:#85E89D">      clientSecretSecret</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">        name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">operator-oauth</span></span>
+<span class="line"><span style="color:#85E89D">        key</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">client_secret</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">    operatorConfig</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      hostname</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">tailscale-operator-gke-nonprod</span></span></code></pre>
+<p>Once this is committed and synced by Argo CD, the operator should register itself in the Tailscale admin console with the <code>tag:k8s-operator</code> tag.</p>
+<h2 id="step-5-use-tailscale-as-the-ingress-class">Step 5: use Tailscale as the Ingress class</h2>
+<p>Once the operator is running, it is time to use Tailscale as the <code>ingressClassName</code> for internal services.</p>
+<p>This is the part that is different from a normal public ingress setup. I am not creating a public DNS record, using cert-manager, or managing a TLS secret. Tailscale Ingress uses MagicDNS, and Tailscale handles HTTPS for the <code>.ts.net</code> name.</p>
+<p>For Argo CD, the Ingress should use:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  ingressClassName</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">tailscale</span></span>
+<span class="line"><span style="color:#85E89D">  tls</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">hosts</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">        - </span><span style="color:#9ECBFF">argocd-nonprod-g</span></span></code></pre>
+<p>That short TLS host becomes the first label of the MagicDNS name:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>argocd-nonprod-g.tailnet-name.ts.net</span></span></code></pre>
+<p>So the final URL becomes:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>https://argocd-nonprod-g.tailnet-name.ts.net/</span></span></code></pre>
+<p>This is where I had to adjust my original Argo CD values. I had values that looked like a public ingress path, with a public host and a cert-manager-managed TLS secret. That belongs to the public DNS and Gateway/cert-manager model, not to the private Tailscale model.</p>
+<p>For this path, I want the short Tailscale host:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>argocd-nonprod-g</span></span></code></pre>
+<p>Argo CD is installed by Helm, so I expose the server through chart values:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">configs</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  params</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    server.insecure</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">server</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  ingress</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    enabled</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span>
+<span class="line"><span style="color:#85E89D">    ingressClassName</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">tailscale</span></span>
+<span class="line"><span style="color:#85E89D">    hosts</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">argocd-nonprod-g</span></span>
+<span class="line"><span style="color:#85E89D">    tls</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#85E89D">hosts</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">          - </span><span style="color:#9ECBFF">argocd-nonprod-g</span></span></code></pre>
+<p>The <code>server.insecure: true</code> value is needed because TLS terminates before traffic reaches the Argo CD server. The backend service is plain HTTP on port 80.</p>
+<p>The rendered Ingress should look like this:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">networking.k8s.io/v1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Ingress</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd-server</span></span>
+<span class="line"><span style="color:#85E89D">  namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd</span></span>
+<span class="line"><span style="color:#85E89D">spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  ingressClassName</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">tailscale</span></span>
+<span class="line"><span style="color:#85E89D">  rules</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">host</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd-nonprod-g</span></span>
+<span class="line"><span style="color:#85E89D">      http</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">        paths</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">          - </span><span style="color:#85E89D">path</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">/</span></span>
+<span class="line"><span style="color:#85E89D">            pathType</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Prefix</span></span>
+<span class="line"><span style="color:#85E89D">            backend</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">              service</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">                name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd-server</span></span>
+<span class="line"><span style="color:#85E89D">                port</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">                  number</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">80</span></span>
+<span class="line"><span style="color:#85E89D">  tls</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">hosts</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">        - </span><span style="color:#9ECBFF">argocd-nonprod-g</span></span></code></pre>
+<p>If I see a public-style host or a TLS secret like this, I know I am still mixing two different ingress models:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">tls</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#85E89D">hosts</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">argocd.nonprod.g.example.com</span></span>
+<span class="line"><span style="color:#85E89D">    secretName</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd-server-tls</span></span></code></pre>
+<p>For the Tailscale path, I remove the cert-manager annotations, remove the public host, and leave the host as the short MagicDNS label.</p>
+<p>Then I check the Ingress:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#9ECBFF"> get</span><span style="color:#9ECBFF"> ingress</span><span style="color:#9ECBFF"> argocd-server</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> argocd</span><span style="color:#79B8FF"> -o</span><span style="color:#9ECBFF"> yaml</span></span>
+<span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#9ECBFF"> get</span><span style="color:#9ECBFF"> ingress</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> argocd</span></span></code></pre>
+<p>Expected shape:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>NAME            CLASS       HOSTS             ADDRESS                                PORTS     AGE</span></span>
+<span class="line"><span>argocd-server   tailscale   argocd-nonprod-g  argocd-nonprod-g.tailnet-name.ts.net   80, 443   2m</span></span></code></pre>
+<p>The first request can be slower because the Tailscale certificate may be provisioned on first connect. If the first attempt times out, I give it a moment and try again.</p>
+<h2 id="step-6-test-with-a-simple-app">Step 6: test with a simple app</h2>
+<p>Before relying on the Argo CD exposure completely, I like to test the operator with a small app. This removes Argo CD-specific behavior from the debugging process and proves that Tailscale Ingress works on its own.</p>
+<p>The sample app runs in its own namespace:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">v1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Namespace</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">janus-test</span></span>
+<span class="line"><span style="color:#B392F0">---</span></span>
+<span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">apps/v1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Deployment</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">hello</span></span>
+<span class="line"><span style="color:#85E89D">  namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">janus-test</span></span>
+<span class="line"><span style="color:#85E89D">spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  replicas</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">1</span></span>
+<span class="line"><span style="color:#85E89D">  selector</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    matchLabels</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      app</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">hello</span></span>
+<span class="line"><span style="color:#85E89D">  template</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      labels</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">        app</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">hello</span></span>
+<span class="line"><span style="color:#85E89D">    spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      containers</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">        - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">hello</span></span>
+<span class="line"><span style="color:#85E89D">          image</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">us-docker.pkg.dev/google-samples/containers/gke/hello-app:1.0</span></span>
+<span class="line"><span style="color:#85E89D">          ports</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">            - </span><span style="color:#85E89D">containerPort</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">8080</span></span>
+<span class="line"><span style="color:#B392F0">---</span></span>
+<span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">v1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Service</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">hello</span></span>
+<span class="line"><span style="color:#85E89D">  namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">janus-test</span></span>
+<span class="line"><span style="color:#85E89D">spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  selector</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    app</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">hello</span></span>
+<span class="line"><span style="color:#85E89D">  ports</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">http</span></span>
+<span class="line"><span style="color:#85E89D">      port</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">80</span></span>
+<span class="line"><span style="color:#85E89D">      targetPort</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">8080</span></span>
+<span class="line"><span style="color:#85E89D">      protocol</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">TCP</span></span>
+<span class="line"><span style="color:#B392F0">---</span></span>
+<span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">networking.k8s.io/v1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Ingress</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">hello</span></span>
+<span class="line"><span style="color:#85E89D">  namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">janus-test</span></span>
+<span class="line"><span style="color:#85E89D">spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  ingressClassName</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">tailscale</span></span>
+<span class="line"><span style="color:#85E89D">  tls</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">hosts</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">        - </span><span style="color:#9ECBFF">janus-test</span></span>
+<span class="line"><span style="color:#85E89D">  rules</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">host</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">janus-test</span></span>
+<span class="line"><span style="color:#85E89D">      http</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">        paths</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">          - </span><span style="color:#85E89D">path</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">/</span></span>
+<span class="line"><span style="color:#85E89D">            pathType</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Prefix</span></span>
+<span class="line"><span style="color:#85E89D">            backend</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">              service</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">                name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">hello</span></span>
+<span class="line"><span style="color:#85E89D">                port</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">                  number</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">80</span></span></code></pre>
+<p>The <code>tls.hosts</code> value is what drives the Tailscale MagicDNS name. The <code>rules.host</code> keeps the Ingress definition explicit and consistent with the way I usually write Kubernetes Ingress resources.</p>
+<p>Validate it:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#9ECBFF"> get</span><span style="color:#9ECBFF"> pods</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> janus-test</span><span style="color:#79B8FF"> -o</span><span style="color:#9ECBFF"> wide</span></span>
+<span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#9ECBFF"> get</span><span style="color:#9ECBFF"> svc</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> janus-test</span></span>
+<span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#9ECBFF"> get</span><span style="color:#9ECBFF"> ingress</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> janus-test</span></span></code></pre>
+<p>Expected Ingress shape:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>NAME    CLASS       HOSTS         ADDRESS                            PORTS     AGE</span></span>
+<span class="line"><span>hello   tailscale   janus-test   janus-test.tailnet-name.ts.net    80, 443   1m</span></span></code></pre>
+<p>Then call it through the tailnet:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">curl</span><span style="color:#9ECBFF"> https://janus-test.tailnet-name.ts.net/</span></span></code></pre>
+<p>Expected response:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Hello, world!</span></span>
+<span class="line"><span>Version: 1.0.0</span></span></code></pre>
+<p>If this works, then the operator, OAuth credentials, MagicDNS, HTTPS, and Tailscale Ingress are all working independently of Argo CD.</p>
+<h2 id="where-this-leaves-the-cluster">Where this leaves the cluster</h2>
+<p>At this point, the GKE nonprod cluster has a private platform access path.</p>
+<p>Argo CD is available at:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>https://argocd-nonprod-g.tailnet-name.ts.net/</span></span></code></pre>
+<p>The current access model is conservative:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>The team:</span></span>
+<span class="line"><span>  read-only Argo CD access for now</span></span></code></pre>
+<p>Read-only access gives the team a way to observe the new GitOps environment while the platform is still being stabilized. Write access can come later, after the deployment flow and RBAC model have had more time to settle.</p>
+<p>That matters because the cluster is no longer only running platform controllers and sample apps. It is starting to run real application workload, while keeping internal platform access private through Tailscale.</p> </div> <nav class="blog-post-navigation"> <a href="/blog/gke-gitops-foundations" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">GKE - Part 4: ExternalDNS, cert-manager, and Real URLs for the GitOps Platform</div> </a>  </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Posts</h2> <div class="related-posts-grid"> <a href="/blog/gke-gitops-foundations" class="blog-card card-link"> <img src="/assets/blog/gke-gitops-foundations/banner.webp" alt="GKE - Part 4: ExternalDNS, cert-manager, and Real URLs for the GitOps Platform" class="blog-card-image"> <h3 class="blog-card-title">GKE - Part 4: ExternalDNS, cert-manager, and Real URLs for the GitOps Platform</h3> <p class="blog-card-description"> Adding the platform services that turn Gateway API from a manually wired entry point into a DNS and TLS managed edge for GKE. </p> </a><a href="/blog/gke-ci-structure" class="blog-card card-link"> <img src="/assets/blog/gke-ci-structure/banner.webp" alt="GKE - Part 3: From Local Terraform to CI: Structuring Shared and Nonprod Stacks for GKE" class="blog-card-image"> <h3 class="blog-card-title">GKE - Part 3: From Local Terraform to CI: Structuring Shared and Nonprod Stacks for GKE</h3> <p class="blog-card-description"> Moving a Terraform-first GKE setup from local execution to CI, and organizing shared and environment stacks to make the system repeatable and extensible. </p> </a><a href="/blog/gke-private-node" class="blog-card card-link"> <img src="/assets/blog/gke-private-node/banner.webp" alt="GKE — Part 2: Private Nodes, Gateway API, and a More Realistic Cluster Shape" class="blog-card-image"> <h3 class="blog-card-title">GKE — Part 2: Private Nodes, Gateway API, and a More Realistic Cluster Shape</h3> <p class="blog-card-description"> Evolving a Terraform-managed GKE cluster from a public proof of concept into a more structured setup with private nodes and a defined entry point. </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container text-primary"> <p>© 2026 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer>  </body></html>
