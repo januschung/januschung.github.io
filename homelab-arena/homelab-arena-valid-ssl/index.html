@@ -1,0 +1,404 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Removing browser SSL warnings from the homelab by using pfSense as an internal certificate authority, serving a wildcard certificate through k3s Traefik, and trusting the CA across laptops, Linux boxes, and Android devices."><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v5.17.2"><link rel="canonical" href="https://januschung.github.io/homelab-arena/homelab-arena-valid-ssl/"><title>Part 8: Valid SSL at Home — pfSense CA, Traefik, and Trusted Internal HTTPS - Janus</title><link rel="stylesheet" href="/_astro/about.CdqPxALF.css">
+<link rel="stylesheet" href="/_astro/index.BFrYoEHc.css"></head> <body class="min-h-screen flex flex-col"> <span data-pagefind-filter="locale:en" class="hidden" aria-hidden="true"></span> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/homelab-arena">Homelab Arena</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul>  <div class="mobile-controls"> <button class="search-icon-button" aria-label="Toggle search" id="search-toggle"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"> <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round"></path> </svg> </button> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> </div> <div class="header-search" id="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false,&#34;translations&#34;:{&#34;placeholder&#34;:&#34;Search…&#34;}}"></div> <script type="module" src="/_astro/Search.astro_astro_type_script_index_0_lang.tZYucdM2.js"></script> </div>  </div> </nav> </header> <script type="module">(function(){const n=document.getElementById("mobile-menu-toggle"),s=document.getElementById("nav-links"),c=document.querySelector("header"),a=document.getElementById("search-toggle"),e=document.getElementById("header-search");n&&s&&(n.addEventListener("click",()=>{const t=s.classList.toggle("nav-open");n.classList.toggle("active"),c.classList.toggle("menu-open"),t?document.body.style.overflow="hidden":document.body.style.overflow="",e&&e.classList.remove("search-open")}),s.querySelectorAll("a").forEach(t=>{t.addEventListener("click",()=>{s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow=""})}),document.addEventListener("click",t=>{!c.contains(t.target)&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow="")})),a&&e&&(a.addEventListener("click",o=>{o.stopPropagation(),e.classList.toggle("search-open"),s&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n&&n.classList.remove("active"),c&&c.classList.remove("menu-open")),e.classList.contains("search-open")&&setTimeout(()=>{const t=e.querySelector('input[type="search"]');t&&(t.focus(),t.dispatchEvent(new Event("input",{bubbles:!0})));const i=e.querySelector(".pagefind-ui__results-area");i&&(i.style.display="block")},150)}),document.addEventListener("click",o=>{e&&!e.contains(o.target)&&!a.contains(o.target)&&e.classList.contains("search-open")&&e.classList.remove("search-open")}),document.addEventListener("keydown",o=>{o.key==="Escape"&&e&&e.classList.contains("search-open")&&e.classList.remove("search-open")}))})();</script> <main class="flex-1" data-locale-prefix>  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">Part 8: Valid SSL at Home — pfSense CA, Traefik, and Trusted Internal HTTPS</h1> <div class="blog-post-meta"> <time>May 10, 2026</time> <span class="blog-post-meta-separator">•</span> <span>14 min read</span>  </div> <div class="pill-group pill-group--top"> <span class="pill">k3s</span><span class="pill">traefik</span><span class="pill">pfsense</span><span class="pill">tls</span><span class="pill">ssl</span><span class="pill">homelab</span> </div> </header> <div class="blog-post-content prose"> <h2 id="homelab-arena-part-8-valid-ssl-at-home">Homelab Arena Part 8: Valid SSL at Home</h2>
+<p>Part 7 made the cluster feel closer to a platform. Applications started to follow the same shape: they were defined in Git, deployed through Argo CD, persisted through a common storage pattern, and backed up outside the cluster. That solved a big part of the operational story.</p>
+<p>There was still one very visible problem left. Every internal HTTPS page looked suspicious to the browser.</p>
+<p>The services were reachable through local names like:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>tools.c.home</span></span>
+<span class="line"><span>ghost.c.home</span></span>
+<span class="line"><span>argocd.c.home</span></span></code></pre>
+<p>DNS worked. Traefik worked. The applications loaded. The problem was that the browser still treated them like unsafe websites because Traefik was serving its default certificate. That default certificate is useful as a fallback, but it is not trusted by laptops, phones, or browsers.</p>
+<p>This became more than a cosmetic issue. On my laptop, the Traefik default certificate and Chrome combination meant the page would regularly fall back into a warning flow. Sometimes it felt like the page needed to be refreshed through a browser warning every few minutes. For me, that was annoying. For my kids, it was a terrible user experience. A home service should feel like it belongs on the home network, not like something everyone has to bypass with a scary warning screen.</p>
+<p>This part adds a proper internal SSL setup for the homelab. pfSense becomes the internal certificate authority, Traefik serves a wildcard certificate for the home domain, and client devices trust that CA.</p>
+<p><img src="/assets/homelab-arena/homelab-arena-valid-ssl/banner.webp" alt="Homelab Arena Part 8 - Brought to you by Scatman"></p>
+<hr>
+<h2 id="the-trust-layer">The trust layer</h2>
+<p>The core problem was trust, not routing. The browser could reach the service, but it had no reason to trust the certificate being presented by Traefik.</p>
+<p>For public websites, this is handled by public certificate authorities and services like Let’s Encrypt. For this homelab, the services live under an internal <code>.home</code> domain, so public certificate authorities are not the right fit. I do not want to expose these services publicly just to get certificates, and I do not want to click through browser warnings forever.</p>
+<p>The home network needs its own internal certificate authority. pfSense is already a central piece of the network, so it is a good place to manage that internal CA. The CA signs a wildcard certificate for <code>*.c.home</code>, Traefik serves that certificate, and each client device trusts the CA.</p>
+<p>The final flow looks like this:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Client device</span></span>
+<span class="line"><span>  trusts home-ca.crt</span></span>
+<span class="line"><span>        |</span></span>
+<span class="line"><span>        v</span></span>
+<span class="line"><span>https://tools.c.home</span></span>
+<span class="line"><span>        |</span></span>
+<span class="line"><span>        v</span></span>
+<span class="line"><span>Local DNS</span></span>
+<span class="line"><span>  tools.c.home -> Traefik IP</span></span>
+<span class="line"><span>        |</span></span>
+<span class="line"><span>        v</span></span>
+<span class="line"><span>k3s Traefik</span></span>
+<span class="line"><span>  serves *.c.home certificate</span></span>
+<span class="line"><span>        |</span></span>
+<span class="line"><span>        v</span></span>
+<span class="line"><span>Kubernetes application</span></span></code></pre>
+<p>The important distinction is that client devices trust the CA certificate, while Traefik serves a wildcard certificate signed by that CA.</p>
+<h2 id="creating-the-ca-in-pfsense">Creating the CA in pfSense</h2>
+<p>In pfSense, the certificate manager is under:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>System -> Cert Manager -> CAs</span></span></code></pre>
+<p>Create a new internal certificate authority with values like these:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Descriptive name: home-ca</span></span>
+<span class="line"><span>Method: Create an internal Certificate Authority</span></span>
+<span class="line"><span>Key type: RSA</span></span>
+<span class="line"><span>Key length: 2048 or 4096</span></span>
+<span class="line"><span>Lifetime: 3650</span></span>
+<span class="line"><span>Common Name: home-ca</span></span>
+<span class="line"><span>Trust Store: enabled</span></span>
+<span class="line"><span>Randomize Serial: enabled</span></span></code></pre>
+<p>The CA becomes the internal root of trust for the home network. I use a long lifetime because every device in the house needs to trust this CA. Rotating the CA means touching every laptop, Linux machine, and phone again, so I prefer to keep the CA stable and rotate issued certificates separately if needed.</p>
+<p>The <code>Trust Store</code> option makes pfSense trust this CA locally. <code>Randomize Serial</code> keeps issued certificate serial numbers from being predictable.</p>
+<hr>
+<h2 id="creating-the-wildcard-certificate">Creating the wildcard certificate</h2>
+<p>After creating the CA, create the certificate that Traefik will serve.</p>
+<p>Go to:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>System -> Cert Manager -> Certificates</span></span></code></pre>
+<p>Choose:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Create an internal certificate</span></span></code></pre>
+<p>Use the CA created earlier:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Certificate authority: home-ca</span></span></code></pre>
+<p>Use values like these:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Descriptive name: homelab-wildcard</span></span>
+<span class="line"><span>Type: Server Certificate</span></span>
+<span class="line"><span>Key type: RSA</span></span>
+<span class="line"><span>Key length: 2048 or 4096</span></span>
+<span class="line"><span>Lifetime: 3650</span></span>
+<span class="line"><span>Common Name: *.c.home</span></span>
+<span class="line"><span>Digest Algorithm: SHA256</span></span></code></pre>
+<p>The SAN section matters. In pfSense, the SAN type may be shown as <code>FQDN</code>. Add these entries:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>FQDN: *.c.home</span></span>
+<span class="line"><span>FQDN: c.home</span></span></code></pre>
+<p>The certificate should effectively contain:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>CN: *.c.home</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>SAN:</span></span>
+<span class="line"><span>  *.c.home</span></span>
+<span class="line"><span>  c.home</span></span></code></pre>
+<p>Modern browsers validate hostnames through SAN entries, so this section is required for a clean browser experience.</p>
+<hr>
+<h2 id="exporting-from-pfsense">Exporting from pfSense</h2>
+<p>After creating the CA and wildcard certificate, export three files from pfSense.</p>
+<p>From:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>System -> Cert Manager -> Certificates</span></span></code></pre>
+<p>export:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>homelab-wildcard.crt</span></span>
+<span class="line"><span>homelab-wildcard.key</span></span></code></pre>
+<p>From:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>System -> Cert Manager -> CAs</span></span></code></pre>
+<p>export:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>home-ca.crt</span></span></code></pre>
+<p>These files have different jobs. The CA certificate is installed on client devices. The wildcard certificate and private key are used by Traefik. The key stays outside the repository because I do not want to commit private key material to GitHub. Since the key remains local, I do not need Ansible Vault for this setup. If I ever decide to store the key in the repository, then it should be encrypted first.</p>
+<hr>
+<h2 id="creating-the-fullchain-certificate">Creating the fullchain certificate</h2>
+<p>Linux exposed one missing detail in my first attempt. I installed the CA on a Linux box, but <code>curl</code> still failed unless I used <code>-k</code>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">curl</span><span style="color:#79B8FF"> -vk</span><span style="color:#9ECBFF"> https://tools.c.home</span></span></code></pre>
+<p>The <code>-k</code> flag skips certificate verification, so it only proves the service is reachable. It does not prove the trust chain is correct.</p>
+<p>The fix was to make Traefik serve the full certificate chain. On the machine that holds the exported certificates, create a fullchain file:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#79B8FF">cd</span><span style="color:#9ECBFF"> ~/homelab-certs</span></span>
+<span class="line"><span style="color:#B392F0">cat</span><span style="color:#9ECBFF"> homelab-wildcard.crt</span><span style="color:#9ECBFF"> home-ca.crt</span><span style="color:#F97583"> ></span><span style="color:#9ECBFF"> homelab-wildcard-fullchain.crt</span></span></code></pre>
+<p>After that, Traefik should use:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>homelab-wildcard-fullchain.crt</span></span>
+<span class="line"><span>homelab-wildcard.key</span></span></code></pre>
+<p>Client devices should use:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>home-ca.crt</span></span></code></pre>
+<p>This made certificate verification much more consistent across browsers and Linux command-line tools.</p>
+<hr>
+<h2 id="installing-the-certificate-into-k3s-traefik">Installing the certificate into k3s Traefik</h2>
+<p>The Kubernetes TLS secret belongs in <code>kube-system</code>, because this certificate is used by Traefik as the default TLS certificate.</p>
+<p>The manual command looks like this:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#9ECBFF"> create</span><span style="color:#9ECBFF"> secret</span><span style="color:#9ECBFF"> tls</span><span style="color:#9ECBFF"> home-wildcard-tls</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --cert=homelab-wildcard-fullchain.crt</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --key=homelab-wildcard.key</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  -n</span><span style="color:#9ECBFF"> kube-system</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --dry-run=client</span><span style="color:#79B8FF"> -o</span><span style="color:#9ECBFF"> yaml</span><span style="color:#F97583"> |</span><span style="color:#B392F0"> kubectl</span><span style="color:#9ECBFF"> apply</span><span style="color:#79B8FF"> -f</span><span style="color:#9ECBFF"> -</span></span></code></pre>
+<p>Then create the Traefik default <code>TLSStore</code>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">cat</span><span style="color:#F97583"> &#x3C;&#x3C;</span><span style="color:#9ECBFF">'EOF'</span><span style="color:#F97583"> |</span><span style="color:#B392F0"> kubectl</span><span style="color:#9ECBFF"> apply</span><span style="color:#79B8FF"> -f</span><span style="color:#9ECBFF"> -</span></span>
+<span class="line"><span style="color:#9ECBFF">apiVersion: traefik.io/v1alpha1</span></span>
+<span class="line"><span style="color:#9ECBFF">kind: TLSStore</span></span>
+<span class="line"><span style="color:#9ECBFF">metadata:</span></span>
+<span class="line"><span style="color:#9ECBFF">  name: default</span></span>
+<span class="line"><span style="color:#9ECBFF">  namespace: kube-system</span></span>
+<span class="line"><span style="color:#9ECBFF">spec:</span></span>
+<span class="line"><span style="color:#9ECBFF">  defaultCertificate:</span></span>
+<span class="line"><span style="color:#9ECBFF">    secretName: home-wildcard-tls</span></span>
+<span class="line"><span style="color:#9ECBFF">EOF</span></span></code></pre>
+<p>Restart Traefik after applying the secret and TLS store:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#9ECBFF"> rollout</span><span style="color:#9ECBFF"> restart</span><span style="color:#9ECBFF"> deployment/traefik</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> kube-system</span></span></code></pre>
+<p>At this point, Traefik has a default certificate for HTTPS. Application namespaces do not need their own copy of the wildcard secret.</p>
+<hr>
+<h2 id="making-it-part-of-the-k3s-ansible-flow">Making it part of the k3s Ansible flow</h2>
+<p>I wanted this to be part of the cluster setup rather than a set of manual commands I would forget later.</p>
+<p>The certificate role runs after the <code>k3s_server</code> role because k3s and Traefik need to exist first. The control-plane play becomes:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#B392F0">---</span></span>
+<span class="line"><span style="color:#6A737D"># Order: control plane first so agents can join an API that exists.</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Install k3s control plane</span></span>
+<span class="line"><span style="color:#85E89D">  hosts</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">k3s_servers</span></span>
+<span class="line"><span style="color:#85E89D">  gather_facts</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span>
+<span class="line"><span style="color:#85E89D">  pre_tasks</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Require k3s_cluster_token (from Terraform or Vault)</span></span>
+<span class="line"><span style="color:#85E89D">      ansible.builtin.assert</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">        that</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">          - </span><span style="color:#9ECBFF">k3s_cluster_token is defined</span></span>
+<span class="line"><span style="color:#E1E4E8">          - </span><span style="color:#9ECBFF">(k3s_cluster_token | length) > 0</span></span>
+<span class="line"><span style="color:#85E89D">        fail_msg</span><span style="color:#E1E4E8">: </span><span style="color:#F97583">>-</span></span>
+<span class="line"><span style="color:#9ECBFF">          Define k3s_cluster_token (copy ansible/inventory/group_vars/all/secrets.yml.example to secrets.yml</span></span>
+<span class="line"><span style="color:#9ECBFF">          and set the value from: terraform output -raw k3s_cluster_token).</span></span>
+<span class="line"><span style="color:#85E89D">  roles</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">role</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">k3s_common</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">role</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">k3s_server</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">role</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">traefik_tls</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Install k3s agents</span></span>
+<span class="line"><span style="color:#85E89D">  hosts</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">k3s_agents</span></span>
+<span class="line"><span style="color:#85E89D">  gather_facts</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span>
+<span class="line"><span style="color:#85E89D">  pre_tasks</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Require k3s_cluster_token and k3s_server_url</span></span>
+<span class="line"><span style="color:#85E89D">      ansible.builtin.assert</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">        that</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">          - </span><span style="color:#9ECBFF">k3s_cluster_token is defined</span></span>
+<span class="line"><span style="color:#E1E4E8">          - </span><span style="color:#9ECBFF">(k3s_cluster_token | length) > 0</span></span>
+<span class="line"><span style="color:#E1E4E8">          - </span><span style="color:#9ECBFF">k3s_server_url is defined</span></span>
+<span class="line"><span style="color:#E1E4E8">          - </span><span style="color:#9ECBFF">(k3s_server_url | length) > 0</span></span>
+<span class="line"><span style="color:#85E89D">        fail_msg</span><span style="color:#E1E4E8">: </span><span style="color:#F97583">>-</span></span>
+<span class="line"><span style="color:#9ECBFF">          Set k3s_cluster_token (inventory/group_vars/all/secrets.yml) and k3s_server_url (inventory/group_vars/k3s_agents.yml).</span></span>
+<span class="line"><span style="color:#85E89D">  roles</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">role</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">k3s_common</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">role</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">k3s_agent</span></span></code></pre>
+<p>The role runs only on the k3s server. Worker nodes do not need to manage the Traefik TLS secret.</p>
+<hr>
+<h2 id="role-defaults">Role defaults</h2>
+<p>Create:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>roles/traefik_tls/defaults/main.yml</span></span></code></pre>
+<p>with:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#B392F0">---</span></span>
+<span class="line"><span style="color:#85E89D">traefik_tls_cert_file</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"{{ lookup('env', 'HOME') }}/homelab-certs/homelab-wildcard-fullchain.crt"</span></span>
+<span class="line"><span style="color:#85E89D">traefik_tls_key_file</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"{{ lookup('env', 'HOME') }}/homelab-certs/homelab-wildcard.key"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">traefik_tls_secret_name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">home-wildcard-tls</span></span>
+<span class="line"><span style="color:#85E89D">traefik_tls_namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">kube-system</span></span>
+<span class="line"><span style="color:#85E89D">traefik_tls_store_name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">default</span></span>
+<span class="line"><span style="color:#85E89D">traefik_tls_deployment_name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">traefik</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># K3s normally writes kubeconfig here on the server/control-plane node.</span></span>
+<span class="line"><span style="color:#85E89D">k3s_kubeconfig_path</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">/etc/rancher/k3s/k3s.yaml</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Restart Traefik after cert/secret changes so the new default cert is picked up reliably.</span></span>
+<span class="line"><span style="color:#85E89D">traefik_tls_restart_traefik</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span></code></pre>
+<p>The role reads the certificate and key from the Ansible control machine, copies them temporarily to the k3s server, creates the Kubernetes secret, applies the Traefik TLS store, and removes the temporary files.</p>
+<hr>
+<h2 id="role-tasks">Role tasks</h2>
+<p>Create:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>roles/traefik_tls/tasks/main.yml</span></span></code></pre>
+<p>with:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#B392F0">---</span></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Check local wildcard certificate file exists</span></span>
+<span class="line"><span style="color:#85E89D">  ansible.builtin.stat</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    path</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"{{ traefik_tls_cert_file }}"</span></span>
+<span class="line"><span style="color:#85E89D">  delegate_to</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">localhost</span></span>
+<span class="line"><span style="color:#85E89D">  become</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">false</span></span>
+<span class="line"><span style="color:#85E89D">  register</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">traefik_tls_cert_stat</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Check local wildcard private key file exists</span></span>
+<span class="line"><span style="color:#85E89D">  ansible.builtin.stat</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    path</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"{{ traefik_tls_key_file }}"</span></span>
+<span class="line"><span style="color:#85E89D">  delegate_to</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">localhost</span></span>
+<span class="line"><span style="color:#85E89D">  become</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">false</span></span>
+<span class="line"><span style="color:#85E89D">  register</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">traefik_tls_key_stat</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Require local wildcard cert and key files</span></span>
+<span class="line"><span style="color:#85E89D">  ansible.builtin.assert</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    that</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">traefik_tls_cert_stat.stat.exists</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#9ECBFF">traefik_tls_key_stat.stat.exists</span></span>
+<span class="line"><span style="color:#85E89D">    fail_msg</span><span style="color:#E1E4E8">: </span><span style="color:#F97583">>-</span></span>
+<span class="line"><span style="color:#9ECBFF">      Missing wildcard cert/key files. Export them from pfSense and place them at</span></span>
+<span class="line"><span style="color:#9ECBFF">      traefik_tls_cert_file={{ traefik_tls_cert_file }} and</span></span>
+<span class="line"><span style="color:#9ECBFF">      traefik_tls_key_file={{ traefik_tls_key_file }}, or override these variables.</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Create temporary Traefik TLS directory on server</span></span>
+<span class="line"><span style="color:#85E89D">  ansible.builtin.file</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    path</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">/tmp/traefik-tls</span></span>
+<span class="line"><span style="color:#85E89D">    state</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">directory</span></span>
+<span class="line"><span style="color:#85E89D">    mode</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"0700"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Copy wildcard certificate to server</span></span>
+<span class="line"><span style="color:#85E89D">  ansible.builtin.copy</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    src</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"{{ traefik_tls_cert_file }}"</span></span>
+<span class="line"><span style="color:#85E89D">    dest</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">/tmp/traefik-tls/tls.crt</span></span>
+<span class="line"><span style="color:#85E89D">    mode</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"0600"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Copy wildcard private key to server</span></span>
+<span class="line"><span style="color:#85E89D">  ansible.builtin.copy</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    src</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"{{ traefik_tls_key_file }}"</span></span>
+<span class="line"><span style="color:#85E89D">    dest</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">/tmp/traefik-tls/tls.key</span></span>
+<span class="line"><span style="color:#85E89D">    mode</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"0600"</span></span>
+<span class="line"><span style="color:#85E89D">  no_log</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Create or update Traefik wildcard TLS secret</span></span>
+<span class="line"><span style="color:#85E89D">  ansible.builtin.shell</span><span style="color:#E1E4E8">: </span><span style="color:#F97583">|</span></span>
+<span class="line"><span style="color:#9ECBFF">    set -euo pipefail</span></span>
+<span class="line"><span style="color:#9ECBFF">    kubectl --kubeconfig {{ k3s_kubeconfig_path }} \</span></span>
+<span class="line"><span style="color:#9ECBFF">      create secret tls {{ traefik_tls_secret_name }} \</span></span>
+<span class="line"><span style="color:#9ECBFF">      --cert=/tmp/traefik-tls/tls.crt \</span></span>
+<span class="line"><span style="color:#9ECBFF">      --key=/tmp/traefik-tls/tls.key \</span></span>
+<span class="line"><span style="color:#9ECBFF">      -n {{ traefik_tls_namespace }} \</span></span>
+<span class="line"><span style="color:#9ECBFF">      --dry-run=client -o yaml | \</span></span>
+<span class="line"><span style="color:#9ECBFF">    kubectl --kubeconfig {{ k3s_kubeconfig_path }} apply -f -</span></span>
+<span class="line"><span style="color:#85E89D">  args</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    executable</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">/bin/bash</span></span>
+<span class="line"><span style="color:#85E89D">  no_log</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span>
+<span class="line"><span style="color:#85E89D">  register</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">traefik_tls_secret_result</span></span>
+<span class="line"><span style="color:#85E89D">  changed_when</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"'configured' in traefik_tls_secret_result.stdout or 'created' in traefik_tls_secret_result.stdout"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Configure Traefik default TLSStore</span></span>
+<span class="line"><span style="color:#85E89D">  ansible.builtin.shell</span><span style="color:#E1E4E8">: </span><span style="color:#F97583">|</span></span>
+<span class="line"><span style="color:#9ECBFF">    set -euo pipefail</span></span>
+<span class="line"><span style="color:#9ECBFF">    cat &#x3C;&#x3C;EOF | kubectl --kubeconfig {{ k3s_kubeconfig_path }} apply -f -</span></span>
+<span class="line"><span style="color:#9ECBFF">    apiVersion: traefik.io/v1alpha1</span></span>
+<span class="line"><span style="color:#9ECBFF">    kind: TLSStore</span></span>
+<span class="line"><span style="color:#9ECBFF">    metadata:</span></span>
+<span class="line"><span style="color:#9ECBFF">      name: {{ traefik_tls_store_name }}</span></span>
+<span class="line"><span style="color:#9ECBFF">      namespace: {{ traefik_tls_namespace }}</span></span>
+<span class="line"><span style="color:#9ECBFF">    spec:</span></span>
+<span class="line"><span style="color:#9ECBFF">      defaultCertificate:</span></span>
+<span class="line"><span style="color:#9ECBFF">        secretName: {{ traefik_tls_secret_name }}</span></span>
+<span class="line"><span style="color:#9ECBFF">    EOF</span></span>
+<span class="line"><span style="color:#85E89D">  args</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    executable</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">/bin/bash</span></span>
+<span class="line"><span style="color:#85E89D">  register</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">traefik_tls_store_result</span></span>
+<span class="line"><span style="color:#85E89D">  changed_when</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"'configured' in traefik_tls_store_result.stdout or 'created' in traefik_tls_store_result.stdout"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Restart Traefik when TLS resources changed</span></span>
+<span class="line"><span style="color:#85E89D">  ansible.builtin.command</span><span style="color:#E1E4E8">: </span><span style="color:#F97583">></span></span>
+<span class="line"><span style="color:#9ECBFF">    kubectl --kubeconfig {{ k3s_kubeconfig_path }}</span></span>
+<span class="line"><span style="color:#9ECBFF">    rollout restart deployment/{{ traefik_tls_deployment_name }}</span></span>
+<span class="line"><span style="color:#9ECBFF">    -n {{ traefik_tls_namespace }}</span></span>
+<span class="line"><span style="color:#85E89D">  when</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#9ECBFF">traefik_tls_restart_traefik | bool</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#9ECBFF">traefik_tls_secret_result.changed or traefik_tls_store_result.changed</span></span>
+<span class="line"><span style="color:#85E89D">  changed_when</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">- </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Remove temporary Traefik TLS files from server</span></span>
+<span class="line"><span style="color:#85E89D">  ansible.builtin.file</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    path</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">/tmp/traefik-tls</span></span>
+<span class="line"><span style="color:#85E89D">    state</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">absent</span></span></code></pre>
+<p>Run the normal playbook:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">ansible-playbook</span><span style="color:#79B8FF"> -i</span><span style="color:#9ECBFF"> inventory/hosts.yml</span><span style="color:#9ECBFF"> playbooks/site.yml</span></span></code></pre>
+<p>This keeps the Traefik certificate setup tied to cluster bootstrap instead of leaving it as a manual afterthought.</p>
+<hr>
+<h2 id="checking-the-fullchain">Checking the fullchain</h2>
+<p>The secret should contain two certificates: the wildcard certificate and the CA certificate.</p>
+<p>Check it with:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#9ECBFF"> get</span><span style="color:#9ECBFF"> secret</span><span style="color:#9ECBFF"> home-wildcard-tls</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> kube-system</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  -o</span><span style="color:#9ECBFF"> jsonpath='{.data.tls\.crt}'</span><span style="color:#F97583"> |</span><span style="color:#B392F0"> base64</span><span style="color:#79B8FF"> -d</span><span style="color:#F97583"> |</span><span style="color:#B392F0"> grep</span><span style="color:#9ECBFF"> "BEGIN CERTIFICATE"</span><span style="color:#79B8FF"> -c</span></span></code></pre>
+<p>Expected output:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>2</span></span></code></pre>
+<p>If the output is <code>1</code>, the secret only contains the leaf certificate. Some clients may still accept that, but Linux verification can fail. The fullchain keeps behavior consistent.</p>
+<hr>
+<h2 id="enabling-tls-for-applications">Enabling TLS for applications</h2>
+<p>Applications do not need to manage certificates. The Deployment stays the same, the Service stays the same, and the Ingress only needs TLS enabled for the hostname.</p>
+<p>A typical Ingress looks like this:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  ingressClassName</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">traefik</span></span>
+<span class="line"><span style="color:#85E89D">  tls</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">hosts</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">        - </span><span style="color:#9ECBFF">tools.c.home</span></span>
+<span class="line"><span style="color:#85E89D">  rules</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">host</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">tools.c.home</span></span></code></pre>
+<p>There is no <code>secretName</code> in the application Ingress. Traefik uses the default TLSStore certificate, which is the pfSense-signed wildcard certificate created earlier.</p>
+<p>The app asks for HTTPS, and Traefik serves the default certificate.</p>
+<hr>
+<h2 id="trusting-the-ca-on-macos">Trusting the CA on macOS</h2>
+<p>On macOS, install the CA certificate:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>home-ca.crt</span></span></code></pre>
+<p>Use this command:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">sudo</span><span style="color:#9ECBFF"> security</span><span style="color:#9ECBFF"> add-trusted-cert</span><span style="color:#79B8FF"> -d</span><span style="color:#79B8FF"> -r</span><span style="color:#9ECBFF"> trustRoot</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  -k</span><span style="color:#9ECBFF"> /Library/Keychains/System.keychain</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#9ECBFF">  ~/Downloads/home-ca.crt</span></span></code></pre>
+<p>It can also be done through Keychain Access:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Applications -> Utilities -> Keychain Access</span></span></code></pre>
+<p>Then select:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>System keychain</span></span>
+<span class="line"><span>Certificates</span></span>
+<span class="line"><span>home-ca</span></span>
+<span class="line"><span>Trust</span></span>
+<span class="line"><span>When using this certificate: Always Trust</span></span></code></pre>
+<p>This step was easy to miss. The certificate can be installed while still showing:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>This certificate is marked as not trusted for all users</span></span></code></pre>
+<p>After setting the CA to <code>Always Trust</code>, Safari stopped warning. Chrome worked after that too.</p>
+<hr>
+<h2 id="trusting-the-ca-on-linux">Trusting the CA on Linux</h2>
+<p>For Debian, Ubuntu, and Linux Lite, copy the CA certificate into the system certificate directory:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">sudo</span><span style="color:#9ECBFF"> cp</span><span style="color:#9ECBFF"> home-ca.crt</span><span style="color:#9ECBFF"> /usr/local/share/ca-certificates/home-ca.crt</span></span>
+<span class="line"><span style="color:#B392F0">sudo</span><span style="color:#9ECBFF"> update-ca-certificates</span></span></code></pre>
+<p>The command should report something like:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>1 added, 0 removed</span></span></code></pre>
+<p>Then test with:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">curl</span><span style="color:#79B8FF"> -v</span><span style="color:#9ECBFF"> https://tools.c.home</span></span></code></pre>
+<p>The <code>-k</code> flag should only be used for debugging:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">curl</span><span style="color:#79B8FF"> -vk</span><span style="color:#9ECBFF"> https://tools.c.home</span></span></code></pre>
+<p>If <code>curl -vk</code> works and <code>curl -v</code> fails, the service is reachable but trust verification is still incomplete. The usual causes are a missing CA on the client or Traefik serving only the leaf certificate instead of the fullchain.</p>
+<hr>
+<h2 id="browser-trust-stores-on-linux">Browser trust stores on Linux</h2>
+<p>Linux has one extra wrinkle: system tools and browsers may not use the same trust store. The system CA store is enough for tools like <code>curl</code>, but some browsers and applications also use NSS certificate databases such as <code>cert8.db</code> and <code>cert9.db</code>.</p>
+<p>For that part, I used a script based on Thomas Leister’s guide:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>https://thomas-leister.de/en/how-to-import-ca-root-certificate/</span></span></code></pre>
+<p>Install <code>certutil</code> first:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">sudo</span><span style="color:#9ECBFF"> apt</span><span style="color:#9ECBFF"> update</span></span>
+<span class="line"><span style="color:#B392F0">sudo</span><span style="color:#9ECBFF"> apt</span><span style="color:#9ECBFF"> install</span><span style="color:#79B8FF"> -y</span><span style="color:#9ECBFF"> libnss3-tools</span></span></code></pre>
+<p>Then create the helper script:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">cat</span><span style="color:#F97583"> ></span><span style="color:#9ECBFF"> install-home-ca-nss.sh</span><span style="color:#F97583"> &#x3C;&#x3C;</span><span style="color:#9ECBFF">'EOF'</span></span>
+<span class="line"><span style="color:#9ECBFF">#!/usr/bin/env bash</span></span>
+<span class="line"><span style="color:#9ECBFF">set -euo pipefail</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF">certfile="${1:-home-ca.crt}"</span></span>
+<span class="line"><span style="color:#9ECBFF">certname="${2:-Home CA}"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF">if [ ! -f "$certfile" ]; then</span></span>
+<span class="line"><span style="color:#9ECBFF">  echo "Missing cert file: $certfile"</span></span>
+<span class="line"><span style="color:#9ECBFF">  exit 1</span></span>
+<span class="line"><span style="color:#9ECBFF">fi</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF"># Firefox/Chrome legacy DBM profiles</span></span>
+<span class="line"><span style="color:#9ECBFF">find "$HOME" -name "cert8.db" -print0 | while IFS= read -r -d '' certDB; do</span></span>
+<span class="line"><span style="color:#9ECBFF">  certdir="$(dirname "$certDB")"</span></span>
+<span class="line"><span style="color:#9ECBFF">  echo "Installing into DBM: $certdir"</span></span>
+<span class="line"><span style="color:#9ECBFF">  certutil -A -n "$certname" -t "TCu,Cu,Tu" -i "$certfile" -d "dbm:$certdir" || true</span></span>
+<span class="line"><span style="color:#9ECBFF">done</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF"># Firefox/Chrome SQL profiles</span></span>
+<span class="line"><span style="color:#9ECBFF">find "$HOME" -name "cert9.db" -print0 | while IFS= read -r -d '' certDB; do</span></span>
+<span class="line"><span style="color:#9ECBFF">  certdir="$(dirname "$certDB")"</span></span>
+<span class="line"><span style="color:#9ECBFF">  echo "Installing into SQL: $certdir"</span></span>
+<span class="line"><span style="color:#9ECBFF">  certutil -D -n "$certname" -d "sql:$certdir" 2>/dev/null || true</span></span>
+<span class="line"><span style="color:#9ECBFF">  certutil -A -n "$certname" -t "TCu,Cu,Tu" -i "$certfile" -d "sql:$certdir"</span></span>
+<span class="line"><span style="color:#9ECBFF">done</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF">echo "Done. Restart browsers."</span></span>
+<span class="line"><span style="color:#9ECBFF">EOF</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">chmod</span><span style="color:#9ECBFF"> +x</span><span style="color:#9ECBFF"> install-home-ca-nss.sh</span></span></code></pre>
+<p>Run it with the CA certificate:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">./install-home-ca-nss.sh</span><span style="color:#9ECBFF"> /path/to/home-ca.crt</span><span style="color:#9ECBFF"> "Home CA"</span></span></code></pre>
+<p>After that, restart the browsers so they reload their trust stores.</p>
+<hr>
+<h2 id="trusting-the-ca-on-android">Trusting the CA on Android</h2>
+<p>This setup also works well on Android because Chrome and Brave use the Android system credential store.</p>
+<p>First, transfer the CA certificate to the phone:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>home-ca.crt</span></span></code></pre>
+<p>On Android, open:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Settings</span></span>
+<span class="line"><span>  -> Security &#x26; privacy</span></span>
+<span class="line"><span>  -> More security settings</span></span>
+<span class="line"><span>  -> Encryption &#x26; credentials</span></span></code></pre>
+<p>Choose the option to install a certificate, then select the CA certificate file. Android may show a strong warning because installing a CA means the device will trust certificates signed by that authority. That warning is expected. In this case, the CA is the one created in pfSense for the home network.</p>
+<p>After installing the CA, Brave and Chrome can open internal services like:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>https://tools.c.home</span></span>
+<span class="line"><span>https://argocd.c.home</span></span></code></pre>
+<p>without showing the certificate warning.</p>
+<p>This was a nice checkpoint because the setup was no longer just something that worked on my laptop. The phone trusted it too, which made the homelab feel much more natural to use around the house.</p>
+<hr>
+<h2 id="what-this-changes">What this changes</h2>
+<p>This is one of those changes that does not look dramatic in Kubernetes, but changes how the whole homelab feels to use. The applications were already there before this part. The DNS names already worked. Traefik was already routing traffic. The difference is that the browser no longer treats every internal service like a suspicious website.</p>
+<p>That matters more than I expected. When a dashboard opens without a warning, it feels like it belongs on the network. When my kids open a page and do not have to ask why Chrome is showing a scary message, the service feels like part of the house instead of one of my experiments.</p>
+<p>The setup is still simple from the application side. Apps only need a hostname and TLS enabled on their Ingress. Traefik handles the certificate at the edge, and the devices in the house trust the pfSense CA. Once that trust is in place, the same pattern works across macOS, Linux, Android, Safari, Chrome, and Brave.</p>
+<p>Part 7 made application deployment repeatable. This part makes those applications feel trusted enough for everyday use.</p> </div> <nav class="blog-post-navigation"> <a href="/homelab-arena/homelab-arena-presistance-appset" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">Part 7: From Cluster to Platform — ApplicationSet, Storage, and Backups</div> </a>  </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Posts</h2> <div class="related-posts-grid"> <a href="/homelab-arena/homelab-arena-presistance-appset" class="blog-card card-link"> <img src="/assets/homelab-arena/homelab-arena-persistance-appset/banner.webp" alt="Part 7: From Cluster to Platform — ApplicationSet, Storage, and Backups" class="blog-card-image"> <h3 class="blog-card-title">Part 7: From Cluster to Platform — ApplicationSet, Storage, and Backups</h3> <p class="blog-card-description"> Turning a k3s cluster into a repeatable application platform using Argo CD ApplicationSet, shared Helm charts, NFS persistence, and host-level backups. </p> </a><a href="/homelab-arena/homelab-arena-argocd" class="blog-card card-link"> <img src="/assets/homelab-arena/homelab-arena-argocd/banner.webp" alt="Part 6: Handing the Cluster Over to Argo CD" class="blog-card-image"> <h3 class="blog-card-title">Part 6: Handing the Cluster Over to Argo CD</h3> <p class="blog-card-description"> Moving from a working k3s cluster to a self-managed platform by introducing Argo CD, wildcard DNS, and the first GitOps workflow. </p> </a><a href="/homelab-arena/homelab-arena-terraform-ansible" class="blog-card card-link"> <img src="/assets/homelab-arena/homelab-arena-terraform-ansible/banner.webp" alt="Part 5: Terraform, Ansible, and k3s on Proxmox" class="blog-card-image"> <h3 class="blog-card-title">Part 5: Terraform, Ansible, and k3s on Proxmox</h3> <p class="blog-card-description"> Turning the Ubuntu template into real VMs and a joined k3s cluster: shared token, static IPs, DNS aligned with the Pi-hole/pfSense LAN from Part 3, and Ansible installing the control plane before the workers. </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container text-primary"> <p>© 2026 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer>  </body></html>
