@@ -1,0 +1,117 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="I wanted to move files to Android without installing a random file manager app, so I started using ADB from my Linux terminal instead."><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v5.17.2"><link rel="canonical" href="https://januschung.github.io/blog/adb-android/"><title>Using ADB as My Android File Manager from Linux - Janus</title><link rel="stylesheet" href="/_astro/about.CdqPxALF.css">
+<link rel="stylesheet" href="/_astro/index.BFrYoEHc.css"></head> <body class="min-h-screen flex flex-col"> <span data-pagefind-filter="locale:en" class="hidden" aria-hidden="true"></span> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/homelab-arena">Homelab Arena</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul>  <div class="mobile-controls"> <button class="search-icon-button" aria-label="Toggle search" id="search-toggle"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"> <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round"></path> </svg> </button> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> </div> <div class="header-search" id="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false,&#34;translations&#34;:{&#34;placeholder&#34;:&#34;Search…&#34;}}"></div> <script type="module" src="/_astro/Search.astro_astro_type_script_index_0_lang.tZYucdM2.js"></script> </div>  </div> </nav> </header> <script type="module">(function(){const n=document.getElementById("mobile-menu-toggle"),s=document.getElementById("nav-links"),c=document.querySelector("header"),a=document.getElementById("search-toggle"),e=document.getElementById("header-search");n&&s&&(n.addEventListener("click",()=>{const t=s.classList.toggle("nav-open");n.classList.toggle("active"),c.classList.toggle("menu-open"),t?document.body.style.overflow="hidden":document.body.style.overflow="",e&&e.classList.remove("search-open")}),s.querySelectorAll("a").forEach(t=>{t.addEventListener("click",()=>{s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow=""})}),document.addEventListener("click",t=>{!c.contains(t.target)&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow="")})),a&&e&&(a.addEventListener("click",o=>{o.stopPropagation(),e.classList.toggle("search-open"),s&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n&&n.classList.remove("active"),c&&c.classList.remove("menu-open")),e.classList.contains("search-open")&&setTimeout(()=>{const t=e.querySelector('input[type="search"]');t&&(t.focus(),t.dispatchEvent(new Event("input",{bubbles:!0})));const i=e.querySelector(".pagefind-ui__results-area");i&&(i.style.display="block")},150)}),document.addEventListener("click",o=>{e&&!e.contains(o.target)&&!a.contains(o.target)&&e.classList.contains("search-open")&&e.classList.remove("search-open")}),document.addEventListener("keydown",o=>{o.key==="Escape"&&e&&e.classList.contains("search-open")&&e.classList.remove("search-open")}))})();</script> <main class="flex-1" data-locale-prefix>  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">Using ADB as My Android File Manager from Linux</h1> <div class="blog-post-meta"> <time>May 21, 2026</time> <span class="blog-post-meta-separator">•</span> <span>4 min read</span>  </div> <div class="pill-group pill-group--top"> <span class="pill">android</span><span class="pill">adb</span><span class="pill">linux</span> </div> </header> <div class="blog-post-content prose"> <h1 id="move-files-to-android-from-linux-with-adb">Move Files to Android from Linux with ADB</h1>
+<p>I recently needed to move a few files onto an Android device.</p>
+<p>Normally, this should be boring. Copy file, paste file, done.</p>
+<p>But on Android, especially on TV boxes or devices without a great built-in file manager, it quickly turns into one of those tiny annoying tasks. Install some random file explorer. Give it storage permissions. Hope it does not show ads. Maybe use Google Drive. Maybe send the file to myself. Maybe plug the device into a computer and deal with whatever file transfer mode Android feels like exposing today.</p>
+<p>I did not want any of that.</p>
+<p><img src="/assets/blog/adb-android/banner.webp" alt="Andriod the Bot is using Android ADB"></p>
+<p>Then I found out that there was a way to do this with ADB.</p>
+<p>ADB, or Android Debug Bridge, is usually introduced as a developer tool. But for this use case, I do not care about Android development at all. I just want a clean way to move files from my Linux terminal to an Android device.</p>
+<p>Once ADB is enabled, Android storage starts to feel like a remote machine. I can list folders, push files, pull files back, create directories, delete files, and even install APKs — all without installing another file manager app.</p>
+<p>The Android setting may be called <strong>USB debugging</strong> or <strong>Wireless debugging</strong>, depending on the device. I will call it <strong>USB/Wireless debugging</strong> here. The name is not the important part. The important part is enabling ADB access.</p>
+<p>After that, the workflow is simple:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">adb</span><span style="color:#9ECBFF"> connect</span><span style="color:#9ECBFF"> 192.168.1.50:5555</span></span>
+<span class="line"><span style="color:#B392F0">adb</span><span style="color:#9ECBFF"> push</span><span style="color:#9ECBFF"> ~/Downloads/book.epub</span><span style="color:#9ECBFF"> /sdcard/Download/ebooks/</span></span>
+<span class="line"><span style="color:#B392F0">adb</span><span style="color:#9ECBFF"> shell</span><span style="color:#9ECBFF"> ls</span><span style="color:#79B8FF"> -la</span><span style="color:#9ECBFF"> /sdcard/Download/ebooks/</span></span></code></pre>
+<p>That is the whole reason I like this approach. No extra Android app. No cloud upload. No GUI file transfer. Just a terminal and a few commands.</p>
+<h2 id="basic-setup">Basic setup</h2>
+<p>Enable Developer Options on Android:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Settings → About device → Build number → tap 7 times</span></span></code></pre>
+<p>Then enable USB/Wireless debugging:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Settings → Developer options → USB/Wireless debugging</span></span></code></pre>
+<p>Install ADB on Linux:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#6A737D"># Ubuntu / Debian</span></span>
+<span class="line"><span style="color:#B392F0">sudo</span><span style="color:#9ECBFF"> apt</span><span style="color:#9ECBFF"> install</span><span style="color:#9ECBFF"> adb</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Fedora</span></span>
+<span class="line"><span style="color:#B392F0">sudo</span><span style="color:#9ECBFF"> dnf</span><span style="color:#9ECBFF"> install</span><span style="color:#9ECBFF"> android-tools</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Arch Linux</span></span>
+<span class="line"><span style="color:#B392F0">sudo</span><span style="color:#9ECBFF"> pacman</span><span style="color:#79B8FF"> -S</span><span style="color:#9ECBFF"> android-tools</span></span></code></pre>
+<h2 id="common-adb-file-commands">Common ADB file commands</h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#6A737D"># Connect to an Android device over the network.</span></span>
+<span class="line"><span style="color:#6A737D"># Replace the IP address with your device IP.</span></span>
+<span class="line"><span style="color:#B392F0">adb</span><span style="color:#9ECBFF"> connect</span><span style="color:#9ECBFF"> 192.168.1.50:5555</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Disconnect from all connected ADB devices.</span></span>
+<span class="line"><span style="color:#B392F0">adb</span><span style="color:#9ECBFF"> disconnect</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Disconnect from one specific Android device.</span></span>
+<span class="line"><span style="color:#B392F0">adb</span><span style="color:#9ECBFF"> disconnect</span><span style="color:#9ECBFF"> 192.168.1.50:5555</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Open an interactive shell on the Android device.</span></span>
+<span class="line"><span style="color:#B392F0">adb</span><span style="color:#9ECBFF"> shell</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># List files in Android shared storage.</span></span>
+<span class="line"><span style="color:#B392F0">adb</span><span style="color:#9ECBFF"> shell</span><span style="color:#9ECBFF"> ls</span><span style="color:#9ECBFF"> /sdcard/</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Copy a local file to Android Documents.</span></span>
+<span class="line"><span style="color:#B392F0">adb</span><span style="color:#9ECBFF"> push</span><span style="color:#9ECBFF"> notes.txt</span><span style="color:#9ECBFF"> /sdcard/Documents/</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Copy one file from Android to the current Linux directory.</span></span>
+<span class="line"><span style="color:#B392F0">adb</span><span style="color:#9ECBFF"> pull</span><span style="color:#9ECBFF"> /sdcard/Download/example.pdf</span><span style="color:#9ECBFF"> .</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Create a folder on Android.</span></span>
+<span class="line"><span style="color:#B392F0">adb</span><span style="color:#9ECBFF"> shell</span><span style="color:#9ECBFF"> mkdir</span><span style="color:#9ECBFF"> /sdcard/Download/ebooks</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Create a nested folder on Android.</span></span>
+<span class="line"><span style="color:#B392F0">adb</span><span style="color:#9ECBFF"> shell</span><span style="color:#9ECBFF"> mkdir</span><span style="color:#79B8FF"> -p</span><span style="color:#9ECBFF"> /sdcard/Download/ebooks/fiction</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Delete one file from Android.</span></span>
+<span class="line"><span style="color:#B392F0">adb</span><span style="color:#9ECBFF"> shell</span><span style="color:#9ECBFF"> rm</span><span style="color:#9ECBFF"> /sdcard/Download/example.pdf</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Delete a folder and everything inside it.</span></span>
+<span class="line"><span style="color:#6A737D"># Be careful. This does not move files to a trash bin.</span></span>
+<span class="line"><span style="color:#B392F0">adb</span><span style="color:#9ECBFF"> shell</span><span style="color:#9ECBFF"> rm</span><span style="color:#79B8FF"> -r</span><span style="color:#9ECBFF"> /sdcard/Download/my-folder</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Show file size and disk usage for a folder.</span></span>
+<span class="line"><span style="color:#B392F0">adb</span><span style="color:#9ECBFF"> shell</span><span style="color:#9ECBFF"> du</span><span style="color:#79B8FF"> -h</span><span style="color:#9ECBFF"> /sdcard/Download/</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Show available disk space.</span></span>
+<span class="line"><span style="color:#B392F0">adb</span><span style="color:#9ECBFF"> shell</span><span style="color:#9ECBFF"> df</span><span style="color:#79B8FF"> -h</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Install an APK from Linux to Android.</span></span>
+<span class="line"><span style="color:#6A737D"># Only install APKs you trust.</span></span>
+<span class="line"><span style="color:#B392F0">adb</span><span style="color:#9ECBFF"> install</span><span style="color:#9ECBFF"> app.apk</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Reinstall or update an APK while keeping app data.</span></span>
+<span class="line"><span style="color:#B392F0">adb</span><span style="color:#9ECBFF"> install</span><span style="color:#79B8FF"> -r</span><span style="color:#9ECBFF"> app.apk</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># List installed packages.</span></span>
+<span class="line"><span style="color:#B392F0">adb</span><span style="color:#9ECBFF"> shell</span><span style="color:#9ECBFF"> pm</span><span style="color:#9ECBFF"> list</span><span style="color:#9ECBFF"> packages</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Search installed packages by keyword.</span></span>
+<span class="line"><span style="color:#B392F0">adb</span><span style="color:#9ECBFF"> shell</span><span style="color:#9ECBFF"> pm</span><span style="color:#9ECBFF"> list</span><span style="color:#9ECBFF"> packages</span><span style="color:#F97583"> |</span><span style="color:#B392F0"> grep</span><span style="color:#9ECBFF"> firefox</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Uninstall an app by package name.</span></span>
+<span class="line"><span style="color:#6A737D"># Example package name only.</span></span>
+<span class="line"><span style="color:#B392F0">adb</span><span style="color:#9ECBFF"> uninstall</span><span style="color:#9ECBFF"> org.mozilla.firefox</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Restart the ADB server on Linux.</span></span>
+<span class="line"><span style="color:#B392F0">adb</span><span style="color:#9ECBFF"> kill-server</span></span>
+<span class="line"><span style="color:#B392F0">adb</span><span style="color:#9ECBFF"> start-server</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Reboot the Android device.</span></span>
+<span class="line"><span style="color:#B392F0">adb</span><span style="color:#9ECBFF"> reboot</span></span></code></pre>
+<h2 id="my-usual-workflow">My usual workflow</h2>
+<p>Most of the time, I only need this:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#6A737D"># Connect to the Android device.</span></span>
+<span class="line"><span style="color:#B392F0">adb</span><span style="color:#9ECBFF"> connect</span><span style="color:#9ECBFF"> 192.168.1.50:5555</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Check that ADB sees it.</span></span>
+<span class="line"><span style="color:#B392F0">adb</span><span style="color:#9ECBFF"> devices</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Create a folder.</span></span>
+<span class="line"><span style="color:#B392F0">adb</span><span style="color:#9ECBFF"> shell</span><span style="color:#9ECBFF"> mkdir</span><span style="color:#79B8FF"> -p</span><span style="color:#9ECBFF"> /sdcard/Download/ebooks</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Copy a file to Android.</span></span>
+<span class="line"><span style="color:#B392F0">adb</span><span style="color:#9ECBFF"> push</span><span style="color:#9ECBFF"> ~/Downloads/book.epub</span><span style="color:#9ECBFF"> /sdcard/Download/ebooks/</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Confirm the file exists.</span></span>
+<span class="line"><span style="color:#B392F0">adb</span><span style="color:#9ECBFF"> shell</span><span style="color:#9ECBFF"> ls</span><span style="color:#79B8FF"> -la</span><span style="color:#9ECBFF"> /sdcard/Download/ebooks/</span></span></code></pre>
+<h2 id="final-thoughts">Final thoughts</h2>
+<p>ADB is usually treated as something only Android developers need, but I think it is underrated as a normal file transfer tool.</p>
+<p>For me, the win is not that ADB is fancy. It is the opposite. It is boring in the best way.</p>
+<p>I do not need to install a random file manager. I do not need to upload private files to a cloud drive just to download them again. I do not need to fight with a TV remote to move files around.</p>
+<p>I can stay on my Linux machine, run a few commands, and put the file exactly where I want it.</p>
+<p>That is enough.</p> </div> <nav class="blog-post-navigation"> <a href="/blog/gke-tailsacle" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">GKE - Part 5: Private Platform Access with the Tailscale Kubernetes Operator</div> </a>  </nav>  </div> </article>  </main> <footer class="footer"> <div class="container text-primary"> <p>© 2026 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer>  </body></html>
