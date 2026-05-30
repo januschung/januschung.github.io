@@ -1,0 +1,169 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Self-hosting a Tailscale-style coordination server with Headscale on my K3s cluster"><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v5.17.2"><link rel="canonical" href="https://januschung.github.io/devops-odyssey/oci-k3s-headscale/"><title>The DevOps Odyssey, Part 10: From Tailscale Curiosity to a Self-Hosted Headscale Network - Janus</title><link rel="stylesheet" href="/_astro/about.CdqPxALF.css">
+<link rel="stylesheet" href="/_astro/index.BFrYoEHc.css"></head> <body class="min-h-screen flex flex-col"> <span data-pagefind-filter="locale:en" class="hidden" aria-hidden="true"></span> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/homelab-arena">Homelab Arena</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul>  <div class="mobile-controls"> <button class="search-icon-button" aria-label="Toggle search" id="search-toggle"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"> <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round"></path> </svg> </button> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> </div> <div class="header-search" id="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false,&#34;translations&#34;:{&#34;placeholder&#34;:&#34;Search…&#34;}}"></div> <script type="module" src="/_astro/Search.astro_astro_type_script_index_0_lang.tZYucdM2.js"></script> </div>  </div> </nav> </header> <script type="module">(function(){const n=document.getElementById("mobile-menu-toggle"),s=document.getElementById("nav-links"),c=document.querySelector("header"),a=document.getElementById("search-toggle"),e=document.getElementById("header-search");n&&s&&(n.addEventListener("click",()=>{const t=s.classList.toggle("nav-open");n.classList.toggle("active"),c.classList.toggle("menu-open"),t?document.body.style.overflow="hidden":document.body.style.overflow="",e&&e.classList.remove("search-open")}),s.querySelectorAll("a").forEach(t=>{t.addEventListener("click",()=>{s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow=""})}),document.addEventListener("click",t=>{!c.contains(t.target)&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow="")})),a&&e&&(a.addEventListener("click",o=>{o.stopPropagation(),e.classList.toggle("search-open"),s&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n&&n.classList.remove("active"),c&&c.classList.remove("menu-open")),e.classList.contains("search-open")&&setTimeout(()=>{const t=e.querySelector('input[type="search"]');t&&(t.focus(),t.dispatchEvent(new Event("input",{bubbles:!0})));const i=e.querySelector(".pagefind-ui__results-area");i&&(i.style.display="block")},150)}),document.addEventListener("click",o=>{e&&!e.contains(o.target)&&!a.contains(o.target)&&e.classList.contains("search-open")&&e.classList.remove("search-open")}),document.addEventListener("keydown",o=>{o.key==="Escape"&&e&&e.classList.contains("search-open")&&e.classList.remove("search-open")}))})();</script> <main class="flex-1" data-locale-prefix>  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">The DevOps Odyssey, Part 10: From Tailscale Curiosity to a Self-Hosted Headscale Network</h1> <div class="blog-post-meta"> <time>May 28, 2026</time> <span class="blog-post-meta-separator">•</span> <span>9 min read</span>  </div> <div class="pill-group pill-group--top"> <span class="pill">headscale</span><span class="pill">tailscale</span><span class="pill">vpn</span><span class="pill">networking</span> </div> </header> <div class="blog-post-content prose"> <h1 id="the-devops-odyssey-part-10-from-tailscale-curiosity-to-a-self-hosted-headscale-network">The DevOps Odyssey, Part 10: From Tailscale Curiosity to a Self-Hosted Headscale Network</h1>
+<p>I have always liked the idea behind Tailscale.</p>
+<p>Private networking sounds simple until you actually need to run it. VPNs, firewall rules, DNS, split tunnels, routes, certificates, mobile clients, and access control can quickly turn into a project of their own.</p>
+<p>Tailscale makes that world feel much more approachable.</p>
+<p>Install a client. Log in. Devices find each other. Traffic goes over WireGuard. Suddenly, you have a private mesh network without spending a weekend rebuilding your entire mental model of VPN infrastructure.</p>
+<p>That simplicity is powerful.</p>
+<p>But as usual, curiosity got me.</p>
+<p>At some point, I found <a href="https://github.com/juanfont/headscale">Headscale</a>, an open-source, self-hosted implementation of the Tailscale coordination server. What made it more interesting was that Tailscale itself mentions Headscale on its <a href="https://tailscale.com/opensource#encouraging-headscale">open-source page</a>.</p>
+<p>Tailscale describes Headscale as an open-source alternative to the Tailscale coordination server. It is developed independently, but Tailscale also notes that it works with Headscale maintainers when client changes may affect compatibility.</p>
+<p>That made the project feel worth exploring.</p>
+<p>I was not looking for a “replace Tailscale tomorrow” project. I was more interested in a simpler question:</p>
+<blockquote>
+<p>What does it feel like to self-host the control-plane side of a Tailscale-style network?</p>
+</blockquote>
+<p>So I tried it.</p>
+<!-- more -->
+<p><img src="/assets/devops-odyssey/oci-k3s-headscale/banner.webp" alt="A self-hosted coordination server becomes the next experiment."></p>
+<h2 id="why-i-was-curious">Why I Was Curious</h2>
+<p>Headscale immediately appealed to the homelab part of my brain.</p>
+<p>Tailscale’s model is elegant because the data plane is peer-to-peer where possible. Devices communicate over encrypted WireGuard tunnels, while the coordination server helps them discover each other, authenticate, exchange metadata, and understand how the private network should behave.</p>
+<p>In the normal Tailscale product, Tailscale runs that coordination server for you.</p>
+<p>Headscale asks a different question:</p>
+<blockquote>
+<p>What if I run that coordination server myself?</p>
+</blockquote>
+<p>That question was interesting for a few reasons.</p>
+<p>Running something myself usually helps me understand where the real boundaries are. It turns a polished product experience back into individual pieces I can inspect.</p>
+<p>It also fits the homelab mindset. I already run Kubernetes, DNS, GitOps, reverse proxies, monitoring, and internal tools. A self-hosted coordination server felt like a natural next experiment.</p>
+<p>Most importantly, it was small enough to test without designing the final architecture upfront.</p>
+<p>I did not need to build a full production network on day one. I only needed one server and a couple of clients.</p>
+<h2 id="what-headscale-is">What Headscale Is</h2>
+<p>In simple terms, Headscale is a self-hosted coordination server for Tailscale clients.</p>
+<p>It is not a replacement for the Tailscale client.</p>
+<p>That distinction matters.</p>
+<p>For this experiment, I still used the regular Tailscale client on my laptop and phone. The difference is that instead of logging into Tailscale’s hosted coordination service, the clients point to my own Headscale server.</p>
+<p>The simplified flow looks like this:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Tailscale client</span></span>
+<span class="line"><span>    ↓</span></span>
+<span class="line"><span>Custom login server URL</span></span>
+<span class="line"><span>    ↓</span></span>
+<span class="line"><span>Headscale</span></span></code></pre>
+<p>Headscale handles the coordination side. The clients still use the Tailscale client software.</p>
+<p>That distinction is important because Headscale is not the full Tailscale SaaS experience. I do not see it as a drop-in replacement for every Tailscale use case, and I do not think self-hosting is automatically better.</p>
+<p>For me, Headscale is best viewed as a self-hosted control server experiment for personal labs, homelabs, and small environments.</p>
+<p>That made it a good fit for the kind of experiment I like writing about in this series.</p>
+<h2 id="running-it-on-k3s">Running It on K3s</h2>
+<p>At this point in the DevOps Odyssey, deploying something to K3s is almost part of the game.</p>
+<p>I already had the cluster, Traefik, persistent storage, GitOps, and a public hostname wired up from earlier parts of the series. So when I wanted to try Headscale, creating a separate VM did not feel necessary.</p>
+<p>The obvious move was to deploy it like any other platform service.</p>
+<p>The requirements were simple:</p>
+<ul>
+<li>run Headscale as a container</li>
+<li>expose it through HTTPS</li>
+<li>persist its state</li>
+<li>make it reachable from a public hostname</li>
+<li>connect clients using the regular Tailscale app</li>
+</ul>
+<p>The most important setting was the public server URL:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>HEADSCALE_SERVER_URL: "https://janus-headscale.duckdns.org"</span></span></code></pre>
+<p>That is the address my Tailscale clients use as their custom login server URL.</p>
+<p>Everything else was familiar territory: Helm values, Traefik ingress, a persistent volume, and a node selector to keep it on the system node.</p>
+<p>In other words, the interesting part was not “can I run another container on K3s?”</p>
+<p>The interesting part was whether this container could become the coordination server for my own small Tailscale-style network.</p>
+<h2 id="the-small-first-goal">The Small First Goal</h2>
+<p>I kept the first goal intentionally small.</p>
+<p>I was not trying to solve ACLs, subnet routing, MagicDNS, OIDC, or a web UI yet. I only wanted to answer one question:</p>
+<blockquote>
+<p>Can I deploy Headscale and connect my laptop and phone?</p>
+</blockquote>
+<p>That was enough for the first milestone.</p>
+<p>Two clients. One control server. Successful registration. Visible nodes.</p>
+<p>If that worked, I could build on it later.</p>
+<h2 id="high-level-architecture">High-Level Architecture</h2>
+<p>The first version looked like this:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>+----------------------+                  +--------------------------------+</span></span>
+<span class="line"><span>| MacBook / Laptop     |                  |                                |</span></span>
+<span class="line"><span>| Tailscale client     |&#x3C;---------------->|                                |</span></span>
+<span class="line"><span>+----------------------+                  |                                |</span></span>
+<span class="line"><span>        Coordination via custom           |                                |</span></span>
+<span class="line"><span>        login server                      |                                |</span></span>
+<span class="line"><span>                                          | Headscale                      |</span></span>
+<span class="line"><span>+----------------------+                  | OCI / K3s                      |</span></span>
+<span class="line"><span>| Android Phone        |                  | janus-headscale.duckdns.org    |</span></span>
+<span class="line"><span>| Tailscale client     |&#x3C;---------------->|                                |</span></span>
+<span class="line"><span>+----------------------+                  |                                |</span></span>
+<span class="line"><span>        Coordination via custom           |                                |</span></span>
+<span class="line"><span>        login server                      +--------------------------------+</span></span></code></pre>
+<p>In this first post, only the laptop, phone, and Headscale server are in scope.</p>
+<p>The homelab router, subnet routes, MagicDNS, ACLs, and private service access are the next layer. I wanted the control server to work first.</p>
+<h2 id="no-ui-at-least-not-yet">No UI, At Least Not Yet</h2>
+<p>One thing that surprised me at first was that Headscale does not ship with a built-in admin UI.</p>
+<p>Management is mostly done through the CLI.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">headscale</span><span style="color:#9ECBFF"> users</span><span style="color:#9ECBFF"> list</span></span>
+<span class="line"><span style="color:#B392F0">headscale</span><span style="color:#9ECBFF"> nodes</span><span style="color:#9ECBFF"> list</span></span>
+<span class="line"><span style="color:#B392F0">headscale</span><span style="color:#9ECBFF"> preauthkeys</span><span style="color:#9ECBFF"> create</span></span></code></pre>
+<p>In my deployment, the Headscale container image is also fairly hardened. It is not the kind of image where I casually <code>kubectl exec -it</code> into a shell and poke around.</p>
+<p>So I treated the Headscale CLI as the interface and ran specific commands through Kubernetes:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> headscale</span><span style="color:#9ECBFF"> exec</span><span style="color:#9ECBFF"> deploy/headscale</span><span style="color:#79B8FF"> --</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#9ECBFF">  headscale</span><span style="color:#9ECBFF"> users</span><span style="color:#9ECBFF"> list</span></span></code></pre>
+<p>That became the operational pattern.</p>
+<p>Run a specific command. Get the result. Avoid treating the pod like a pet server.</p>
+<h2 id="registering-devices">Registering Devices</h2>
+<p>Before any device could join, I needed a Headscale user.</p>
+<p>I created one called <code>janus</code>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> headscale</span><span style="color:#9ECBFF"> exec</span><span style="color:#9ECBFF"> deploy/headscale</span><span style="color:#79B8FF"> --</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#9ECBFF">  headscale</span><span style="color:#9ECBFF"> users</span><span style="color:#9ECBFF"> create</span><span style="color:#9ECBFF"> janus</span></span></code></pre>
+<p>Then I generated a short-lived pre-auth key for that user:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> headscale</span><span style="color:#9ECBFF"> exec</span><span style="color:#9ECBFF"> deploy/headscale</span><span style="color:#79B8FF"> --</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#9ECBFF">  headscale</span><span style="color:#9ECBFF"> preauthkeys</span><span style="color:#9ECBFF"> create</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --user</span><span style="color:#9ECBFF"> janus</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --expiration</span><span style="color:#9ECBFF"> 1h</span></span></code></pre>
+<p>Because I was not using OIDC yet, pre-auth keys were the simplest way to register devices. I kept the key short-lived so it was useful for setup without becoming a permanent credential.</p>
+<p>The basic loop was simple:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>create user</span></span>
+<span class="line"><span>generate short-lived key</span></span>
+<span class="line"><span>register device</span></span>
+<span class="line"><span>list nodes</span></span></code></pre>
+<p>For this first version, that was enough.</p>
+<h2 id="connecting-my-laptop-and-phone">Connecting My Laptop and Phone</h2>
+<p>On my laptop, I used the regular Tailscale client.</p>
+<p>The difference was the login server.</p>
+<p>Instead of using Tailscale’s hosted coordination server, I pointed the client to:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>https://janus-headscale.duckdns.org</span></span></code></pre>
+<p>The command looked like this:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">tailscale</span><span style="color:#9ECBFF"> up</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --login-server</span><span style="color:#9ECBFF"> https://janus-headscale.duckdns.org</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --authkey</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">KE</span><span style="color:#E1E4E8">Y</span><span style="color:#F97583">></span></span></code></pre>
+<p>After that, the laptop appeared in Headscale:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> headscale</span><span style="color:#9ECBFF"> exec</span><span style="color:#9ECBFF"> deploy/headscale</span><span style="color:#79B8FF"> --</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#9ECBFF">  headscale</span><span style="color:#9ECBFF"> nodes</span><span style="color:#9ECBFF"> list</span></span></code></pre>
+<p>That was the first satisfying moment.</p>
+<p>The control plane was mine. The client was still the regular Tailscale client. The node registered successfully.</p>
+<p>My phone was the next test. I installed the regular Tailscale Android app, configured it to use the same alternative server, and registered it with another pre-auth key.</p>
+<p>After that, the phone also appeared in the node list.</p>
+<p>At this point, the experiment had crossed the first threshold:</p>
+<blockquote>
+<p>Headscale on OCI/K3s was coordinating real clients.</p>
+</blockquote>
+<p>The laptop and phone were no longer just independent devices. They were part of the same self-hosted tailnet-style network.</p>
+<h2 id="what-worked">What Worked</h2>
+<p>The core experiment worked.</p>
+<p>Headscale ran on K3s. Traefik exposed it over HTTPS. The regular Tailscale client could connect to it. My laptop joined. My Android phone joined. The nodes appeared in Headscale.</p>
+<p>That was enough to prove the basic model.</p>
+<p>The smallest useful version was surprisingly small:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Headscale</span></span>
+<span class="line"><span>K3s</span></span>
+<span class="line"><span>Ingress</span></span>
+<span class="line"><span>Persistent volume</span></span>
+<span class="line"><span>One user</span></span>
+<span class="line"><span>Short-lived pre-auth keys</span></span>
+<span class="line"><span>Tailscale clients</span></span></code></pre>
+<p>That is a good sign.</p>
+<p>It means the project is approachable enough for a homelab experiment, while still exposing enough of the system to learn how the pieces fit together.</p>
+<h2 id="what-i-learned">What I Learned</h2>
+<p>The biggest thing I learned is that “Tailscale” is not just one piece of software in my head anymore.</p>
+<p>Before trying Headscale, I mostly thought about Tailscale as a complete experience: install the client, log in, and devices can talk to each other. Running Headscale made the boundaries much clearer.</p>
+<p>There is the client on each device. There is the coordination server. There is the encrypted WireGuard traffic between peers. Then there are the supporting pieces: DNS, routes, ACLs, identity, and device registration.</p>
+<p>Tailscale’s hosted product makes those pieces feel almost invisible. Headscale exposes one of the important layers and lets me run it myself.</p>
+<p>That is useful, but it also changes the responsibility model.</p>
+<p>If I self-host the coordination server, I own it. I need to think about persistence, upgrades, backups, access, and recovery. Self-hosting is not magic. It is ownership. I get more control, but I also own the persistence, upgrades, backups, access, and recovery story.</p>
+<h2 id="final-thoughts">Final Thoughts</h2>
+<p>I started this because I was curious.</p>
+<p>I already liked the way Tailscale made private networking feel simple, and discovering Headscale made me want to understand what the self-hosted side of that model looked like.</p>
+<p>After running it on my existing K3s cluster and connecting my laptop and phone, the first experiment worked.</p>
+<p>I now have a small self-hosted coordination server using the regular Tailscale clients, short-lived auth keys, and a public endpoint I control.</p>
+<p>That is enough for a first step.</p>
+<p>What I am curious about next is whether I can use this setup to connect back into my homelab services safely, without exposing them directly to the public internet.</p>
+<p>That will be the next experiment.</p> </div> <nav class="blog-post-navigation"> <a href="/devops-odyssey/oci-k3s-rebuild" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">The DevOps Odyssey, Part 9: The Day My K3s Cluster Disappeared</div> </a>  </nav>  </div> </article>  </main> <footer class="footer"> <div class="container text-primary"> <p>© 2026 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer>  </body></html>
