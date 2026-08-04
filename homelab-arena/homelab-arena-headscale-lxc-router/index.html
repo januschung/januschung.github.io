@@ -1,0 +1,195 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Using a Proxmox LXC container as a Tailscale subnet router and exit node so my Headscale network on OCI K3s can reach internal homelab services through c.home."><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v5.17.2"><link rel="canonical" href="https://januschung.github.io/homelab-arena/homelab-arena-headscale-lxc-router/"><title>Homelab Arena Part 9: Connecting My Homelab to Headscale with a Tailscale LXC Router - Janus</title><link rel="stylesheet" href="/_astro/about.CdqPxALF.css">
+<link rel="stylesheet" href="/_astro/index.BFrYoEHc.css"></head> <body class="min-h-screen flex flex-col"> <span data-pagefind-filter="locale:en" class="hidden" aria-hidden="true"></span> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/homelab-arena">Homelab Arena</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul>  <div class="mobile-controls"> <button class="search-icon-button" aria-label="Toggle search" id="search-toggle"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"> <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round"></path> </svg> </button> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> </div> <div class="header-search" id="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false,&#34;translations&#34;:{&#34;placeholder&#34;:&#34;Search…&#34;}}"></div> <script type="module" src="/_astro/Search.astro_astro_type_script_index_0_lang.tZYucdM2.js"></script> </div>  </div> </nav> </header> <script type="module">(function(){const n=document.getElementById("mobile-menu-toggle"),s=document.getElementById("nav-links"),c=document.querySelector("header"),a=document.getElementById("search-toggle"),e=document.getElementById("header-search");n&&s&&(n.addEventListener("click",()=>{const t=s.classList.toggle("nav-open");n.classList.toggle("active"),c.classList.toggle("menu-open"),t?document.body.style.overflow="hidden":document.body.style.overflow="",e&&e.classList.remove("search-open")}),s.querySelectorAll("a").forEach(t=>{t.addEventListener("click",()=>{s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow=""})}),document.addEventListener("click",t=>{!c.contains(t.target)&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow="")})),a&&e&&(a.addEventListener("click",o=>{o.stopPropagation(),e.classList.toggle("search-open"),s&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n&&n.classList.remove("active"),c&&c.classList.remove("menu-open")),e.classList.contains("search-open")&&setTimeout(()=>{const t=e.querySelector('input[type="search"]');t&&(t.focus(),t.dispatchEvent(new Event("input",{bubbles:!0})));const i=e.querySelector(".pagefind-ui__results-area");i&&(i.style.display="block")},150)}),document.addEventListener("click",o=>{e&&!e.contains(o.target)&&!a.contains(o.target)&&e.classList.contains("search-open")&&e.classList.remove("search-open")}),document.addEventListener("keydown",o=>{o.key==="Escape"&&e&&e.classList.contains("search-open")&&e.classList.remove("search-open")}))})();</script> <main class="flex-1" data-locale-prefix>  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">Homelab Arena Part 9: Connecting My Homelab to Headscale with a Tailscale LXC Router</h1> <div class="blog-post-meta"> <time>July 8, 2026</time> <span class="blog-post-meta-separator">•</span> <span>14 min read</span>  </div> <div class="pill-group pill-group--top"> <span class="pill">headscale</span><span class="pill">tailscale</span><span class="pill">proxmox</span><span class="pill">lxc</span><span class="pill">pfsense</span><span class="pill">pihole</span><span class="pill">homelab</span><span class="pill">k3s</span><span class="pill">networking</span> </div> </header> <div class="blog-post-content prose"> <h2 id="homelab-arena-part-9-connecting-my-homelab-to-headscale-with-a-tailscale-lxc-router">Homelab Arena Part 9: Connecting My Homelab to Headscale with a Tailscale LXC Router</h2>
+<p>The Headscale setup started as part of my DevOps Odyssey. I wanted to understand what it would feel like to self-host the coordination server behind a Tailscale-style network, so I deployed Headscale on my OCI K3s cluster and connected a couple of regular Tailscale clients to it.</p>
+<p>That was a useful experiment by itself, but it did not stay only on the cloud side for very long. Once my laptop and phone could join the Headscale network, the next question was obvious: could this become a private bridge back into my homelab?</p>
+<p>That is why this post fits better in Homelab Arena. The control plane still lives on OCI K3s, but the result matters most inside my home network. I was not trying to expose home services to the public internet. I wanted the opposite. I wanted the services to stay private, while still being reachable from trusted devices when I was away from home.</p>
+<p>I also did not imagine, when I first built the homelab K3s cluster, that it would eventually work together with another K3s cluster running in OCI. One cluster runs the home services. The other runs the coordination server. A small router inside my homelab connects the two worlds.</p>
+<p>That router is a Proxmox LXC container running the regular Tailscale client. It became both a subnet router for my home networks and an optional exit node for my trusted devices.</p>
+<p><img src="/assets/homelab-arena/homelab-arena-headscale-lxc-router/banner.webp" alt="Homelab Arena Part 9 - Connecting the homelab to Headscale"></p>
+<hr>
+<h2 id="what-i-wanted">What I wanted</h2>
+<p>The goal was not to make the homelab public. I do not want dashboards like Proxmox, pfSense, Pi-hole, Argo CD, or internal applications exposed directly to the internet just because I occasionally need to reach them from outside the house.</p>
+<p>What I wanted was a private access path. When my laptop or phone joins the Headscale network, it should be able to reach selected home subnets through a trusted route. DNS should still work through Pi-hole. Internal names should still feel like internal names. If a service is normally available as <code>blog.c.home</code> when I am at home, I wanted that same name to work when I am away.</p>
+<p>There was also a second use case that made sense once the router existed. Sometimes I want my device to send all traffic through home, not just traffic for the homelab subnets. That is what a Tailscale exit node is for. The same LXC can advertise home routes and also become an optional exit node, so my laptop or phone can choose to egress through my home network when I need it.</p>
+<p>So the target was not just:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>remote device -> homelab subnet</span></span></code></pre>
+<p>It was closer to:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>remote device -> Headscale -> home router LXC -> homelab services</span></span>
+<span class="line"><span>remote device -> Headscale -> home router LXC -> internet through home</span></span></code></pre>
+<p>The first path lets me reach internal services. The second path lets my trusted devices behave more like they are on the home network when I choose the LXC as the exit node.</p>
+<h2 id="the-shape-of-the-setup">The shape of the setup</h2>
+<p>The final shape is easier to understand if I separate the control plane from the home network.</p>
+<p>Headscale runs outside my house on the OCI K3s cluster. My laptop and phone use the regular Tailscale client, but instead of logging into Tailscale’s hosted coordination server, they point to my Headscale URL.</p>
+<p>Inside the homelab, I created a small Debian LXC container on Proxmox. That container also runs the regular Tailscale client and joins the same Headscale network. The difference is that this container advertises routes for my home LAN subnets and also advertises itself as an exit node.</p>
+<p>The flow looks like this:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Laptop or phone outside home</span></span>
+<span class="line"><span>        |</span></span>
+<span class="line"><span>        | Tailscale client</span></span>
+<span class="line"><span>        v</span></span>
+<span class="line"><span>Headscale on OCI K3s</span></span>
+<span class="line"><span>        |</span></span>
+<span class="line"><span>        | private tailnet route</span></span>
+<span class="line"><span>        v</span></span>
+<span class="line"><span>tailscale-router LXC at home</span></span>
+<span class="line"><span>        |</span></span>
+<span class="line"><span>        +--> home LAN routes</span></span>
+<span class="line"><span>        |       |</span></span>
+<span class="line"><span>        |       v</span></span>
+<span class="line"><span>        |   Homelab services and Pi-hole DNS</span></span>
+<span class="line"><span>        |</span></span>
+<span class="line"><span>        +--> optional exit node</span></span>
+<span class="line"><span>                |</span></span>
+<span class="line"><span>                v</span></span>
+<span class="line"><span>            Internet through home</span></span></code></pre>
+<p>That is the bridge. Headscale coordinates the devices, but the LXC router provides the useful path back into the home network. When I only need internal services, subnet routing is enough. When I want all traffic to leave through home, I can select the same LXC as the exit node from the Tailscale client.</p>
+<p>This keeps the responsibilities clean. OCI K3s does not run my home services. Homelab K3s does not need to run the Headscale control plane. The LXC router is the small piece that makes them useful together.</p>
+<h2 id="why-i-used-a-proxmox-lxc">Why I used a Proxmox LXC</h2>
+<p>I considered a few options for the router. I could have used a full VM. I could have installed Tailscale directly on an existing host. I could have tried to run it inside the homelab K3s cluster. All of those would probably work, but none of them felt quite right for this job.</p>
+<p>The router is not really an application. It is part of the network path. I wanted it to be small, predictable, and close to the home networking layer. In my setup, that means Proxmox, pfSense, and Pi-hole.</p>
+<p>So I created a dedicated LXC container named <code>tailscale-router</code>.</p>
+<p>The container does not need much:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Hostname: tailscale-router</span></span>
+<span class="line"><span>OS: Debian 12</span></span>
+<span class="line"><span>CPU: 1 core</span></span>
+<span class="line"><span>Memory: 512 MB</span></span>
+<span class="line"><span>Disk: 4 GB</span></span>
+<span class="line"><span>IP: 10.0.1.90/24</span></span>
+<span class="line"><span>Gateway: 10.0.1.1</span></span>
+<span class="line"><span>DNS: 10.0.0.99, 1.1.1.1</span></span></code></pre>
+<p>This is one of those cases where boring infrastructure is a good thing. The router does not need a UI. It does not need application storage. It does not need to be part of the Kubernetes cluster. It only needs to stay online, join Headscale, advertise the correct routes, and be available when I want to use it as an exit node.</p>
+<h2 id="preparing-the-lxc-for-tailscale">Preparing the LXC for Tailscale</h2>
+<p>There was one Proxmox LXC detail that mattered before Tailscale could work properly: the container needed access to <code>/dev/net/tun</code>.</p>
+<p>Tailscale uses a TUN device to create its network interface. In a normal VM, that is usually available without much thought. In an LXC container, I had to pass it through from the Proxmox host.</p>
+<p>For my container, the ID was <code>102</code>, so I edited this file on the Proxmox host:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>/etc/pve/lxc/102.conf</span></span></code></pre>
+<p>I added these lines:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>lxc.cgroup2.devices.allow: c 10:200 rwm</span></span>
+<span class="line"><span>lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file</span></span></code></pre>
+<p>Then I rebooted the container:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">pct</span><span style="color:#9ECBFF"> reboot</span><span style="color:#79B8FF"> 102</span></span></code></pre>
+<p>After the container came back, I checked for the device inside the LXC:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">ls</span><span style="color:#79B8FF"> -l</span><span style="color:#9ECBFF"> /dev/net/tun</span></span></code></pre>
+<p>This step is easy to overlook because Tailscale can still install without it. The problem shows up later when the service tries to create the tunnel interface. I would rather handle the LXC permission clearly upfront than troubleshoot a half-working router later.</p>
+<h2 id="installing-and-preparing-tailscale">Installing and preparing Tailscale</h2>
+<p>Inside the container, I installed Tailscale using the normal install script:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">curl</span><span style="color:#79B8FF"> -fsSL</span><span style="color:#9ECBFF"> https://tailscale.com/install.sh</span><span style="color:#F97583"> |</span><span style="color:#B392F0"> sh</span></span></code></pre>
+<p>Because this container will route traffic between the Tailscale network and the home LAN, IP forwarding needs to be enabled. It also matters for exit-node behavior, because the router may forward traffic from a remote device out through the home network.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">cat</span><span style="color:#F97583"> &#x3C;&#x3C;</span><span style="color:#9ECBFF">'EOF'</span><span style="color:#F97583"> ></span><span style="color:#9ECBFF"> /etc/sysctl.d/99-tailscale-router.conf</span></span>
+<span class="line"><span style="color:#9ECBFF">net.ipv4.ip_forward=1</span></span>
+<span class="line"><span style="color:#9ECBFF">net.ipv6.conf.all.forwarding=1</span></span>
+<span class="line"><span style="color:#9ECBFF">EOF</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">sysctl</span><span style="color:#79B8FF"> -w</span><span style="color:#9ECBFF"> net.ipv4.ip_forward=</span><span style="color:#79B8FF">1</span></span>
+<span class="line"><span style="color:#B392F0">sysctl</span><span style="color:#79B8FF"> -w</span><span style="color:#9ECBFF"> net.ipv6.conf.all.forwarding=</span><span style="color:#79B8FF">1</span></span></code></pre>
+<p>Then I enabled and started the Tailscale daemon:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">systemctl</span><span style="color:#9ECBFF"> enable</span><span style="color:#79B8FF"> --now</span><span style="color:#9ECBFF"> tailscaled</span></span></code></pre>
+<p>At this point, the LXC was ready to become a Headscale node.</p>
+<h2 id="joining-the-router-to-headscale">Joining the router to Headscale</h2>
+<p>On the OCI K3s side, Headscale already had my user. I generated a short-lived pre-auth key so the router could join without setting up OIDC or a browser login flow.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> headscale</span><span style="color:#9ECBFF"> exec</span><span style="color:#9ECBFF"> deploy/headscale</span><span style="color:#79B8FF"> --</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#9ECBFF">  headscale</span><span style="color:#9ECBFF"> preauthkeys</span><span style="color:#9ECBFF"> create</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --user</span><span style="color:#9ECBFF"> janus</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --expiration</span><span style="color:#9ECBFF"> 1h</span></span></code></pre>
+<p>Then, inside the LXC, I joined the router to Headscale:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">tailscale</span><span style="color:#9ECBFF"> up</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --login-server</span><span style="color:#9ECBFF"> https://janus-headscale.duckdns.org</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --authkey</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">KE</span><span style="color:#E1E4E8">Y</span><span style="color:#F97583">></span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --hostname</span><span style="color:#9ECBFF"> tailscale-router</span></span></code></pre>
+<p>After that, I checked the Headscale node list:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> headscale</span><span style="color:#9ECBFF"> exec</span><span style="color:#9ECBFF"> deploy/headscale</span><span style="color:#79B8FF"> --</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#9ECBFF">  headscale</span><span style="color:#9ECBFF"> nodes</span><span style="color:#9ECBFF"> list</span></span></code></pre>
+<p>Seeing <code>tailscale-router</code> appear in Headscale was the first real checkpoint. At that point, the home network had a device inside the same private network as my laptop and phone.</p>
+<p>But it was still only a node. It was not routing the homelab yet.</p>
+<h2 id="advertising-the-home-routes-and-exit-node">Advertising the home routes and exit node</h2>
+<p>The next step was to tell Tailscale what this LXC could provide.</p>
+<p>In my homelab, the important networks are:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>10.0.0.0/24</span></span>
+<span class="line"><span>10.0.1.0/24</span></span>
+<span class="line"><span>10.0.2.0/24</span></span></code></pre>
+<p>The router itself lives on <code>10.0.1.0/24</code>, but that is not the only subnet that matters. Pi-hole lives at <code>10.0.0.88</code>, and without access to that subnet, DNS would not work correctly for remote clients. This is where I had to remind myself that routing and DNS are part of the same user experience. Reaching an IP address is not enough if the names I actually use cannot resolve.</p>
+<p>On the LXC, I advertised all three home routes and also advertised the router as an exit node:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">tailscale</span><span style="color:#9ECBFF"> set</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --advertise-routes=10.0.0.0/24,10.0.1.0/24,10.0.2.0/24</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --advertise-exit-node</span></span></code></pre>
+<p>Then I restarted <code>tailscaled</code>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">systemctl</span><span style="color:#9ECBFF"> restart</span><span style="color:#9ECBFF"> tailscaled</span></span></code></pre>
+<p>I like separating the initial join from the route advertisement. First the node joins Headscale. Then I configure what the node should advertise. It makes the workflow easier to reason about, and it also made troubleshooting clearer when I was checking which routes Headscale could see.</p>
+<p>After that, I went back to Headscale and listed the routes:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> headscale</span><span style="color:#9ECBFF"> exec</span><span style="color:#9ECBFF"> deploy/headscale</span><span style="color:#79B8FF"> --</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#9ECBFF">  headscale</span><span style="color:#9ECBFF"> routes</span><span style="color:#9ECBFF"> list</span></span></code></pre>
+<p>The home routes showed up, and the exit-node routes showed up as well. Advertising them from the router is only the first half. Headscale still needs to enable the routes before clients can use them.</p>
+<h2 id="enabling-the-routes-in-headscale">Enabling the routes in Headscale</h2>
+<p>From the Headscale side, I enabled each route that I wanted to use:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> headscale</span><span style="color:#9ECBFF"> exec</span><span style="color:#9ECBFF"> deploy/headscale</span><span style="color:#79B8FF"> --</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#9ECBFF">  headscale</span><span style="color:#9ECBFF"> routes</span><span style="color:#9ECBFF"> enable</span><span style="color:#79B8FF"> --route</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">ROUTE_I</span><span style="color:#E1E4E8">D</span><span style="color:#F97583">></span></span></code></pre>
+<p>For the home networks, I enabled:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>10.0.0.0/24</span></span>
+<span class="line"><span>10.0.1.0/24</span></span>
+<span class="line"><span>10.0.2.0/24</span></span></code></pre>
+<p>For the exit node, Headscale may show default routes such as:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>0.0.0.0/0</span></span>
+<span class="line"><span>::/0</span></span></code></pre>
+<p>Those represent the “send all traffic through this node” behavior. Once those routes are enabled, the LXC can be selected as an exit node from a client.</p>
+<p>This separation is important. The router can advertise routes, but Headscale decides whether those routes should actually be accepted. That applies to both subnet routes and exit-node routes.</p>
+<p>Once the routes were enabled, my remote devices had two options. They could reach only the homelab subnets through the LXC, or they could choose the LXC as an exit node and send all traffic through home.</p>
+<p>The setup changed from a simple client network:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>laptop -> Headscale -> phone</span></span></code></pre>
+<p>into something more useful:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>laptop -> Headscale network -> tailscale-router -> homelab LAN</span></span>
+<span class="line"><span>laptop -> Headscale network -> tailscale-router -> internet through home</span></span></code></pre>
+<p>That was the point where the Headscale experiment started feeling like part of the homelab instead of a separate cloud-side project.</p>
+<h2 id="making-pi-hole-dns-work-remotely">Making Pi-hole DNS work remotely</h2>
+<p>Routing gave my devices a path to the home LAN, but DNS still needed to be correct.</p>
+<p>Inside my home network, Pi-hole handles local DNS. It knows records under my internal <code>c.home</code> domain. That is why names like this work when I am at home:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>blog.c.home</span></span></code></pre>
+<p>To make the same names work remotely, Headscale needs to push Pi-hole as the DNS resolver for connected clients.</p>
+<p>In my Headscale values, the relevant settings look like this:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">HEADSCALE_DNS_MAGIC_DNS</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"true"</span></span>
+<span class="line"><span style="color:#85E89D">HEADSCALE_DNS_BASE_DOMAIN</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"hanusc.internal"</span></span>
+<span class="line"><span style="color:#85E89D">HEADSCALE_DNS_OVERRIDE_LOCAL_DNS</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"true"</span></span>
+<span class="line"><span style="color:#85E89D">HEADSCALE_DNS_NAMESERVERS_GLOBAL</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">'["10.0.0.99"]'</span></span></code></pre>
+<p>The key value is the global nameserver:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">HEADSCALE_DNS_NAMESERVERS_GLOBAL</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">'["10.0.0.99"]'</span></span></code></pre>
+<p>That tells clients to use Pi-hole for DNS while connected to the Headscale network.</p>
+<p>This only works because the subnet router also advertises <code>10.0.0.0/24</code>. If the remote client cannot reach <code>10.0.0.99</code>, then pushing Pi-hole as the DNS server does not help. The resolver itself has to be reachable through the private route.</p>
+<p>The exit node makes this even more useful in some situations. If I choose the home LXC as my exit node, then my device is not only resolving home names through Pi-hole; it is also sending all of its traffic out through the home network. I do not need that all the time, but it is useful to have as an option.</p>
+<p>On mobile, there is one more practical detail: the Tailscale app needs to use Tailscale DNS. If the phone keeps using the carrier DNS or Android Private DNS, it may never ask Pi-hole about <code>c.home</code>.</p>
+<h2 id="testing-from-outside-the-house">Testing from outside the house</h2>
+<p>The real test had to happen outside the home network.</p>
+<p>When I am at home, <code>blog.c.home</code> already works. That does not prove the subnet router is doing anything. The test is whether the same name works when I am away, connected through the Headscale network.</p>
+<p>From outside the home network, I connected my laptop to Tailscale and tested DNS first:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">dig</span><span style="color:#9ECBFF"> blog.c.home</span></span></code></pre>
+<p>Then I tested HTTPS:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">curl</span><span style="color:#79B8FF"> -v</span><span style="color:#9ECBFF"> https://blog.c.home</span></span></code></pre>
+<p>Finally, I opened the same address in the browser:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>https://blog.c.home</span></span></code></pre>
+<p>That was the moment the setup felt right. I was not using a public hostname, opening a port on my home router, or typing a private IP address from memory. I was using the same homelab domain I use inside the house, but from outside the house.</p>
+<p>The path looked like this:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Laptop outside home</span></span>
+<span class="line"><span>        |</span></span>
+<span class="line"><span>        v</span></span>
+<span class="line"><span>Tailscale client</span></span>
+<span class="line"><span>        |</span></span>
+<span class="line"><span>        v</span></span>
+<span class="line"><span>Headscale coordination on OCI K3s</span></span>
+<span class="line"><span>        |</span></span>
+<span class="line"><span>        v</span></span>
+<span class="line"><span>tailscale-router LXC at home</span></span>
+<span class="line"><span>        |</span></span>
+<span class="line"><span>        v</span></span>
+<span class="line"><span>Pi-hole DNS and homelab LAN</span></span>
+<span class="line"><span>        |</span></span>
+<span class="line"><span>        v</span></span>
+<span class="line"><span>blog.c.home</span></span></code></pre>
+<p>The page loaded, and the internal name worked exactly the way I wanted.</p>
+<p>I also tested the exit-node path separately. That part is not required for reaching <code>blog.c.home</code>, but it proves the router can do more than subnet routing. When I select <code>tailscale-router</code> as the exit node from my client, my traffic can leave through the home network. When I do not need that, I can leave exit-node usage off and still use the subnet routes for homelab access.</p>
+<p>That distinction is nice. The same LXC gives me both capabilities, but I do not have to use them the same way all the time.</p>
+<h2 id="where-this-leaves-the-homelab">Where this leaves the homelab</h2>
+<p>This started as a continuation of the Headscale experiment, but it fits better in Homelab Arena because the real result is inside the home network. Headscale on OCI K3s gives me the coordination point. The Proxmox LXC gives me a small router at home. Pi-hole keeps the <code>c.home</code> names working. The regular Tailscale clients connect everything together.</p>
+<p>The setup also keeps the homelab private. I am not exposing every internal service just so I can reach it when I am away from home. I am not creating a public endpoint for every dashboard. I am not relying on random IP addresses. Trusted devices join Headscale, use the LXC router, and reach the home network through private routes.</p>
+<p>I like that the LXC is not tied to the homelab K3s cluster. It sits closer to the network layer, near pfSense and Pi-hole, which makes more sense for remote access. If I am rebuilding the application cluster, I do not want that to also break my way back into the house. A small, boring router outside the app cluster feels like the cleaner design.</p>
+<p>There is still more to do. The next layer is access control: which devices should reach which parts of the homelab, how routes should be limited, and how new clients should be approved. But for this step, the important part works.</p>
+<p>When I am away from home, I can connect through Headscale and open:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>https://blog.c.home</span></span></code></pre>
+<p>That is the win.</p>
+<p>The homelab stays private, the OCI K3s cluster and homelab K3s cluster now work together, and the LXC router gives me both private subnet access and an optional way to route traffic out through home.</p> </div> <nav class="blog-post-navigation"> <a href="/homelab-arena/homelab-arena-valid-ssl" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">Part 8: Valid SSL at Home — pfSense CA, Traefik, and Trusted Internal HTTPS</div> </a>  </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Posts</h2> <div class="related-posts-grid"> <a href="/homelab-arena/homelab-arena-valid-ssl" class="blog-card card-link"> <img src="/assets/homelab-arena/homelab-arena-valid-ssl/banner.webp" alt="Part 8: Valid SSL at Home — pfSense CA, Traefik, and Trusted Internal HTTPS" class="blog-card-image"> <h3 class="blog-card-title">Part 8: Valid SSL at Home — pfSense CA, Traefik, and Trusted Internal HTTPS</h3> <p class="blog-card-description"> Removing browser SSL warnings from the homelab by using pfSense as an internal certificate authority, serving a wildcard certificate through k3s Traefik, and trusting the CA across laptops, Linux boxes, and Android devices. </p> </a><a href="/homelab-arena/homelab-arena-presistance-appset" class="blog-card card-link"> <img src="/assets/homelab-arena/homelab-arena-persistance-appset/banner.webp" alt="Part 7: From Cluster to Platform — ApplicationSet, Storage, and Backups" class="blog-card-image"> <h3 class="blog-card-title">Part 7: From Cluster to Platform — ApplicationSet, Storage, and Backups</h3> <p class="blog-card-description"> Turning a k3s cluster into a repeatable application platform using Argo CD ApplicationSet, shared Helm charts, NFS persistence, and host-level backups. </p> </a><a href="/homelab-arena/homelab-arena-argocd" class="blog-card card-link"> <img src="/assets/homelab-arena/homelab-arena-argocd/banner.webp" alt="Part 6: Handing the Cluster Over to Argo CD" class="blog-card-image"> <h3 class="blog-card-title">Part 6: Handing the Cluster Over to Argo CD</h3> <p class="blog-card-description"> Moving from a working k3s cluster to a self-managed platform by introducing Argo CD, wildcard DNS, and the first GitOps workflow. </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container text-primary"> <p>© 2026 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer>  </body></html>
