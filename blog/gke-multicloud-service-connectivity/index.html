@@ -1,0 +1,139 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Connecting workloads across GKE and EKS with the Tailscale Kubernetes operator, so a workload moved to GKE can still reach a private service in EKS."><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v5.17.2"><link rel="canonical" href="https://januschung.github.io/blog/gke-multicloud-service-connectivity/"><title>GKE - Part 6: Multi-Cloud Service Connectivity Between GKE and EKS - Janus</title><link rel="stylesheet" href="/_astro/about.CdqPxALF.css">
+<link rel="stylesheet" href="/_astro/index.BFrYoEHc.css"></head> <body class="min-h-screen flex flex-col"> <span data-pagefind-filter="locale:en" class="hidden" aria-hidden="true"></span> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/homelab-arena">Homelab Arena</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul>  <div class="mobile-controls"> <button class="search-icon-button" aria-label="Toggle search" id="search-toggle"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"> <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round"></path> </svg> </button> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> </div> <div class="header-search" id="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false,&#34;translations&#34;:{&#34;placeholder&#34;:&#34;Search…&#34;}}"></div> <script type="module" src="/_astro/Search.astro_astro_type_script_index_0_lang.tZYucdM2.js"></script> </div>  </div> </nav> </header> <script type="module">(function(){const n=document.getElementById("mobile-menu-toggle"),s=document.getElementById("nav-links"),c=document.querySelector("header"),a=document.getElementById("search-toggle"),e=document.getElementById("header-search");n&&s&&(n.addEventListener("click",()=>{const t=s.classList.toggle("nav-open");n.classList.toggle("active"),c.classList.toggle("menu-open"),t?document.body.style.overflow="hidden":document.body.style.overflow="",e&&e.classList.remove("search-open")}),s.querySelectorAll("a").forEach(t=>{t.addEventListener("click",()=>{s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow=""})}),document.addEventListener("click",t=>{!c.contains(t.target)&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow="")})),a&&e&&(a.addEventListener("click",o=>{o.stopPropagation(),e.classList.toggle("search-open"),s&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n&&n.classList.remove("active"),c&&c.classList.remove("menu-open")),e.classList.contains("search-open")&&setTimeout(()=>{const t=e.querySelector('input[type="search"]');t&&(t.focus(),t.dispatchEvent(new Event("input",{bubbles:!0})));const i=e.querySelector(".pagefind-ui__results-area");i&&(i.style.display="block")},150)}),document.addEventListener("click",o=>{e&&!e.contains(o.target)&&!a.contains(o.target)&&e.classList.contains("search-open")&&e.classList.remove("search-open")}),document.addEventListener("keydown",o=>{o.key==="Escape"&&e&&e.classList.contains("search-open")&&e.classList.remove("search-open")}))})();</script> <main class="flex-1" data-locale-prefix>  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">GKE - Part 6: Multi-Cloud Service Connectivity Between GKE and EKS</h1> <div class="blog-post-meta"> <time>August 23, 2026</time> <span class="blog-post-meta-separator">•</span> <span>8 min read</span>  </div> <div class="pill-group pill-group--top"> <span class="pill">gcp</span><span class="pill">gke</span><span class="pill">aws</span><span class="pill">eks</span><span class="pill">kubernetes</span><span class="pill">tailscale</span><span class="pill">multicloud</span><span class="pill">networking</span><span class="pill">platform</span> </div> </header> <div class="blog-post-content prose"> <h1 id="gke---part-6-multi-cloud-service-connectivity-between-gke-and-eks">GKE - Part 6: Multi-Cloud Service Connectivity Between GKE and EKS</h1>
+<p><img src="/assets/blog/gke-multicloud-service-connectivity/banner.webp" alt="multicloud service connecting GKE and EKS via Tailscale"></p>
+<p>I have been gradually moving more of the nonprod platform onto GKE.</p>
+<p>Most of the work has been straightforward because many applications already communicate through normal API endpoints. But I eventually ran into one workflow that made moving only part of the stack less clean.</p>
+<p>One application calls another through an internal Kubernetes Service URL such as <code>http://app-b.namespace.svc.cluster.local</code>.</p>
+<p>That works perfectly while both workloads live in the same cluster.</p>
+<p>The problem starts when I want to move the caller to GKE while its dependency remains in EKS.</p>
+<p>A Kubernetes Service DNS name is cluster-local. GKE cannot resolve or reach an EKS Service just because both clusters run Kubernetes.</p>
+<p>I could expose the EKS application publicly, but turning an internal backend service into a public endpoint only to support this move felt like the wrong direction.</p>
+<p>Around the same time, I attended Temporal Replay and stopped by the Tailscale counter.</p>
+<p>I was already using the Tailscale Kubernetes operator for private Ingress, but during that conversation I learned more about Tailscale Egress.</p>
+<p>That immediately made me think about this problem.</p>
+<p>Could a workload in GKE call a private service in EKS through the tailnet? And would the same model work in the opposite direction?</p>
+<p>This part is about testing that private multi-cloud connection.</p>
+<h2 id="the-problem-i-needed-to-solve">The problem I needed to solve</h2>
+<p>Inside one Kubernetes cluster, service-to-service communication is simple:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>appA</span></span>
+<span class="line"><span>  |</span></span>
+<span class="line"><span>  v</span></span>
+<span class="line"><span>Kubernetes Service</span></span>
+<span class="line"><span>  |</span></span>
+<span class="line"><span>  v</span></span>
+<span class="line"><span>appB</span></span></code></pre>
+<p>That is exactly what I want when both applications live in the same cluster.</p>
+<p>The awkward case is when they do not:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>AWS EKS                 GCP GKE</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>appB  &#x3C;---------------  appA</span></span></code></pre>
+<p>Moving <code>appA</code> to GKE breaks the assumption that <code>appB</code> is always reachable through the same Kubernetes DNS domain.</p>
+<p>I wanted to keep <code>appB</code> private and still allow the GKE workload to reach it.</p>
+<h2 id="why-not-use-the-public-endpoint">Why not use the public endpoint?</h2>
+<p>One option would be to point the GKE workload at the same public API endpoint used by external clients.</p>
+<p>That works, but now an internal backend dependency relies on public DNS, public ingress, TLS, and internet-facing load balancing.</p>
+<p>None of those are inherently bad. They are just unnecessary for this communication path.</p>
+<p>What I wanted instead was a private service-to-service path between GKE and EKS.</p>
+<p>Since both clusters already had the Tailscale Kubernetes operator, the tailnet was the obvious place to experiment.</p>
+<h2 id="ingress-plus-egress">Ingress plus Egress</h2>
+<p>I was already familiar with Tailscale Ingress.</p>
+<p>I use it to expose internal Kubernetes services such as Argo CD privately through <code>.ts.net</code> addresses.</p>
+<p>Ingress handles traffic coming from the tailnet into Kubernetes.</p>
+<p>Egress handles the opposite direction: a normal Kubernetes workload can reach something that exists elsewhere on the tailnet.</p>
+<p>Together, the path looks like:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>GKE workload</span></span>
+<span class="line"><span>     |</span></span>
+<span class="line"><span>     v</span></span>
+<span class="line"><span>Tailscale Egress</span></span>
+<span class="line"><span>     |</span></span>
+<span class="line"><span>     v</span></span>
+<span class="line"><span>Tailnet</span></span>
+<span class="line"><span>     |</span></span>
+<span class="line"><span>     v</span></span>
+<span class="line"><span>Tailscale Ingress</span></span>
+<span class="line"><span>     |</span></span>
+<span class="line"><span>     v</span></span>
+<span class="line"><span>EKS workload</span></span></code></pre>
+<p>The useful part is that the application itself does not need to run Tailscale.</p>
+<p>There is no Tailscale sidecar in every application pod. The Kubernetes operator manages the proxy resources and keeps the cross-cloud networking in the platform layer.</p>
+<h2 id="building-a-disposable-test">Building a disposable test</h2>
+<p>Before changing a real workload, I wanted to prove the pattern with something disposable.</p>
+<p>I created a tiny backend application in EKS called <code>eks-app</code>. It only needed to return a successful HTTP response.</p>
+<p>I also created a small test application that made repeated HTTP requests against a configured target and displayed the result in a browser.</p>
+<p>The local EKS path stayed completely normal:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>eks-test -> Kubernetes Service -> eks-app</span></span></code></pre>
+<p>Then I exposed <code>eks-app</code> privately to the tailnet.</p>
+<p>At a high level, the important Service settings were:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">type</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">LoadBalancer</span></span>
+<span class="line"><span style="color:#85E89D">loadBalancerClass</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">tailscale</span></span></code></pre>
+<p>with:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">annotations</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  tailscale.com/hostname</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">eks-app</span></span></code></pre>
+<p>That gave the test backend a private address such as <code>eks-app.tailnet-name.ts.net</code>.</p>
+<p>No public AWS load balancer, Route53 record, or public Gateway was needed for this path.</p>
+<h2 id="creating-the-gke-side">Creating the GKE side</h2>
+<p>On GKE, I created a Kubernetes Service representing the application that actually lives in EKS.</p>
+<p>The important annotation was:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">tailscale.com/tailnet-fqdn</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">eks-app.tailnet-name.ts.net</span></span></code></pre>
+<p>The Tailscale operator creates the egress proxy resources behind that Service.</p>
+<p>From the calling application’s perspective, it can still use something as simple as <code>http://eks-app:8080</code>.</p>
+<p>Underneath, the call crosses the tailnet and enters the EKS cluster through the Tailscale-managed ingress path.</p>
+<p>That separation is what makes the design useful to me.</p>
+<p>The application knows which service it needs.</p>
+<p>The platform decides how that service is reached.</p>
+<h2 id="testing-it-from-a-browser">Testing it from a browser</h2>
+<p>I wanted the test to be easy to repeat without constantly using <code>kubectl exec</code> and <code>curl</code>.</p>
+<p>So I exposed the test applications themselves privately through Tailscale.</p>
+<p>Opening the EKS test page triggered requests from the test pod running in EKS. Opening the GKE test page triggered requests from the test pod running in GKE.</p>
+<p>The browser was only a control panel. The actual backend requests originated inside Kubernetes.</p>
+<p>That let me compare a normal same-cluster path against the GKE-to-EKS path without including my laptop’s network connection in the test.</p>
+<p>I intentionally kept the application simple.</p>
+<p>The goal was not to build a benchmarking platform. I only wanted to prove that the private cross-cloud service path worked.</p>
+<h2 id="reversing-the-direction">Reversing the direction</h2>
+<p>After the EKS-hosted test worked, I reversed the setup.</p>
+<p>This time I created <code>gke-app</code> in GKE, kept the local GKE call on normal Kubernetes networking, and exposed <code>gke-app</code> to the tailnet.</p>
+<p>EKS then created the corresponding Tailscale egress Service.</p>
+<p>The direction became:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>EKS workload</span></span>
+<span class="line"><span>     |</span></span>
+<span class="line"><span>     v</span></span>
+<span class="line"><span>Tailscale</span></span>
+<span class="line"><span>     |</span></span>
+<span class="line"><span>     v</span></span>
+<span class="line"><span>GKE workload</span></span></code></pre>
+<p>That proved the same connectivity model worked in both directions.</p>
+<p>For this experiment, that was enough.</p>
+<p>I did not need to decide whether one cloud would permanently host a particular service or whether both applications would eventually end up in the same cluster.</p>
+<p>The important part was proving that a private dependency could cross the cluster boundary without being exposed publicly.</p>
+<h2 id="what-this-solves-for-the-gke-move">What this solves for the GKE move</h2>
+<p>The immediate problem was not building a complete multi-cloud network.</p>
+<p>It was making sure a workload moved to GKE could still reach a private dependency that remained in EKS.</p>
+<p>With Tailscale Egress and Ingress working together, that dependency no longer forces me to expose the backend publicly or keep the caller in the same cluster.</p>
+<p>The reverse test also worked, which means the connectivity itself is not tied to EKS always being the destination.</p>
+<p>For now, that is enough.</p>
+<p>I have a private path between GKE and EKS when an application dependency crosses the cluster boundary, while normal Kubernetes Service networking still handles traffic that stays inside one cluster.</p>
+<h2 id="keeping-cloud-knowledge-out-of-the-application">Keeping cloud knowledge out of the application</h2>
+<p>I do not want application code deciding how to route traffic based on whether it is running in AWS or GCP.</p>
+<p>The deployment configuration can provide the appropriate endpoint.</p>
+<p>When the dependency is local, use the local Kubernetes Service.</p>
+<p>When the dependency is in the other cloud, use a Kubernetes Service backed by Tailscale Egress.</p>
+<p>The application still makes a normal HTTP request.</p>
+<p>It does not need to understand EKS, GKE, MagicDNS, or the cross-cloud networking underneath.</p>
+<p>That keeps the networking problem in the platform layer, where I want it.</p>
+<h2 id="why-not-build-a-full-aws-to-gcp-network">Why not build a full AWS-to-GCP network?</h2>
+<p>A traditional multi-cloud network is still an option.</p>
+<p>AWS Site-to-Site VPN, GCP Cloud VPN, Transit Gateway, Cloud Router, Direct Connect, or Interconnect all have a place when the requirement becomes broader.</p>
+<p>If I eventually have many services communicating across clouds, large traffic volumes, or a need for shared private routing, I would revisit that architecture.</p>
+<p>But my current requirement is smaller: a workload moving to GKE still needs to reach a private service in EKS.</p>
+<p>Both clusters already have the Tailscale Kubernetes operator.</p>
+<p>Using Tailscale Ingress and Egress gives me a small private bridge without requiring me to build the entire multi-cloud network first.</p>
+<h2 id="where-this-leaves-the-gke-setup">Where this leaves the GKE setup</h2>
+<p>GKE and EKS are no longer completely isolated application environments.</p>
+<p>Selected workloads can communicate privately across the two clouds when they need to.</p>
+<p>Local service traffic still stays inside the local Kubernetes cluster.</p>
+<p>Public APIs still use the normal public ingress path.</p>
+<p>Tailscale fills the gap when a private application dependency crosses from one cluster to the other.</p>
+<p>That is the part I wanted to prove.</p>
+<p>And in this case, the idea came from learning about a part of a tool I was already using.</p>
+<p>I went to the Tailscale counter at Temporal Replay thinking mostly about Ingress.</p>
+<p>I came away thinking about Egress.</p> </div> <nav class="blog-post-navigation"> <a href="/blog/adb-android" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">Using ADB as My Android File Manager from Linux</div> </a>  </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Posts</h2> <div class="related-posts-grid"> <a href="/blog/gke-tailsacle" class="blog-card card-link"> <img src="/assets/blog/gke-tailscale/banner.webp" alt="GKE - Part 5: Private Platform Access with the Tailscale Kubernetes Operator" class="blog-card-image"> <h3 class="blog-card-title">GKE - Part 5: Private Platform Access with the Tailscale Kubernetes Operator</h3> <p class="blog-card-description"> Installing the Tailscale Kubernetes operator on GKE, exposing Argo CD privately through Tailscale Ingress, and documenting the setup so I do not have to rediscover it next time. </p> </a><a href="/blog/gke-gitops-foundations" class="blog-card card-link"> <img src="/assets/blog/gke-gitops-foundations/banner.webp" alt="GKE - Part 4: ExternalDNS, cert-manager, and Real URLs for the GitOps Platform" class="blog-card-image"> <h3 class="blog-card-title">GKE - Part 4: ExternalDNS, cert-manager, and Real URLs for the GitOps Platform</h3> <p class="blog-card-description"> Adding the platform services that turn Gateway API from a manually wired entry point into a DNS and TLS managed edge for GKE. </p> </a><a href="/blog/gke-ci-structure" class="blog-card card-link"> <img src="/assets/blog/gke-ci-structure/banner.webp" alt="GKE - Part 3: From Local Terraform to CI: Structuring Shared and Nonprod Stacks for GKE" class="blog-card-image"> <h3 class="blog-card-title">GKE - Part 3: From Local Terraform to CI: Structuring Shared and Nonprod Stacks for GKE</h3> <p class="blog-card-description"> Moving a Terraform-first GKE setup from local execution to CI, and organizing shared and environment stacks to make the system repeatable and extensible. </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container text-primary"> <p>© 2026 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer>  </body></html>
