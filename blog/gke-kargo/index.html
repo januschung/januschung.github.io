@@ -1,0 +1,199 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="How Kargo fits into a GitOps platform built around immutable artifacts, Argo CD, and environment promotion."><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v5.17.2"><link rel="canonical" href="https://januschung.github.io/blog/gke-kargo/"><title>GKE Part 7 — Build Once, Promote Forward with Kargo - Janus</title><link rel="stylesheet" href="/_astro/about.CdqPxALF.css">
+<link rel="stylesheet" href="/_astro/index.BFrYoEHc.css"></head> <body class="min-h-screen flex flex-col"> <span data-pagefind-filter="locale:en" class="hidden" aria-hidden="true"></span> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/homelab-arena">Homelab Arena</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul>  <div class="mobile-controls"> <button class="search-icon-button" aria-label="Toggle search" id="search-toggle"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"> <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round"></path> </svg> </button> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> </div> <div class="header-search" id="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false,&#34;translations&#34;:{&#34;placeholder&#34;:&#34;Search…&#34;}}"></div> <script type="module" src="/_astro/Search.astro_astro_type_script_index_0_lang.tZYucdM2.js"></script> </div>  </div> </nav> </header> <script type="module">(function(){const n=document.getElementById("mobile-menu-toggle"),s=document.getElementById("nav-links"),c=document.querySelector("header"),a=document.getElementById("search-toggle"),e=document.getElementById("header-search");n&&s&&(n.addEventListener("click",()=>{const t=s.classList.toggle("nav-open");n.classList.toggle("active"),c.classList.toggle("menu-open"),t?document.body.style.overflow="hidden":document.body.style.overflow="",e&&e.classList.remove("search-open")}),s.querySelectorAll("a").forEach(t=>{t.addEventListener("click",()=>{s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow=""})}),document.addEventListener("click",t=>{!c.contains(t.target)&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow="")})),a&&e&&(a.addEventListener("click",o=>{o.stopPropagation(),e.classList.toggle("search-open"),s&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n&&n.classList.remove("active"),c&&c.classList.remove("menu-open")),e.classList.contains("search-open")&&setTimeout(()=>{const t=e.querySelector('input[type="search"]');t&&(t.focus(),t.dispatchEvent(new Event("input",{bubbles:!0})));const i=e.querySelector(".pagefind-ui__results-area");i&&(i.style.display="block")},150)}),document.addEventListener("click",o=>{e&&!e.contains(o.target)&&!a.contains(o.target)&&e.classList.contains("search-open")&&e.classList.remove("search-open")}),document.addEventListener("keydown",o=>{o.key==="Escape"&&e&&e.classList.contains("search-open")&&e.classList.remove("search-open")}))})();</script> <main class="flex-1" data-locale-prefix>  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">GKE Part 7 — Build Once, Promote Forward with Kargo</h1> <div class="blog-post-meta"> <time>September 3, 2026</time> <span class="blog-post-meta-separator">•</span> <span>12 min read</span>  </div> <div class="pill-group pill-group--top"> <span class="pill">gke</span><span class="pill">kargo</span><span class="pill">argocd</span><span class="pill">gitops</span><span class="pill">kubernetes</span><span class="pill">platform-engineering</span><span class="pill">cicd</span><span class="pill">gcp</span> </div> </header> <div class="blog-post-content prose"> <h1 id="gke-part-7--build-once-promote-forward-with-kargo">GKE Part 7 — Build Once, Promote Forward with Kargo</h1>
+<p>One of the principles behind my delivery platform is that an application artifact should be built once and then promoted through environments without being rebuilt along the way. CI is responsible for producing and validating the artifact, while dev, staging, and production are destinations that consume that same artifact. I wrote about this approach previously in <a href="../build-promote/"><em>Build Once. Promote Forward. Ship Daily.</em></a>, where the main goal was to remove rebuild-per-environment pipelines and make promotion a lightweight, predictable operation instead of another build cycle.</p>
+<p>That model already worked well with GitOps. GitHub Actions built and published the container, Git stored the desired image version for each environment, and Argo CD reconciled those changes into Kubernetes. What was missing was a dedicated layer that understood the delivery path itself. The mechanics of promotion existed, but the meaning of promotion was mostly encoded in workflow steps, scripts, repository conventions, and permissions spread across several systems.</p>
+<p>Kargo fits into that gap.</p>
+<p><img src="/assets/blog/gke-kargo/kargo.webp" alt="Kargo Logo"></p>
+<!-- more -->
+<h2 id="the-gitops-workflow-before-kargo">The GitOps Workflow Before Kargo</h2>
+<p>The original flow was straightforward and intentionally simple. CI built the application, ran the required checks, pushed the resulting image to the registry, and then automation updated the Git repository used by Argo CD.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>GitHub</span></span>
+<span class="line"><span>   |</span></span>
+<span class="line"><span>   v</span></span>
+<span class="line"><span>GitHub Actions</span></span>
+<span class="line"><span>   |</span></span>
+<span class="line"><span>   | Build, test, scan</span></span>
+<span class="line"><span>   v</span></span>
+<span class="line"><span>Container Registry</span></span>
+<span class="line"><span>   |</span></span>
+<span class="line"><span>   v</span></span>
+<span class="line"><span>Deployment Repository</span></span>
+<span class="line"><span>   |</span></span>
+<span class="line"><span>   v</span></span>
+<span class="line"><span>Argo CD</span></span>
+<span class="line"><span>   |</span></span>
+<span class="line"><span>   v</span></span>
+<span class="line"><span>Kubernetes</span></span></code></pre>
+<p>Promotion was usually implemented as a small Git change. A workflow could update the image tag in a Helm values file, commit the result, and let Argo CD reconcile the environment. That pattern was reliable and aligned well with GitOps because the deployment repository remained the source of truth.</p>
+<p>I still think this is a good design for many platforms. It is easy to understand, uses familiar tools, and does not require a large delivery framework. The challenge appears later, when the promotion logic begins to carry more responsibility than simply changing a value in YAML.</p>
+<p>As more environments and applications are added, the workflow starts needing to understand which artifact is currently in dev, which artifact should move to staging, whether the deployment completed successfully, whether the same artifact was already verified somewhere else, and who is allowed to move it forward. None of those problems are especially difficult by themselves, but together they turn a small automation script into a growing release system.</p>
+<h2 id="kargo-fits-the-build-once-model">Kargo Fits the Build-Once Model</h2>
+<p>What interested me about Kargo was not a new deployment mechanism. Its delivery model matches an architecture I already wanted: create an artifact once, give it a stable identity, and move that artifact through a defined sequence of environments.</p>
+<p>The resulting flow looks more like this:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>GitHub Actions</span></span>
+<span class="line"><span>      |</span></span>
+<span class="line"><span>      | Build once</span></span>
+<span class="line"><span>      v</span></span>
+<span class="line"><span>Container Registry</span></span>
+<span class="line"><span>      |</span></span>
+<span class="line"><span>      v</span></span>
+<span class="line"><span>    Kargo</span></span>
+<span class="line"><span>      |</span></span>
+<span class="line"><span>      | Promote</span></span>
+<span class="line"><span>      v</span></span>
+<span class="line"><span> Dev ---> Staging ---> Production</span></span>
+<span class="line"><span>      |</span></span>
+<span class="line"><span>      v</span></span>
+<span class="line"><span>     Git</span></span>
+<span class="line"><span>      |</span></span>
+<span class="line"><span>      v</span></span>
+<span class="line"><span>   Argo CD</span></span>
+<span class="line"><span>      |</span></span>
+<span class="line"><span>      v</span></span>
+<span class="line"><span> Kubernetes</span></span></code></pre>
+<p>CI continues to own the creation of software artifacts. Argo CD continues to own reconciliation between Git and Kubernetes. Kargo sits between those two responsibilities and models how an artifact moves through the delivery process.</p>
+<p>That division is useful because it keeps build and promotion as separate concerns. The build pipeline answers whether an artifact is valid enough to publish. The promotion system decides where that exact artifact should run next. Environment-specific configuration can still change, but the application artifact itself remains unchanged as it moves forward.</p>
+<h2 id="warehouse-freight-and-stage">Warehouse, Freight, and Stage</h2>
+<p>Kargo introduces its own terminology, but the three concepts that mattered most in my setup were Warehouse, Freight, and Stage.</p>
+<p>A <strong>Warehouse</strong> watches for artifacts that are eligible to enter the delivery process. In my case, that means watching a container registry for newly published application images. The Warehouse can also filter what it considers valid, which is useful when a registry contains several image families, helper tags, or artifacts that should never enter the promotion path.</p>
+<p>Once Kargo discovers a valid artifact, it represents that artifact as <strong>Freight</strong>. This is one of the parts of the model I ended up liking more than I expected. In a traditional GitOps workflow, the identity of a release is often just an image tag sitting inside a values file. With Freight, the artifact becomes something the delivery system can track as it moves between environments.</p>
+<p>A <strong>Stage</strong> represents one of those environments. Dev, staging, and production can therefore be modeled as part of the delivery system instead of existing only as naming conventions inside repositories and CI jobs.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>New Freight</span></span>
+<span class="line"><span>     |</span></span>
+<span class="line"><span>     v</span></span>
+<span class="line"><span>    Dev</span></span>
+<span class="line"><span>     |</span></span>
+<span class="line"><span>     v</span></span>
+<span class="line"><span>  Staging</span></span>
+<span class="line"><span>     |</span></span>
+<span class="line"><span>     v</span></span>
+<span class="line"><span>Production</span></span></code></pre>
+<p>This maps cleanly to the build-once model because the Freight stays the same while its destination changes. The image that reaches staging is the same image that previously ran in dev, and the image that eventually reaches production can be traced through the same promotion path.</p>
+<h2 id="promotion-becomes-an-explicit-platform-operation">Promotion Becomes an Explicit Platform Operation</h2>
+<p>Before Kargo, promotion was represented indirectly by a sequence of lower-level actions. A workflow cloned the deployment repository, changed a Helm value, committed the update, and waited for Argo CD to react. The end result was a promotion, but the systems performing those steps mostly saw file changes and workflow executions.</p>
+<p>Kargo gives promotion a first-class representation. Instead of expressing the process only as a set of Git operations, the platform understands that a particular Freight is being moved into a particular Stage.</p>
+<p>This provides context that would otherwise need to be reconstructed from Git history, CI logs, and Argo CD state. The platform can show which artifact is associated with each environment, how it moved there, and what happened during the promotion.</p>
+<p>The underlying GitOps model still stays intact. Kargo can perform the configuration change needed for the target environment, while Argo CD continues to reconcile that desired state into Kubernetes. The difference is that the operation now carries release intent instead of being treated as a generic repository update.</p>
+<h2 id="reusable-promotion-logic">Reusable Promotion Logic</h2>
+<p>One area where Kargo immediately helped was reducing repeated delivery logic across applications.</p>
+<p>Without a shared abstraction, each project can gradually accumulate its own version of the same workflow: clone the repository, locate the correct values file, update the image reference, commit the change, trigger reconciliation, and wait for the application to become healthy.</p>
+<p>That repetition is manageable at first, but it becomes maintenance overhead when the delivery convention changes. A new validation step, repository structure, commit convention, or Argo CD behavior may require updating many separate workflows.</p>
+<p>Kargo’s promotion tasks provide a better place to keep that logic. Common promotion behavior can be defined once and reused by multiple applications, while application-specific configuration remains relatively small.</p>
+<p>This is closer to how I want a platform boundary to work. Application configuration should describe the artifact and the destination, while the platform owns the mechanics used to move that artifact safely between environments.</p>
+<h2 id="waiting-for-the-deployment-matters">Waiting for the Deployment Matters</h2>
+<p>A Git commit completing successfully does not mean an application finished deploying successfully.</p>
+<p>Argo CD may still be synchronizing resources while new pods start, readiness probes run, controllers reconcile dependencies, or infrastructure finishes provisioning. My custom automation could account for that, but it required explicitly querying Argo CD or adding polling logic around the workflow.</p>
+<p>Kargo already treats Argo CD state as part of the promotion process. A promotion can update the desired configuration and then wait for the corresponding Argo CD application to reach the expected state before considering the operation complete.</p>
+<p>This makes the delivery flow closer to what actually happens in Kubernetes:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Promote artifact</span></span>
+<span class="line"><span>       |</span></span>
+<span class="line"><span>       v</span></span>
+<span class="line"><span>Update Git</span></span>
+<span class="line"><span>       |</span></span>
+<span class="line"><span>       v</span></span>
+<span class="line"><span>Argo CD syncs</span></span>
+<span class="line"><span>       |</span></span>
+<span class="line"><span>       v</span></span>
+<span class="line"><span>Application becomes healthy</span></span>
+<span class="line"><span>       |</span></span>
+<span class="line"><span>       v</span></span>
+<span class="line"><span>Promotion completes</span></span></code></pre>
+<p>That small distinction removes an important source of ambiguity. The release system is no longer treating “configuration changed” and “application deployed successfully” as the same event.</p>
+<h2 id="visibility-is-part-of-the-value">Visibility Is Part of the Value</h2>
+<p>The operational view of the delivery pipeline is another area where Kargo improves the experience.</p>
+<p>With a custom GitOps workflow, the information already exists, but it is spread across several places. Git can show configuration history, CI can show automation runs, and Argo CD can show the current application state. An engineer who understands the system can usually piece together the release history from those sources.</p>
+<p>Kargo adds a view centered specifically on promotion. It becomes much easier to see which artifact is in dev, which one is in staging, what is waiting to move forward, and whether a previous promotion failed.</p>
+<p><img src="/assets/blog/gke-kargo/kargo-ui.webp" alt="Kargo UI"></p>
+<p>That matters beyond convenience. A delivery platform should make its state understandable to the people using it. Developers should not need to understand the internal structure of every deployment repository or workflow just to determine which build is running in an environment.</p>
+<p>The promotion model also provides a natural place for RBAC. Teams can be given visibility or controlled promotion permissions without granting broad administrative access to Kubernetes or the GitOps controllers. That creates a cleaner separation between operating the platform and using the delivery capabilities provided by it.</p>
+<h2 id="kargo-versus-the-custom-workflow">Kargo Versus the Custom Workflow</h2>
+<p>The custom workflow and Kargo solve many of the same practical problems, so I see them as two stages of the same platform evolution rather than competing architectures.</p>
+<p>My original automation was intentionally small. It used tools I already had and added just enough logic to move an image forward through GitOps. As the release process expanded, more delivery concepts had to be implemented around that workflow.</p>
+<p>Kargo already has names and abstractions for many of those concepts.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Concern</th><th>Custom Workflow</th><th>Kargo</th></tr></thead><tbody><tr><td>Discover deployable images</td><td>CI or registry script</td><td>Warehouse</td></tr><tr><td>Represent a release artifact</td><td>Image tag</td><td>Freight</td></tr><tr><td>Model environments</td><td>Repository or workflow convention</td><td>Stage</td></tr><tr><td>Move an artifact forward</td><td>Script or CI job</td><td>Promotion</td></tr><tr><td>Reuse common promotion logic</td><td>Shared script or composite action</td><td>PromotionTask</td></tr><tr><td>Wait for Argo CD</td><td>Custom polling</td><td>Argo-aware promotion steps</td></tr><tr><td>Track promotion state</td><td>CI, Git, and Argo CD</td><td>Promotion model</td></tr><tr><td>Control promotion access</td><td>CI and repository permissions</td><td>RBAC</td></tr><tr><td>View delivery progress</td><td>Multiple systems</td><td>Promotion-focused UI</td></tr></tbody></table>
+<p>The important difference is not whether Kargo can execute something that a shell script cannot. Most delivery operations can be scripted.</p>
+<p>The difference is how much release behavior the platform team wants to design, implement, document, and maintain. Artifact discovery, environment relationships, promotion history, health awareness, access control, and delivery visualization are all things that can be built incrementally around a custom workflow. Eventually, however, that collection of automation starts looking like a small internal release product.</p>
+<p>Kargo gives those concerns a common model before the custom system grows that far.</p>
+<h2 id="a-better-fit-for-multi-cluster-and-multi-cloud-delivery">A Better Fit for Multi-Cluster and Multi-Cloud Delivery</h2>
+<p>This also becomes more useful as the platform grows beyond a single cluster.</p>
+<p>My current infrastructure includes workloads across more than one Kubernetes environment and more than one cloud provider. From the application delivery perspective, I want that difference to matter less than it does at the infrastructure layer.</p>
+<p>A build should not need to know whether its eventual destination is GKE or EKS. The artifact has already been created and validated. The delivery system should decide where it moves, while the GitOps controller associated with that destination handles deployment.</p>
+<p>That gives the platform a cleaner abstraction:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Artifact</span></span>
+<span class="line"><span>   |</span></span>
+<span class="line"><span>   v</span></span>
+<span class="line"><span>Promotion</span></span>
+<span class="line"><span>   |</span></span>
+<span class="line"><span>   +------> GKE environment</span></span>
+<span class="line"><span>   |</span></span>
+<span class="line"><span>   +------> EKS environment</span></span></code></pre>
+<p>The cluster implementation still matters operationally, but it does not need to redefine the software delivery model. Kargo helps keep artifact promotion above that infrastructure boundary.</p>
+<p>For a platform moving toward multi-cluster and multi-cloud operation, that is a useful property. The release process can remain consistent even when the destinations underneath it are different.</p>
+<h2 id="build-once-remains-the-important-part">Build Once Remains the Important Part</h2>
+<p>The main reason Kargo fits this platform is that it reinforces the delivery principle that was already there.</p>
+<p>The artifact produced by CI should have a stable identity. Testing, scanning, and validation should apply to that artifact. Moving from dev to staging should not create a new build, and reaching production should not depend on reproducing the same artifact later under slightly different conditions.</p>
+<p>Promotion should change where the artifact runs, not what the artifact is.</p>
+<p>That distinction is the foundation of the whole design. GitOps made promotion lightweight because the environment could be changed by updating desired state. Kargo adds a system that understands the progression behind those changes and can represent the artifact as it moves through the platform.</p>
+<h2 id="reflection">Reflection</h2>
+<p>Building the original GitOps automation was valuable because it exposed the mechanics behind promotion. The process is not mysterious: identify the artifact, change the desired configuration, let Argo CD reconcile it, and confirm that the application becomes healthy.</p>
+<p>The harder problem appears when that pattern must be standardized across many applications and environments. At that point, the platform needs more than a command that changes an image tag. It needs a consistent way to represent artifacts, environments, promotion history, permissions, and delivery state.</p>
+<p>Kargo gives me those abstractions while preserving the GitOps workflow already in place.</p>
+<p>GitHub Actions continues to create the artifact. The registry stores it. Kargo tracks and promotes it. Git records the desired state. Argo CD reconciles that state into Kubernetes.</p>
+<p>The architecture remains simple, but the release process becomes much easier to reason about.</p>
+<p>That is the part I care about most. The goal of the platform is not to replace working automation simply because a new tool exists. It is to recognize when a pattern has become important enough that it deserves a proper abstraction.</p>
+<p>For build-once, promote-forward delivery, Kargo has become that abstraction.</p> </div> <nav class="blog-post-navigation"> <a href="/blog/gke-multicloud-service-connectivity" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">GKE - Part 6: Multi-Cloud Service Connectivity Between GKE and EKS</div> </a>  </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Posts</h2> <div class="related-posts-grid"> <a href="/blog/gke-multicloud-service-connectivity" class="blog-card card-link"> <img src="/assets/blog/gke-multicloud-service-connectivity/banner.webp" alt="GKE - Part 6: Multi-Cloud Service Connectivity Between GKE and EKS" class="blog-card-image"> <h3 class="blog-card-title">GKE - Part 6: Multi-Cloud Service Connectivity Between GKE and EKS</h3> <p class="blog-card-description"> Connecting workloads across GKE and EKS with the Tailscale Kubernetes operator, so a workload moved to GKE can still reach a private service in EKS. </p> </a><a href="/blog/gke-tailsacle" class="blog-card card-link"> <img src="/assets/blog/gke-tailscale/banner.webp" alt="GKE - Part 5: Private Platform Access with the Tailscale Kubernetes Operator" class="blog-card-image"> <h3 class="blog-card-title">GKE - Part 5: Private Platform Access with the Tailscale Kubernetes Operator</h3> <p class="blog-card-description"> Installing the Tailscale Kubernetes operator on GKE, exposing Argo CD privately through Tailscale Ingress, and documenting the setup so I do not have to rediscover it next time. </p> </a><a href="/blog/gke-gitops-foundations" class="blog-card card-link"> <img src="/assets/blog/gke-gitops-foundations/banner.webp" alt="GKE - Part 4: ExternalDNS, cert-manager, and Real URLs for the GitOps Platform" class="blog-card-image"> <h3 class="blog-card-title">GKE - Part 4: ExternalDNS, cert-manager, and Real URLs for the GitOps Platform</h3> <p class="blog-card-description"> Adding the platform services that turn Gateway API from a manually wired entry point into a DNS and TLS managed edge for GKE. </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container text-primary"> <p>© 2026 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer>  </body></html>
