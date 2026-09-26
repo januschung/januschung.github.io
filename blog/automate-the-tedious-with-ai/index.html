@@ -1,0 +1,98 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="I turned a repetitive Git branch cleanup routine into a Bash menu with AI, and learned that designing the workflow before writing code matters more than the code itself."><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v5.17.2"><link rel="canonical" href="https://januschung.github.io/blog/automate-the-tedious-with-ai/"><title>Automate the Tedious: Supercharging Everyday Routines With AI - Janus</title><link rel="stylesheet" href="/_astro/about.CdqPxALF.css">
+<link rel="stylesheet" href="/_astro/index.BFrYoEHc.css"></head> <body class="min-h-screen flex flex-col"> <span data-pagefind-filter="locale:en" class="hidden" aria-hidden="true"></span> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/homelab-arena">Homelab Arena</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul>  <div class="mobile-controls"> <button class="search-icon-button" aria-label="Toggle search" id="search-toggle"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"> <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round"></path> </svg> </button> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> </div> <div class="header-search" id="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false,&#34;translations&#34;:{&#34;placeholder&#34;:&#34;Search…&#34;}}"></div> <script type="module" src="/_astro/Search.astro_astro_type_script_index_0_lang.tZYucdM2.js"></script> </div>  </div> </nav> </header> <script type="module">(function(){const n=document.getElementById("mobile-menu-toggle"),s=document.getElementById("nav-links"),c=document.querySelector("header"),a=document.getElementById("search-toggle"),e=document.getElementById("header-search");n&&s&&(n.addEventListener("click",()=>{const t=s.classList.toggle("nav-open");n.classList.toggle("active"),c.classList.toggle("menu-open"),t?document.body.style.overflow="hidden":document.body.style.overflow="",e&&e.classList.remove("search-open")}),s.querySelectorAll("a").forEach(t=>{t.addEventListener("click",()=>{s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow=""})}),document.addEventListener("click",t=>{!c.contains(t.target)&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow="")})),a&&e&&(a.addEventListener("click",o=>{o.stopPropagation(),e.classList.toggle("search-open"),s&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n&&n.classList.remove("active"),c&&c.classList.remove("menu-open")),e.classList.contains("search-open")&&setTimeout(()=>{const t=e.querySelector('input[type="search"]');t&&(t.focus(),t.dispatchEvent(new Event("input",{bubbles:!0})));const i=e.querySelector(".pagefind-ui__results-area");i&&(i.style.display="block")},150)}),document.addEventListener("click",o=>{e&&!e.contains(o.target)&&!a.contains(o.target)&&e.classList.contains("search-open")&&e.classList.remove("search-open")}),document.addEventListener("keydown",o=>{o.key==="Escape"&&e&&e.classList.contains("search-open")&&e.classList.remove("search-open")}))})();</script> <main class="flex-1" data-locale-prefix>  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">Automate the Tedious: Supercharging Everyday Routines With AI</h1> <div class="blog-post-meta"> <time>September 25, 2026</time> <span class="blog-post-meta-separator">•</span> <span>6 min read</span>  </div> <div class="pill-group pill-group--top"> <span class="pill">ai</span><span class="pill">bash</span><span class="pill">git</span><span class="pill">automation</span> </div> </header> <div class="blog-post-content prose"> <h1 id="automate-the-tedious-supercharging-everyday-routines-with-ai">Automate the Tedious: Supercharging Everyday Routines With AI</h1>
+<p>Every few weeks I end up with twenty old local branches, and cleaning them up is the same routine: list them by date, check which are merged, find the ones whose remote is gone after a squash merge, then delete them one by one. None of it is hard. It’s just tedious, and tedious is exactly what a tool is for.</p>
+<p>Remembering every command and flag for a chore like this buys you nothing, except maybe in an interview.</p>
+<p>So I asked an AI to help me turn that routine into a tool. The result is <code>jgit</code>, a single bash script that gives me a menu for my local branches: check one out, delete a few, or clean up everything except main. This post is about how it came together, because the process turned out to be more interesting than the script.</p>
+<p><img src="/assets/blog/automate-the-tedious-with-ai/banner.webp" alt="Capybara happily pick and choose what he wants to use with his new bash tool."></p>
+<!-- more -->
+<h2 id="design-first-code-later">Design first, code later</h2>
+<p>My first prompt ended with “Do not implement yet.” That one line changed how the whole thing went.</p>
+<p>I asked for a design: a helper to pick local branches from a menu, then check out or delete them, plus an option to clean up everything except main/master. I also asked what else would be worth adding.</p>
+<p>What came back was a plan, not code. It covered the commands, how branches would be listed, the safety rules, and a ranked list of extras. A few of those extras I wouldn’t have thought of:</p>
+<ul>
+<li><strong>Clean up branches whose upstream is gone.</strong> After a squash merge, git doesn’t consider the branch merged, but the remote branch has been deleted. That’s the most reliable “I’m done with this” signal.</li>
+<li><strong>An undo log.</strong> Record each deleted branch’s name and commit so it can be restored later.</li>
+<li><strong>Worktree awareness.</strong> Git refuses to delete a branch that’s checked out in another worktree, so the tool should hide those instead of failing.</li>
+<li><strong>Bash 3.2 compatibility.</strong> macOS still ships bash 3.2, so no <code>mapfile</code>, no associative arrays, no <code>${var,,}</code>.</li>
+</ul>
+<p>Reading a plan takes a couple of minutes. Reading several hundred lines of code I didn’t ask for yet would have taken much longer, and I’d have been reviewing decisions I never got to make.</p>
+<h2 id="shaping-the-menu">Shaping the menu</h2>
+<p>The first design used fzf for fuzzy search. I said no: I wanted plain bash <code>select</code>, so the script runs on any machine without installing anything. I also said I only care about generic git, not any one hosting service, and asked to see the menu structure before anything else.</p>
+<p>It came back as text mockups of every screen:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>jgit  repo: my-app   on: feature/auth-fix   default: main</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>1) Checkout a branch</span></span>
+<span class="line"><span>2) Delete branches</span></span>
+<span class="line"><span>3) Clean up branches</span></span>
+<span class="line"><span>4) Checkout a remote branch</span></span>
+<span class="line"><span>5) Undo last delete</span></span>
+<span class="line"><span>6) Settings / info</span></span>
+<span class="line"><span>[Q]uit  ></span></span></code></pre>
+<p>Then I asked for letter keys: C for cancel, B for back, N for next page. This is where I learned something about <code>select</code>. It saves whatever you type in <code>$REPLY</code>, even if it isn’t a number, so the script can check for letters first and only then treat the input as a menu choice.</p>
+<p>Two details from that round made the tool feel right:</p>
+<ul>
+<li><strong>Back and Cancel mean different things.</strong> Back goes up one level and keeps what you selected. Cancel throws the selection away and returns to the main menu.</li>
+<li><strong>Numbers stay the same across pages.</strong> Branch 17 is branch 17 whether you’re on page 1 or page 2, and picks from earlier pages are kept.</li>
+</ul>
+<p>The second one has a catch: <code>select</code> can’t page. So fixed menus use <code>select</code>, and branch lists use a small look-alike that prints one page at a time and reads input the same way.</p>
+<h2 id="a-tour-of-the-menus">A tour of the menus</h2>
+<p>Here’s what it looks like to use. Every screen follows the same pattern: numbers to pick, letters to move around.</p>
+<p>Picking a branch to check out. Newest first, with how each one stands against its remote:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Checkout a branch (newest first)</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>  1) main                1 hour ago     [in sync] (protected)</span></span>
+<span class="line"><span>  2) feature/auth-fix    2 days ago     [ahead 2] (current)</span></span>
+<span class="line"><span>  3) fix/login-redirect  1 week ago     [behind 4]</span></span>
+<span class="line"><span>  4) chore/deps          3 weeks ago    [gone]</span></span>
+<span class="line"><span>[B]ack  [C]ancel  [Q]uit   or a number</span></span>
+<span class="line"><span>></span></span></code></pre>
+<p>Picking several branches to delete. Numbers toggle, ranges work, and the list pages when it gets long:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Delete branches - page 1/2 (20)</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>  1) [x] chore/deps          3 weeks ago    [gone]</span></span>
+<span class="line"><span>  2) [ ] fix/login-redirect  1 week ago     [behind 4]</span></span>
+<span class="line"><span>  3) [x] spike/cache         2 months ago   [no upstream]</span></span>
+<span class="line"><span>  ...</span></span>
+<span class="line"><span> 15) [ ] test/old-flow       4 months ago   [no upstream]</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>Selected (2): 1 3</span></span>
+<span class="line"><span>[N]ext  [A]ll  [D]one  [B]ack  [C]ancel  [Q]uit</span></span>
+<span class="line"><span>numbers toggle (e.g. 3 5-7), Enter = done</span></span>
+<span class="line"><span>></span></span></code></pre>
+<p>Confirming. B goes back to the list with your picks still ticked; C drops everything:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>About to delete:</span></span>
+<span class="line"><span>  chore/deps</span></span>
+<span class="line"><span>  spike/cache</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>Delete how?</span></span>
+<span class="line"><span>1) Safe delete (-d, merged only)</span></span>
+<span class="line"><span>2) Force delete (-D)</span></span>
+<span class="line"><span>[B]ack  [C]ancel  [Q]uit  ></span></span></code></pre>
+<p>Cleaning up in bulk. One menu instead of four different commands I’d otherwise chain together:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Clean up branches - protected: main, master (+ current branch)</span></span>
+<span class="line"><span>1) Merged into main</span></span>
+<span class="line"><span>2) Upstream gone (remote branch deleted, e.g. after a squash merge)</span></span>
+<span class="line"><span>3) Stale: no commits in N days</span></span>
+<span class="line"><span>4) Everything except protected</span></span>
+<span class="line"><span>[B]ack  [Q]uit  ></span></span></code></pre>
+<p>And undo, for when I delete one too many:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Undo - deleted branches are logged in .git/jgit-deleted.log</span></span>
+<span class="line"><span>1) Restore last run (2: chore/deps spike/cache)</span></span>
+<span class="line"><span>2) Pick branches to restore</span></span>
+<span class="line"><span>[B]ack  [Q]uit  ></span></span></code></pre>
+<h2 id="what-i-took-away">What I took away</h2>
+<p>The AI saved me typing, not thinking. You still need to be able to read what a script is going to run, especially when it deletes things.</p>
+<p>I knew what I wanted the routine to look like. The AI knew the corners of bash <code>select</code> I’d never bother to look up, like reading letters out of <code>$REPLY</code>. Together that turned a chore into a menu.</p>
+<p>A few habits made the difference:</p>
+<ol>
+<li><strong>Ask for a design and say “don’t implement yet.”</strong> Decisions are cheap in a plan and expensive in code.</li>
+<li><strong>Look at mockups before logic.</strong> Seeing every menu as text caught things I’d never have spotted in code.</li>
+<li><strong>Change one thing per round.</strong> select instead of fzf, then the letter keys, then paging. Each round was small and easy to check.</li>
+</ol>
+<h2 id="what-ill-build-next">What I’ll build next</h2>
+<p>Next I’ll build three more tools the same way, with the same menu style:</p>
+<ul>
+<li><strong>A reusable menu library.</strong> Pulling <code>select</code>, letter keys and paging out of jgit into a file other scripts can share.</li>
+<li><strong>A kubectl triage menu.</strong> Pod and node health, current and crashed-container logs, and events filtered by time window, with a report I can paste into an incident channel.</li>
+<li><strong>A kubeseal helper.</strong> I work across several clusters, and sealing a secret means remembering which cluster’s certificate, controller and namespace go with it. A menu to pick the cluster and the secret, then seal it, would save me that every time.</li>
+</ul> </div> <nav class="blog-post-navigation"> <a href="/blog/gke-migrating-pvc-data-between-clusters" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">GKE Part 8: Move the Volume, Not the Container</div> </a>  </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Posts</h2> <div class="related-posts-grid"> <a href="/blog/local-ai" class="blog-card card-link"> <img src="/assets/blog/local-ai/banner.png" alt="The &#34;Hybrid&#34; AI Stack: Enterprise Power at Work, Localhost Freedom at Home" class="blog-card-image"> <h3 class="blog-card-title">The &quot;Hybrid&quot; AI Stack: Enterprise Power at Work, Localhost Freedom at Home</h3> <p class="blog-card-description"> How I built a personal AI stack on my MacBook Pro M4 using Ollama, Open WebUI, and Draw Things—running entirely locally with zero privacy leaks and unlimited usage, while keeping enterprise cloud tools for work. </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container text-primary"> <p>© 2026 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer>  </body></html>

@@ -1,0 +1,163 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="A reusable helper-pod pattern for moving PVC data between Kubernetes clusters."><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v5.17.2"><link rel="canonical" href="https://januschung.github.io/blog/gke-migrating-pvc-data-between-clusters/"><title>GKE Part 8: Move the Volume, Not the Container - Janus</title><link rel="stylesheet" href="/_astro/about.CdqPxALF.css">
+<link rel="stylesheet" href="/_astro/index.BFrYoEHc.css"></head> <body class="min-h-screen flex flex-col"> <span data-pagefind-filter="locale:en" class="hidden" aria-hidden="true"></span> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/homelab-arena">Homelab Arena</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul>  <div class="mobile-controls"> <button class="search-icon-button" aria-label="Toggle search" id="search-toggle"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"> <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round"></path> </svg> </button> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> </div> <div class="header-search" id="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false,&#34;translations&#34;:{&#34;placeholder&#34;:&#34;Search…&#34;}}"></div> <script type="module" src="/_astro/Search.astro_astro_type_script_index_0_lang.tZYucdM2.js"></script> </div>  </div> </nav> </header> <script type="module">(function(){const n=document.getElementById("mobile-menu-toggle"),s=document.getElementById("nav-links"),c=document.querySelector("header"),a=document.getElementById("search-toggle"),e=document.getElementById("header-search");n&&s&&(n.addEventListener("click",()=>{const t=s.classList.toggle("nav-open");n.classList.toggle("active"),c.classList.toggle("menu-open"),t?document.body.style.overflow="hidden":document.body.style.overflow="",e&&e.classList.remove("search-open")}),s.querySelectorAll("a").forEach(t=>{t.addEventListener("click",()=>{s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow=""})}),document.addEventListener("click",t=>{!c.contains(t.target)&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow="")})),a&&e&&(a.addEventListener("click",o=>{o.stopPropagation(),e.classList.toggle("search-open"),s&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n&&n.classList.remove("active"),c&&c.classList.remove("menu-open")),e.classList.contains("search-open")&&setTimeout(()=>{const t=e.querySelector('input[type="search"]');t&&(t.focus(),t.dispatchEvent(new Event("input",{bubbles:!0})));const i=e.querySelector(".pagefind-ui__results-area");i&&(i.style.display="block")},150)}),document.addEventListener("click",o=>{e&&!e.contains(o.target)&&!a.contains(o.target)&&e.classList.contains("search-open")&&e.classList.remove("search-open")}),document.addEventListener("keydown",o=>{o.key==="Escape"&&e&&e.classList.contains("search-open")&&e.classList.remove("search-open")}))})();</script> <main class="flex-1" data-locale-prefix>  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">GKE Part 8: Move the Volume, Not the Container</h1> <div class="blog-post-meta"> <time>September 20, 2026</time> <span class="blog-post-meta-separator">•</span> <span>7 min read</span>  </div> <div class="pill-group pill-group--top"> <span class="pill">gcp</span><span class="pill">gke</span><span class="pill">kubernetes</span><span class="pill">storage</span> </div> </header> <div class="blog-post-content prose"> <h1 id="gke-part-8-move-the-volume-not-the-container">GKE Part 8: Move the Volume, Not the Container</h1>
+<p>As part of my ongoing migration from EKS to GKE, I needed to move an
+application whose state lived on a Kubernetes PersistentVolumeClaim. The
+manifests and container image were easy to reproduce in the new cluster, but
+the files inside the volume still had to cross the boundary safely.</p>
+<p>The problem felt familiar. I had handled something similar at a previous
+company, and it came up again while rebuilding my homelab platform. In
+<a href="../../homelab-arena/gke-kargo">Homelab Arena Part 7</a>,
+I wrote about separating application data from compute and giving persistent
+workloads a predictable storage and backup model.</p>
+<p>The environments were different, but the underlying lesson was the same:
+Kubernetes makes workloads portable more easily than it makes their data
+portable. Deployments can be recreated from Git, images can be pulled from a
+registry, and configuration can be reapplied, but the contents of a PVC still
+need an explicit migration plan.</p>
+<p>This application added another wrinkle because its container image did not
+include a shell or the usual file-management tools. Instead of modifying the
+image, I attached the volume to a small temporary pod built for the job.</p>
+<p>Since this problem keeps returning across work and my homelab, I decided to
+document the pattern as a reference for my future self. Although this example
+came from an EKS-to-GKE migration, the method is useful for many multi-cluster
+and multi-cloud moves.</p>
+<h2 id="the-pattern">The Pattern</h2>
+<p>The application container does not need to participate in the transfer. A
+temporary helper pod can mount the same PVC and provide the tools needed to
+inspect, package, copy, restore, and verify its contents.</p>
+<p><img src="/assets/blog/gke-migrating-pvc-data-between-clusters/pattern.webp" alt="pattern of pvc migration"></p>
+<p>I call the helper pod <code>pvc-mover</code>. It has one temporary responsibility and
+should disappear as soon as the migration is complete.</p>
+<p>This works whether the application image is full-featured, minimal, distroless,
+or otherwise locked down. The migration tools live in the helper image, so the
+production image remains unchanged.</p>
+<h2 id="stop-the-writer-first">Stop the Writer First</h2>
+<p>A filesystem copy is not automatically an application-consistent backup. If
+the application is writing while files are packaged, related files may
+represent different points in time.</p>
+<p>This matters for SQLite, embedded databases, indexes, and applications that
+maintain journal or metadata files. The safest general procedure is to stop the
+application before mounting its PVC through the helper pod.</p>
+<p>For a GitOps-managed workload, set the replica count to zero in Git and let the
+reconciler stop it. A manual <code>kubectl scale</code> may be reversed immediately when
+automated self-healing is enabled.</p>
+<p>Verify that no application pods remain before continuing:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">namespac</span><span style="color:#E1E4E8">e</span><span style="color:#F97583">></span><span style="color:#9ECBFF"> get</span><span style="color:#9ECBFF"> deploy</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">applicatio</span><span style="color:#E1E4E8">n</span><span style="color:#F97583">></span></span>
+<span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">namespac</span><span style="color:#E1E4E8">e</span><span style="color:#F97583">></span><span style="color:#9ECBFF"> get</span><span style="color:#9ECBFF"> pods</span></span></code></pre>
+<p>If the workload cannot tolerate downtime, use an application-aware backup,
+replication, or a tested snapshot workflow instead. The helper-pod approach is
+best when a short maintenance window is acceptable.</p>
+<h2 id="create-the-pvc-mover">Create the PVC Mover</h2>
+<p>The same pod can back up the source PVC and restore the destination PVC.
+Replace the namespace and claim name, then add any scheduling requirements
+used by the cluster.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">v1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Pod</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">pvc-mover</span></span>
+<span class="line"><span style="color:#85E89D">  namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">&#x3C;namespace></span></span>
+<span class="line"><span style="color:#85E89D">spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  restartPolicy</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Never</span></span>
+<span class="line"><span style="color:#85E89D">  containers</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">mover</span></span>
+<span class="line"><span style="color:#85E89D">      image</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">alpine:3.22</span></span>
+<span class="line"><span style="color:#85E89D">      command</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">        - </span><span style="color:#9ECBFF">sleep</span></span>
+<span class="line"><span style="color:#E1E4E8">        - </span><span style="color:#9ECBFF">"3600"</span></span>
+<span class="line"><span style="color:#85E89D">      volumeMounts</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">        - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">data</span></span>
+<span class="line"><span style="color:#85E89D">          mountPath</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">/data</span></span>
+<span class="line"><span style="color:#85E89D">  volumes</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">data</span></span>
+<span class="line"><span style="color:#85E89D">      persistentVolumeClaim</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">        claimName</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">&#x3C;pvc-name></span></span></code></pre>
+<p>Apply it after the application releases the volume. This ordering also avoids
+attachment conflicts when a <code>ReadWriteOnce</code> volume is still mounted on another
+node.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#9ECBFF"> apply</span><span style="color:#79B8FF"> -f</span><span style="color:#9ECBFF"> pvc-mover.yml</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">namespac</span><span style="color:#E1E4E8">e</span><span style="color:#F97583">></span><span style="color:#9ECBFF"> wait</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --for=condition=Ready</span><span style="color:#9ECBFF"> pod/pvc-mover</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --timeout=90s</span></span></code></pre>
+<h2 id="back-up-the-source-pvc">Back Up the Source PVC</h2>
+<p>Inspect the mounted volume before copying it. This confirms the actual files
+and gives you a quick view of the data size.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">namespac</span><span style="color:#E1E4E8">e</span><span style="color:#F97583">></span><span style="color:#9ECBFF"> exec</span><span style="color:#9ECBFF"> pvc-mover</span><span style="color:#79B8FF"> --</span><span style="color:#9ECBFF"> ls</span><span style="color:#79B8FF"> -lah</span><span style="color:#9ECBFF"> /data</span></span>
+<span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">namespac</span><span style="color:#E1E4E8">e</span><span style="color:#F97583">></span><span style="color:#9ECBFF"> exec</span><span style="color:#9ECBFF"> pvc-mover</span><span style="color:#79B8FF"> --</span><span style="color:#9ECBFF"> du</span><span style="color:#79B8FF"> -sh</span><span style="color:#9ECBFF"> /data</span></span></code></pre>
+<p>For a lift-and-shift migration, packaging the complete volume is often safer
+than copying only the most obvious file. It preserves database journals,
+metadata, identity files, and related state stored beside the primary data.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">namespac</span><span style="color:#E1E4E8">e</span><span style="color:#F97583">></span><span style="color:#9ECBFF"> exec</span><span style="color:#9ECBFF"> pvc-mover</span><span style="color:#79B8FF"> --</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#9ECBFF">  tar</span><span style="color:#9ECBFF"> czf</span><span style="color:#9ECBFF"> /tmp/pvc-data.tar.gz</span><span style="color:#79B8FF"> -C</span><span style="color:#9ECBFF"> /data</span><span style="color:#9ECBFF"> .</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">namespac</span><span style="color:#E1E4E8">e</span><span style="color:#F97583">></span><span style="color:#9ECBFF"> cp</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#9ECBFF">  pvc-mover:/tmp/pvc-data.tar.gz</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#9ECBFF">  ./pvc-data.tar.gz</span></span></code></pre>
+<p>Verify the archive before leaving the source cluster. A checksum provides a
+simple way to confirm that the same artifact reached the destination.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">ls</span><span style="color:#79B8FF"> -lh</span><span style="color:#9ECBFF"> ./pvc-data.tar.gz</span></span>
+<span class="line"><span style="color:#B392F0">sha256sum</span><span style="color:#9ECBFF"> ./pvc-data.tar.gz</span></span>
+<span class="line"><span style="color:#B392F0">tar</span><span style="color:#9ECBFF"> tzf</span><span style="color:#9ECBFF"> ./pvc-data.tar.gz</span><span style="color:#F97583"> |</span><span style="color:#B392F0"> head</span></span></code></pre>
+<h2 id="restore-the-destination-pvc">Restore the Destination PVC</h2>
+<p>Create the destination PVC using a StorageClass supported by the destination
+cluster. StorageClass names and volume implementations are cluster-specific,
+so the source PVC manifest should be reviewed rather than copied blindly.</p>
+<p>Keep the destination application stopped while the volume is populated. Apply
+the same <code>pvc-mover</code> manifest in the destination cluster, this time pointing it
+at the new claim.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">namespac</span><span style="color:#E1E4E8">e</span><span style="color:#F97583">></span><span style="color:#9ECBFF"> cp</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#9ECBFF">  ./pvc-data.tar.gz</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#9ECBFF">  pvc-mover:/tmp/pvc-data.tar.gz</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">namespac</span><span style="color:#E1E4E8">e</span><span style="color:#F97583">></span><span style="color:#9ECBFF"> exec</span><span style="color:#9ECBFF"> pvc-mover</span><span style="color:#79B8FF"> --</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#9ECBFF">  sha256sum</span><span style="color:#9ECBFF"> /tmp/pvc-data.tar.gz</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">namespac</span><span style="color:#E1E4E8">e</span><span style="color:#F97583">></span><span style="color:#9ECBFF"> exec</span><span style="color:#9ECBFF"> pvc-mover</span><span style="color:#79B8FF"> --</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#9ECBFF">  tar</span><span style="color:#9ECBFF"> xzf</span><span style="color:#9ECBFF"> /tmp/pvc-data.tar.gz</span><span style="color:#79B8FF"> -C</span><span style="color:#9ECBFF"> /data</span></span></code></pre>
+<p>The destination checksum should match the value recorded during backup. That
+confirms the archive survived the transfer, although an application-level
+integrity check is still valuable for database files.</p>
+<h2 id="ownership-is-part-of-the-migration">Ownership Is Part of the Migration</h2>
+<p>The helper pod may create files as <code>root</code>, while the application runs with a
+non-root UID and GID. A database can appear to restore successfully and then
+fail on its first write because the ownership is wrong.</p>
+<p>Determine the runtime identity used by the application and apply it to the
+restored data:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">namespac</span><span style="color:#E1E4E8">e</span><span style="color:#F97583">></span><span style="color:#9ECBFF"> exec</span><span style="color:#9ECBFF"> pvc-mover</span><span style="color:#79B8FF"> --</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#9ECBFF">  chown</span><span style="color:#79B8FF"> -R</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">ui</span><span style="color:#E1E4E8">d</span><span style="color:#F97583">></span><span style="color:#9ECBFF">:</span><span style="color:#F97583">&#x3C;</span><span style="color:#9ECBFF">gi</span><span style="color:#E1E4E8">d</span><span style="color:#F97583">></span><span style="color:#9ECBFF"> /data</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">namespac</span><span style="color:#E1E4E8">e</span><span style="color:#F97583">></span><span style="color:#9ECBFF"> exec</span><span style="color:#9ECBFF"> pvc-mover</span><span style="color:#79B8FF"> --</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#9ECBFF">  ls</span><span style="color:#79B8FF"> -lan</span><span style="color:#9ECBFF"> /data</span></span></code></pre>
+<p>An <code>fsGroup</code> may help with volume permissions, but it should not replace
+verification. Its behavior depends on the storage driver and the pod’s security
+settings.</p>
+<h2 id="cut-over-and-clean-up">Cut Over and Clean Up</h2>
+<p>Delete the helper pod after the restoration is complete. It is temporary
+migration infrastructure and should not become a permanent administrative
+container.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">namespac</span><span style="color:#E1E4E8">e</span><span style="color:#F97583">></span><span style="color:#9ECBFF"> delete</span><span style="color:#9ECBFF"> pod</span><span style="color:#9ECBFF"> pvc-mover</span></span></code></pre>
+<p>Start the destination application through its normal deployment process and
+watch the rollout, logs, and health checks. Validate a real read and write
+instead of treating a <code>Running</code> pod as proof of a successful migration.</p>
+<p>Keep the source workload stopped during validation when the volume contains
+singleton identity, lease, or membership state. Running both copies at once
+could create duplicate identities or corrupt shared assumptions.</p>
+<p>The PVC is only one part of the move. Secrets, ConfigMaps, workload identities,
+certificates, DNS records, network policies, and external dependencies still
+need their own migration plan.</p>
+<h2 id="a-note-to-my-future-self">A Note to My Future Self</h2>
+<p>This is not the most sophisticated Kubernetes backup or migration system, and
+it is not intended to be one. It is a small, practical pattern for the
+recurring situation where an application can be stopped, its PVC is manageable
+in size, and its data needs to move between clusters.</p>
+<p>For large datasets, frequent migrations, or strict recovery objectives, native
+replication, application-aware backups, CSI snapshots, or resumable transfer
+tools are better choices. The helper pod is useful precisely because it solves
+the smaller problem without pretending to be a complete data platform.</p>
+<p>The important part is not Alpine or the exact <code>tar</code> command. The reusable idea
+is to separate the data operation from the application image, stop the writer,
+verify the transfer, preserve ownership, and start the destination only after
+the volume is ready.</p>
+<p>I have now encountered this problem at a previous company, during a homelab
+rebuild, and again while migrating applications from EKS to GKE. That is enough
+repetition to justify leaving myself a runbook for the next time it appears.</p> </div> <nav class="blog-post-navigation"> <a href="/blog/gke-kargo" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">GKE - Part 7: Build Once, Promote Forward with Kargo</div> </a> <a href="/blog/automate-the-tedious-with-ai" class="blog-post-nav-link next"> <div class="blog-post-nav-label">Next Post</div> <div class="blog-post-nav-title">Automate the Tedious: Supercharging Everyday Routines With AI</div> </a> </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Posts</h2> <div class="related-posts-grid"> <a href="/blog/gke-kargo" class="blog-card card-link"> <img src="/assets/blog/gke-kargo/banner.webp" alt="GKE - Part 7: Build Once, Promote Forward with Kargo" class="blog-card-image"> <h3 class="blog-card-title">GKE - Part 7: Build Once, Promote Forward with Kargo</h3> <p class="blog-card-description"> How Kargo fits into a GitOps platform built around immutable artifacts, Argo CD, and environment promotion. </p> </a><a href="/blog/gke-multicloud-service-connectivity" class="blog-card card-link"> <img src="/assets/blog/gke-multicloud-service-connectivity/banner.webp" alt="GKE - Part 6: Multi-Cloud Service Connectivity Between GKE and EKS" class="blog-card-image"> <h3 class="blog-card-title">GKE - Part 6: Multi-Cloud Service Connectivity Between GKE and EKS</h3> <p class="blog-card-description"> Connecting workloads across GKE and EKS with the Tailscale Kubernetes operator, so a workload moved to GKE can still reach a private service in EKS. </p> </a><a href="/blog/gke-tailsacle" class="blog-card card-link"> <img src="/assets/blog/gke-tailscale/banner.webp" alt="GKE - Part 5: Private Platform Access with the Tailscale Kubernetes Operator" class="blog-card-image"> <h3 class="blog-card-title">GKE - Part 5: Private Platform Access with the Tailscale Kubernetes Operator</h3> <p class="blog-card-description"> Installing the Tailscale Kubernetes operator on GKE, exposing Argo CD privately through Tailscale Ingress, and documenting the setup so I do not have to rediscover it next time. </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container text-primary"> <p>© 2026 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer>  </body></html>
