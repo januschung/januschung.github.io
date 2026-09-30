@@ -1,0 +1,581 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="A phased, repeatable runbook for bootstrapping Argo CD, Sealed Secrets, and an app-of-apps control repository on a new Kubernetes cluster."><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v5.17.2"><link rel="canonical" href="https://januschung.github.io/blog/argocd-gitops-bootstrap-runbook/"><title>Runbook: Bootstrap Argo CD on a New Cluster with GitOps - Janus</title><link rel="stylesheet" href="/_astro/about.CdqPxALF.css">
+<link rel="stylesheet" href="/_astro/index.BFrYoEHc.css"></head> <body class="min-h-screen flex flex-col"> <span data-pagefind-filter="locale:en" class="hidden" aria-hidden="true"></span> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/homelab-arena">Homelab Arena</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Blog</a> </li><li> <a href="/cv">CV</a> </li> </ul>  <div class="mobile-controls"> <button class="search-icon-button" aria-label="Toggle search" id="search-toggle"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"> <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round"></path> </svg> </button> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> </div> <div class="header-search" id="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false,&#34;translations&#34;:{&#34;placeholder&#34;:&#34;Search…&#34;}}"></div> <script type="module" src="/_astro/Search.astro_astro_type_script_index_0_lang.tZYucdM2.js"></script> </div>  </div> </nav> </header> <script type="module">(function(){const n=document.getElementById("mobile-menu-toggle"),s=document.getElementById("nav-links"),c=document.querySelector("header"),a=document.getElementById("search-toggle"),e=document.getElementById("header-search");n&&s&&(n.addEventListener("click",()=>{const t=s.classList.toggle("nav-open");n.classList.toggle("active"),c.classList.toggle("menu-open"),t?document.body.style.overflow="hidden":document.body.style.overflow="",e&&e.classList.remove("search-open")}),s.querySelectorAll("a").forEach(t=>{t.addEventListener("click",()=>{s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow=""})}),document.addEventListener("click",t=>{!c.contains(t.target)&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow="")})),a&&e&&(a.addEventListener("click",o=>{o.stopPropagation(),e.classList.toggle("search-open"),s&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n&&n.classList.remove("active"),c&&c.classList.remove("menu-open")),e.classList.contains("search-open")&&setTimeout(()=>{const t=e.querySelector('input[type="search"]');t&&(t.focus(),t.dispatchEvent(new Event("input",{bubbles:!0})));const i=e.querySelector(".pagefind-ui__results-area");i&&(i.style.display="block")},150)}),document.addEventListener("click",o=>{e&&!e.contains(o.target)&&!a.contains(o.target)&&e.classList.contains("search-open")&&e.classList.remove("search-open")}),document.addEventListener("keydown",o=>{o.key==="Escape"&&e&&e.classList.contains("search-open")&&e.classList.remove("search-open")}))})();</script> <main class="flex-1" data-locale-prefix>  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">Runbook: Bootstrap Argo CD on a New Cluster with GitOps</h1> <div class="blog-post-meta"> <time>September 29, 2026</time> <span class="blog-post-meta-separator">•</span> <span>15 min read</span>  </div> <div class="pill-group pill-group--top"> <span class="pill">kubernetes</span><span class="pill">argocd</span><span class="pill">gitops</span><span class="pill">helm</span><span class="pill">sealed-secrets</span><span class="pill">runbook</span> </div> </header> <div class="blog-post-content prose"> <h1 id="runbook-bootstrap-argo-cd-on-a-new-cluster-with-gitops">Runbook: Bootstrap Argo CD on a New Cluster with GitOps</h1>
+<p>A portable runbook for bringing up a new Kubernetes cluster in which Argo CD manages itself and everything else from a Git control repo. It uses Sealed Secrets to keep secrets in Git. Ingress and SSO are optional add-ons; see the <a href="#reference-optional-add-ons">Reference</a> section.</p>
+<p><img src="/assets/blog/argocd-gitops-bootstrap-runbook/banner.webp" alt="banner"></p>
+<!-- more -->
+<p>The bootstrap has a chicken-and-egg problem. Argo CD needs repo credentials, and later SSO secrets. Those live in Git as SealedSecrets, which need the sealed-secrets controller, which Argo CD itself installs. So the work goes in <strong>phases</strong>. Each phase is one change merged to the default branch, followed by a manual step.</p>
+<p>Only Argo CD is installed manually with Helm. The temporary, read-only repo secret lets Argo CD read the private control repo and install Sealed Secrets. Installing the Sealed Secrets controller alone would not remove the credential bootstrap: avoiding the temporary secret would also require manually sealing and applying the permanent repo credential before Argo CD takes control.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>Phase 1 (PR)  root app + Argo CD (minimal) + sealed-secrets</span></span>
+<span class="line"><span>   manual     helm install Argo CD, temporary repo secret, apply root app, fetch sealing cert</span></span>
+<span class="line"><span>Phase 2 (PR)  sealed repo creds (+ optional ingress / SSO)</span></span>
+<span class="line"><span>   manual     delete temporary repo secret</span></span></code></pre>
+<hr>
+<h2 id="runbook-metadata">Runbook metadata</h2>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Item</th><th>Value</th></tr></thead><tbody><tr><td>Scope</td><td>A new Kubernetes cluster with no existing Argo CD installation</td></tr><tr><td>Audience</td><td>Cluster and platform operators with cluster-admin access</td></tr><tr><td>Last reviewed</td><td>29 September 2026</td></tr><tr><td>Documented chart versions</td><td>argo-cd 10.2.1; sealed-secrets 2.18.6</td></tr><tr><td>Change pattern</td><td>Two merge-and-sync cycles with manual steps between them</td></tr><tr><td>Expected duration</td><td>About 30–60 minutes, excluding code review, DNS and SSO</td></tr><tr><td>Operational impact</td><td>Installs controllers and CRDs in <code>argocd</code> and <code>kube-system</code></td></tr></tbody></table>
+<p>Run this against a non-production cluster first. Before using newer chart versions, render the charts and check their release notes for value or CRD changes.</p>
+<h3 id="success-criteria">Success criteria</h3>
+<p>The bootstrap is complete when:</p>
+<ul>
+<li><code>bootstrap-argocd</code>, <code>platform</code>, <code>argocd</code> and <code>sealed-secrets</code> report <code>Synced</code> and <code>Healthy</code></li>
+<li>the permanent <code>repo-creds</code> secret exists and Argo CD can still read the control repo</li>
+<li>the temporary <code>repo-creds-bootstrap</code> secret has been deleted</li>
+<li>the sealed-secrets private key is backed up outside the cluster</li>
+</ul>
+<h2 id="prerequisites">Prerequisites</h2>
+<ul>
+<li>A reachable Kubernetes cluster and a kubeconfig with cluster-admin access</li>
+<li>Helm 3, <code>kubectl</code> and <code>kubeseal</code> installed locally</li>
+<li>A Git control repository and permission to merge the two bootstrap changes</li>
+<li>Read-only HTTPS credentials for every private repository Argo CD needs</li>
+<li>A secure vault or secret manager for the sealed-secrets private-key backup</li>
+<li>Optional: DNS, ingress-controller and identity-provider access for ingress or SSO</li>
+</ul>
+<p>Confirm the target context before making changes:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="sh"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#9ECBFF"> config</span><span style="color:#9ECBFF"> current-context</span></span>
+<span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#9ECBFF"> cluster-info</span></span>
+<span class="line"><span style="color:#B392F0">helm</span><span style="color:#9ECBFF"> version</span></span>
+<span class="line"><span style="color:#B392F0">kubeseal</span><span style="color:#79B8FF"> --version</span></span></code></pre>
+<hr>
+<h2 id="placeholders">Placeholders</h2>
+<p>Replace these everywhere before you use a file.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Placeholder</th><th>Meaning</th><th>Example</th></tr></thead><tbody><tr><td><code>&#x3C;GIT_REPO_URL></code></td><td>HTTPS URL of the control repo</td><td><code>https://git.example.com/org/gitops.git</code></td></tr><tr><td><code>&#x3C;GIT_CREDS_PREFIX></code></td><td>URL prefix the repo credentials apply to (org or repo)</td><td><code>https://git.example.com/org</code></td></tr><tr><td><code>&#x3C;DEFAULT_BRANCH></code></td><td>Branch the root app tracks</td><td><code>main</code></td></tr><tr><td><code>&#x3C;CLUSTER_PATH></code></td><td>Folder for this cluster in the repo</td><td><code>clusters/prod</code></td></tr><tr><td><code>&#x3C;SEALING_CERT_PATH></code></td><td>Local path where you save the sealed-secrets public cert</td><td><code>~/sealing/&#x3C;cluster>.crt</code></td></tr><tr><td><code>&#x3C;ARGOCD_FQDN></code></td><td>Public or internal hostname of the Argo CD UI (only for ingress/SSO)</td><td><code>argocd.example.com</code></td></tr></tbody></table>
+<p>The chart versions below are the documented baseline. Treat a version change as a separate, reviewed change.</p>
+<hr>
+<h2 id="core-concepts">Core concepts</h2>
+<ul>
+<li><strong>Control repo.</strong> The repo holds no application code. It defines which apps run in each cluster, at which version, from which repo, and how they are grouped (platform, tools, product).</li>
+<li><strong>Cluster-first layout.</strong> Everything for one cluster lives under <code>&#x3C;CLUSTER_PATH>/</code>, and each cluster folder is self-contained. Never mix environments.</li>
+<li><strong>App-of-apps.</strong> A single root Application points at <code>root/bootstrap/</code>. That folder holds AppProjects plus one “group” Application per folder (<code>platform/</code>, …). Each group Application recursively picks up every <code>*application.yaml</code> in its folder.</li>
+<li><strong>Wrapper charts.</strong> Each component is a small local Helm chart that lists the upstream chart as a dependency. Values sit under the dependency’s name, for example <code>argo-cd:</code>. Extra manifests such as SealedSecrets go in the wrapper’s <code>templates/</code>.</li>
+<li><strong>Projects</strong> restrict which source repos and destination namespaces each group may use.</li>
+<li><strong>Rules.</strong> Don’t edit the cluster by hand, don’t bypass Argo CD, and never commit plaintext secrets. The only bootstrap exceptions are the manual Argo CD install, temporary repo secret and one-time root Application.</li>
+</ul>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>root Application (bootstrap-argocd)</span></span>
+<span class="line"><span>  → root/bootstrap/projects/*   AppProjects</span></span>
+<span class="line"><span>  → root/bootstrap/apps/*       group Applications (platform, ...)</span></span>
+<span class="line"><span>      → &#x3C;group>/**/application.yaml   component Applications</span></span>
+<span class="line"><span>          → wrapper Helm chart (upstream dependency + templates/)</span></span></code></pre>
+<hr>
+<h2 id="folder-tree">Folder tree</h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>&#x3C;CLUSTER_PATH>/</span></span>
+<span class="line"><span>├── root/</span></span>
+<span class="line"><span>│   ├── root-application.yaml             # applied once, by hand</span></span>
+<span class="line"><span>│   └── bootstrap/</span></span>
+<span class="line"><span>│       ├── projects/</span></span>
+<span class="line"><span>│       │   └── platform-project.yaml</span></span>
+<span class="line"><span>│       └── apps/</span></span>
+<span class="line"><span>│           └── platform-application.yaml</span></span>
+<span class="line"><span>└── platform/</span></span>
+<span class="line"><span>    ├── argocd/</span></span>
+<span class="line"><span>    │   ├── Chart.yaml</span></span>
+<span class="line"><span>    │   ├── Chart.lock                    # commit for reproducible dependencies</span></span>
+<span class="line"><span>    │   ├── application.yaml</span></span>
+<span class="line"><span>    │   ├── values-bootstrap.yaml          # first helm install only; keep a copy for rebuilds</span></span>
+<span class="line"><span>    │   ├── values.yaml                    # what Argo CD syncs to itself</span></span>
+<span class="line"><span>    │   └── templates/                     # added in Phase 2</span></span>
+<span class="line"><span>    │       ├── repo-creds.sealed-secret.yaml</span></span>
+<span class="line"><span>    │       └── dex-&#x3C;provider>-secret.sealed-secret.yaml   # optional, SSO</span></span>
+<span class="line"><span>    └── sealed-secrets/</span></span>
+<span class="line"><span>        ├── Chart.yaml</span></span>
+<span class="line"><span>        ├── Chart.lock                    # commit for reproducible dependencies</span></span>
+<span class="line"><span>        ├── application.yaml</span></span>
+<span class="line"><span>        └── values.yaml</span></span></code></pre>
+<p>To add another group later (tools, product apps), add <code>root/bootstrap/projects/&#x3C;group>-project.yaml</code>, <code>root/bootstrap/apps/&#x3C;group>-application.yaml</code> and a <code>&#x3C;group>/</code> folder, all following the same pattern.</p>
+<hr>
+<h2 id="phase-1-install-argo-cd-and-hand-it-control">Phase 1: Install Argo CD and hand it control</h2>
+<h3 id="files-for-pr-1">Files for PR 1</h3>
+<p><strong><code>&#x3C;CLUSTER_PATH>/root/root-application.yaml</code></strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argoproj.io/v1alpha1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Application</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">bootstrap-argocd</span></span>
+<span class="line"><span style="color:#85E89D">  namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd</span></span>
+<span class="line"><span style="color:#85E89D">spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  project</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">default</span></span>
+<span class="line"><span style="color:#85E89D">  destination</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    server</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">https://kubernetes.default.svc</span></span>
+<span class="line"><span style="color:#85E89D">    namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd</span></span>
+<span class="line"><span style="color:#85E89D">  source</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    repoURL</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">&#x3C;GIT_REPO_URL></span></span>
+<span class="line"><span style="color:#85E89D">    targetRevision</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">&#x3C;DEFAULT_BRANCH></span></span>
+<span class="line"><span style="color:#85E89D">    path</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">&#x3C;CLUSTER_PATH>/root/bootstrap</span></span>
+<span class="line"><span style="color:#85E89D">    directory</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      recurse</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span>
+<span class="line"><span style="color:#85E89D">  syncPolicy</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    automated</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      prune</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span>
+<span class="line"><span style="color:#85E89D">      selfHeal</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span></code></pre>
+<p><strong><code>&#x3C;CLUSTER_PATH>/root/bootstrap/projects/platform-project.yaml</code></strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argoproj.io/v1alpha1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">AppProject</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">platform</span></span>
+<span class="line"><span style="color:#85E89D">  namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd</span></span>
+<span class="line"><span style="color:#85E89D">spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  clusterResourceWhitelist</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">group</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">'*'</span></span>
+<span class="line"><span style="color:#85E89D">      kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">'*'</span></span>
+<span class="line"><span style="color:#85E89D">  sourceRepos</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#9ECBFF">&#x3C;GIT_REPO_URL></span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#9ECBFF">https://argoproj.github.io/argo-helm</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#9ECBFF">https://bitnami.github.io/sealed-secrets</span></span>
+<span class="line"><span style="color:#6A737D">    # add the Helm repos of other platform components here</span></span>
+<span class="line"><span style="color:#85E89D">  destinations</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd</span></span>
+<span class="line"><span style="color:#85E89D">      server</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">https://kubernetes.default.svc</span></span>
+<span class="line"><span style="color:#E1E4E8">    - </span><span style="color:#85E89D">namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">kube-system</span></span>
+<span class="line"><span style="color:#85E89D">      server</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">https://kubernetes.default.svc</span></span>
+<span class="line"><span style="color:#6A737D">    # add a destination for each new platform namespace</span></span></code></pre>
+<p><strong><code>&#x3C;CLUSTER_PATH>/root/bootstrap/apps/platform-application.yaml</code></strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argoproj.io/v1alpha1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Application</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">platform</span></span>
+<span class="line"><span style="color:#85E89D">  namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd</span></span>
+<span class="line"><span style="color:#85E89D">spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  project</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">platform</span></span>
+<span class="line"><span style="color:#85E89D">  destination</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    server</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">https://kubernetes.default.svc</span></span>
+<span class="line"><span style="color:#85E89D">    namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd</span></span>
+<span class="line"><span style="color:#85E89D">  source</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    repoURL</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">&#x3C;GIT_REPO_URL></span></span>
+<span class="line"><span style="color:#85E89D">    targetRevision</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">&#x3C;DEFAULT_BRANCH></span></span>
+<span class="line"><span style="color:#85E89D">    path</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">&#x3C;CLUSTER_PATH>/platform</span></span>
+<span class="line"><span style="color:#85E89D">    directory</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      recurse</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span>
+<span class="line"><span style="color:#85E89D">      include</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">"{*application.yaml,*application-set.yaml}"</span></span>
+<span class="line"><span style="color:#85E89D">  syncPolicy</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    automated</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      prune</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span>
+<span class="line"><span style="color:#85E89D">      selfHeal</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span></code></pre>
+<p><strong><code>&#x3C;CLUSTER_PATH>/platform/argocd/Chart.yaml</code></strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">v2</span></span>
+<span class="line"><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd</span></span>
+<span class="line"><span style="color:#85E89D">version</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">0.1.0</span></span>
+<span class="line"><span style="color:#85E89D">dependencies</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argo-cd</span></span>
+<span class="line"><span style="color:#85E89D">    version</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">10.2.1</span></span>
+<span class="line"><span style="color:#85E89D">    repository</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">https://argoproj.github.io/argo-helm</span></span></code></pre>
+<p><strong><code>&#x3C;CLUSTER_PATH>/platform/argocd/application.yaml</code></strong></p>
+<p>The Application name <code>argocd</code> becomes the Helm release name. It must match the release name of the manual <code>helm install</code>, or Argo CD won’t adopt the release.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argoproj.io/v1alpha1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Application</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd</span></span>
+<span class="line"><span style="color:#85E89D">  namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd</span></span>
+<span class="line"><span style="color:#85E89D">spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  project</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">default</span></span>
+<span class="line"><span style="color:#85E89D">  source</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    repoURL</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">&#x3C;GIT_REPO_URL></span></span>
+<span class="line"><span style="color:#85E89D">    targetRevision</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">&#x3C;DEFAULT_BRANCH></span></span>
+<span class="line"><span style="color:#85E89D">    path</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">&#x3C;CLUSTER_PATH>/platform/argocd</span></span>
+<span class="line"><span style="color:#85E89D">    helm</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      valueFiles</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">        - </span><span style="color:#9ECBFF">values.yaml</span></span>
+<span class="line"><span style="color:#85E89D">  destination</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    server</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">https://kubernetes.default.svc</span></span>
+<span class="line"><span style="color:#85E89D">    namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd</span></span>
+<span class="line"><span style="color:#85E89D">  syncPolicy</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    automated</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      prune</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span>
+<span class="line"><span style="color:#85E89D">      selfHeal</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span></code></pre>
+<p><strong><code>&#x3C;CLUSTER_PATH>/platform/argocd/values-bootstrap.yaml</code></strong></p>
+<p>This file has no dex, no ingress and no SealedSecrets, so nothing in it depends on components Argo CD hasn’t installed yet.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#6A737D"># Used only for the initial `helm install`. Access via `kubectl port-forward`.</span></span>
+<span class="line"><span style="color:#85E89D">argo-cd</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  configs</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    params</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      server.insecure</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span><span style="color:#6A737D">   # TLS is terminated at the ingress, if there is one</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">  controller</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    replicas</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">1</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">  repoServer</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    replicas</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">1</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">  applicationSet</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    replicaCount</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">1</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">  redis</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    enabled</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">  dex</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    enabled</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">false</span></span></code></pre>
+<p><strong><code>&#x3C;CLUSTER_PATH>/platform/argocd/values.yaml</code></strong></p>
+<p>Start this file with the <strong>same content as <code>values-bootstrap.yaml</code></strong>, so the first self-sync changes nothing. From Phase 2 onward, this is the file you evolve.</p>
+<p>Do <strong>not</strong> add <code>templates/</code> yet. If SealedSecret manifests sync before the SealedSecret CRD exists, the argocd app fails.</p>
+<p><strong><code>&#x3C;CLUSTER_PATH>/platform/sealed-secrets/Chart.yaml</code></strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">v2</span></span>
+<span class="line"><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">sealed-secrets</span></span>
+<span class="line"><span style="color:#85E89D">version</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">0.1.0</span></span>
+<span class="line"><span style="color:#85E89D">dependencies</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">  - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">sealed-secrets</span></span>
+<span class="line"><span style="color:#85E89D">    version</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">2.18.6</span></span>
+<span class="line"><span style="color:#85E89D">    repository</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">https://bitnami.github.io/sealed-secrets</span></span></code></pre>
+<p><strong><code>&#x3C;CLUSTER_PATH>/platform/sealed-secrets/application.yaml</code></strong></p>
+<p>The Application name <code>sealed-secrets</code> gives the controller Service name <code>sealed-secrets</code> in <code>kube-system</code>. <code>kubeseal</code> needs that name below.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argoproj.io/v1alpha1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Application</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">sealed-secrets</span></span>
+<span class="line"><span style="color:#85E89D">  namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd</span></span>
+<span class="line"><span style="color:#85E89D">spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  project</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">platform</span></span>
+<span class="line"><span style="color:#85E89D">  source</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    repoURL</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">&#x3C;GIT_REPO_URL></span></span>
+<span class="line"><span style="color:#85E89D">    targetRevision</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">&#x3C;DEFAULT_BRANCH></span></span>
+<span class="line"><span style="color:#85E89D">    path</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">&#x3C;CLUSTER_PATH>/platform/sealed-secrets</span></span>
+<span class="line"><span style="color:#85E89D">    helm</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      valueFiles</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">        - </span><span style="color:#9ECBFF">values.yaml</span></span>
+<span class="line"><span style="color:#85E89D">  destination</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    server</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">https://kubernetes.default.svc</span></span>
+<span class="line"><span style="color:#85E89D">    namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">kube-system</span></span>
+<span class="line"><span style="color:#85E89D">  syncPolicy</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    automated</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      prune</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span>
+<span class="line"><span style="color:#85E89D">      selfHeal</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span></code></pre>
+<p><strong><code>&#x3C;CLUSTER_PATH>/platform/sealed-secrets/values.yaml</code></strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">sealed-secrets</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  podSecurityContext</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    enabled</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span>
+<span class="line"><span style="color:#85E89D">    fsGroup</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">65534</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">  containerSecurityContext</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    enabled</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span>
+<span class="line"><span style="color:#85E89D">    readOnlyRootFilesystem</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span>
+<span class="line"><span style="color:#85E89D">    runAsNonRoot</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span>
+<span class="line"><span style="color:#85E89D">    runAsUser</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">1001</span></span></code></pre>
+<p>Before you open the PR, resolve and render both dependencies. Commit each generated <code>Chart.lock</code> file so later builds use the same dependency versions; do not commit the generated <code>charts/</code> directories.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="sh"><code><span class="line"><span style="color:#B392F0">helm</span><span style="color:#9ECBFF"> dependency</span><span style="color:#9ECBFF"> update</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">CLUSTER_PAT</span><span style="color:#E1E4E8">H</span><span style="color:#F97583">></span><span style="color:#9ECBFF">/platform/argocd</span></span>
+<span class="line"><span style="color:#B392F0">helm</span><span style="color:#9ECBFF"> template</span><span style="color:#9ECBFF"> argocd</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">CLUSTER_PAT</span><span style="color:#E1E4E8">H</span><span style="color:#F97583">></span><span style="color:#9ECBFF">/platform/argocd</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  -n</span><span style="color:#9ECBFF"> argocd</span><span style="color:#79B8FF"> -f</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">CLUSTER_PAT</span><span style="color:#E1E4E8">H</span><span style="color:#F97583">></span><span style="color:#9ECBFF">/platform/argocd/values.yaml</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">helm</span><span style="color:#9ECBFF"> dependency</span><span style="color:#9ECBFF"> update</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">CLUSTER_PAT</span><span style="color:#E1E4E8">H</span><span style="color:#F97583">></span><span style="color:#9ECBFF">/platform/sealed-secrets</span></span>
+<span class="line"><span style="color:#B392F0">helm</span><span style="color:#9ECBFF"> template</span><span style="color:#9ECBFF"> sealed-secrets</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">CLUSTER_PAT</span><span style="color:#E1E4E8">H</span><span style="color:#F97583">></span><span style="color:#9ECBFF">/platform/sealed-secrets</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  -n</span><span style="color:#9ECBFF"> kube-system</span><span style="color:#79B8FF"> -f</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">CLUSTER_PAT</span><span style="color:#E1E4E8">H</span><span style="color:#F97583">></span><span style="color:#9ECBFF">/platform/sealed-secrets/values.yaml</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">rm</span><span style="color:#79B8FF"> -rf</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#F97583">  &#x3C;</span><span style="color:#9ECBFF">CLUSTER_PAT</span><span style="color:#E1E4E8">H</span><span style="color:#F97583">></span><span style="color:#9ECBFF">/platform/argocd/charts</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#F97583">  &#x3C;</span><span style="color:#9ECBFF">CLUSTER_PAT</span><span style="color:#E1E4E8">H</span><span style="color:#F97583">></span><span style="color:#9ECBFF">/platform/sealed-secrets/charts</span></span></code></pre>
+<h3 id="manual-step-a-install-and-hand-over-after-pr-1-is-merged">Manual step A: install and hand over (after PR 1 is merged)</h3>
+<p><strong>1. Install Argo CD from the wrapper chart</strong>, not the upstream <code>argo/argo-cd</code>. The values are nested under <code>argo-cd:</code>, and the upstream chart would silently ignore them.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="sh"><code><span class="line"><span style="color:#B392F0">helm</span><span style="color:#9ECBFF"> dependency</span><span style="color:#9ECBFF"> build</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">CLUSTER_PAT</span><span style="color:#E1E4E8">H</span><span style="color:#F97583">></span><span style="color:#9ECBFF">/platform/argocd</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">helm</span><span style="color:#9ECBFF"> install</span><span style="color:#9ECBFF"> argocd</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">CLUSTER_PAT</span><span style="color:#E1E4E8">H</span><span style="color:#F97583">></span><span style="color:#9ECBFF">/platform/argocd</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  -n</span><span style="color:#9ECBFF"> argocd</span><span style="color:#79B8FF"> --create-namespace</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  -f</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">CLUSTER_PAT</span><span style="color:#E1E4E8">H</span><span style="color:#F97583">></span><span style="color:#9ECBFF">/platform/argocd/values-bootstrap.yaml</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">rm</span><span style="color:#79B8FF"> -rf</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">CLUSTER_PAT</span><span style="color:#E1E4E8">H</span><span style="color:#F97583">></span><span style="color:#9ECBFF">/platform/argocd/charts</span></span></code></pre>
+<p><strong>2. Create temporary repo credentials.</strong> Use HTTPS so the secret matches the <code>repoURL</code>s. A <code>repo-creds</code> secret applies to every repo under <code>&#x3C;GIT_CREDS_PREFIX></code>.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="sh"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> argocd</span><span style="color:#9ECBFF"> create</span><span style="color:#9ECBFF"> secret</span><span style="color:#9ECBFF"> generic</span><span style="color:#9ECBFF"> repo-creds-bootstrap</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --from-literal=type=git</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --from-literal=url=</span><span style="color:#F97583">&#x3C;</span><span style="color:#79B8FF">GIT_CREDS_PREFIX</span><span style="color:#F97583">></span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --from-literal=username=</span><span style="color:#F97583">&#x3C;</span><span style="color:#79B8FF">username</span><span style="color:#F97583">></span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --from-literal=password=</span><span style="color:#F97583">&#x3C;</span><span style="color:#79B8FF">token</span><span style="color:#F97583">></span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> argocd</span><span style="color:#9ECBFF"> label</span><span style="color:#9ECBFF"> secret</span><span style="color:#9ECBFF"> repo-creds-bootstrap</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#9ECBFF">  argocd.argoproj.io/secret-type=repo-creds</span></span></code></pre>
+<p>Use a read-only token. For GitHub, use <code>username=x-access-token</code> with a PAT, or see <a href="#github-app-repo-credentials">GitHub App repo credentials</a>.</p>
+<p><strong>3. Apply the root app.</strong> This is the only manual <code>kubectl apply</code>.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="sh"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#9ECBFF"> apply</span><span style="color:#79B8FF"> -f</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">CLUSTER_PAT</span><span style="color:#E1E4E8">H</span><span style="color:#F97583">></span><span style="color:#9ECBFF">/root/root-application.yaml</span></span></code></pre>
+<p><strong>4. Verify.</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="sh"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> argocd</span><span style="color:#9ECBFF"> get</span><span style="color:#9ECBFF"> applications</span><span style="color:#6A737D">     # bootstrap-argocd, platform, argocd, sealed-secrets: Synced/Healthy</span></span>
+<span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> argocd</span><span style="color:#9ECBFF"> get</span><span style="color:#9ECBFF"> secret</span><span style="color:#9ECBFF"> argocd-initial-admin-secret</span><span style="color:#79B8FF"> -o</span><span style="color:#9ECBFF"> jsonpath='{.data.password}'</span><span style="color:#F97583"> |</span><span style="color:#B392F0"> base64</span><span style="color:#79B8FF"> -d</span></span>
+<span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> argocd</span><span style="color:#9ECBFF"> port-forward</span><span style="color:#9ECBFF"> svc/argocd-server</span><span style="color:#9ECBFF"> 8080:80</span><span style="color:#6A737D">   # http://localhost:8080, user admin</span></span></code></pre>
+<p><strong>5. Fetch the sealing cert and back up the private key.</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="sh"><code><span class="line"><span style="color:#B392F0">kubeseal</span><span style="color:#79B8FF"> --controller-name</span><span style="color:#9ECBFF"> sealed-secrets</span><span style="color:#79B8FF"> --controller-namespace</span><span style="color:#9ECBFF"> kube-system</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --fetch-cert</span><span style="color:#F97583"> ></span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">SEALING_CERT_PAT</span><span style="color:#E1E4E8">H</span><span style="color:#F97583">></span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D"># Store this output in a vault. If the key is lost, every SealedSecret must be re-sealed.</span></span>
+<span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> kube-system</span><span style="color:#9ECBFF"> get</span><span style="color:#9ECBFF"> secret</span><span style="color:#79B8FF"> -l</span><span style="color:#9ECBFF"> sealedsecrets.bitnami.com/sealed-secrets-key</span><span style="color:#79B8FF"> -o</span><span style="color:#9ECBFF"> yaml</span></span></code></pre>
+<p><strong>6. Seal the permanent repo credentials</strong> (and any SSO secret from the Reference section). The default scope is strict, so each secret’s name and namespace must match exactly.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="sh"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#9ECBFF"> create</span><span style="color:#9ECBFF"> secret</span><span style="color:#9ECBFF"> generic</span><span style="color:#9ECBFF"> repo-creds</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> argocd</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --from-literal=type=git</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --from-literal=url=</span><span style="color:#F97583">&#x3C;</span><span style="color:#79B8FF">GIT_CREDS_PREFIX</span><span style="color:#F97583">></span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --from-literal=username=</span><span style="color:#F97583">&#x3C;</span><span style="color:#79B8FF">username</span><span style="color:#F97583">></span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --from-literal=password=</span><span style="color:#F97583">&#x3C;</span><span style="color:#79B8FF">token</span><span style="color:#F97583">></span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --dry-run=client</span><span style="color:#79B8FF"> -o</span><span style="color:#9ECBFF"> yaml</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#F97583">|</span><span style="color:#B392F0"> kubectl</span><span style="color:#9ECBFF"> label</span><span style="color:#79B8FF"> --local</span><span style="color:#79B8FF"> -f</span><span style="color:#9ECBFF"> -</span><span style="color:#9ECBFF"> argocd.argoproj.io/secret-type=repo-creds</span><span style="color:#79B8FF"> -o</span><span style="color:#9ECBFF"> yaml</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#F97583">|</span><span style="color:#B392F0"> kubeseal</span><span style="color:#79B8FF"> --cert</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">SEALING_CERT_PAT</span><span style="color:#E1E4E8">H</span><span style="color:#F97583">></span><span style="color:#79B8FF"> --format</span><span style="color:#9ECBFF"> yaml</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#F97583">  ></span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">CLUSTER_PAT</span><span style="color:#E1E4E8">H</span><span style="color:#F97583">></span><span style="color:#9ECBFF">/platform/argocd/templates/repo-creds.sealed-secret.yaml</span></span></code></pre>
+<p>Check that the file decrypts on the cluster:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="sh"><code><span class="line"><span style="color:#B392F0">kubeseal</span><span style="color:#79B8FF"> --controller-name</span><span style="color:#9ECBFF"> sealed-secrets</span><span style="color:#79B8FF"> --controller-namespace</span><span style="color:#9ECBFF"> kube-system</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --validate</span><span style="color:#F97583"> &#x3C;</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">CLUSTER_PAT</span><span style="color:#E1E4E8">H</span><span style="color:#F97583">></span><span style="color:#9ECBFF">/platform/argocd/templates/repo-creds.sealed-secret.yaml</span></span></code></pre>
+<hr>
+<h2 id="phase-2-permanent-repo-credentials">Phase 2: Permanent repo credentials</h2>
+<h3 id="files-for-pr-2">Files for PR 2</h3>
+<p><strong><code>&#x3C;CLUSTER_PATH>/platform/argocd/templates/repo-creds.sealed-secret.yaml</code></strong>: generated by kubeseal. It has this shape:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#B392F0">---</span></span>
+<span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">bitnami.com/v1alpha1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">SealedSecret</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  creationTimestamp</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">null</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">repo-creds</span></span>
+<span class="line"><span style="color:#85E89D">  namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd</span></span>
+<span class="line"><span style="color:#85E89D">spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  encryptedData</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    password</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">&#x3C;ENCRYPTED></span></span>
+<span class="line"><span style="color:#85E89D">    type</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">&#x3C;ENCRYPTED></span></span>
+<span class="line"><span style="color:#85E89D">    url</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">&#x3C;ENCRYPTED></span></span>
+<span class="line"><span style="color:#85E89D">    username</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">&#x3C;ENCRYPTED></span></span>
+<span class="line"><span style="color:#85E89D">  template</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      creationTimestamp</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">null</span></span>
+<span class="line"><span style="color:#85E89D">      labels</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">        argocd.argoproj.io/secret-type</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">repo-creds</span></span>
+<span class="line"><span style="color:#85E89D">      name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">repo-creds</span></span>
+<span class="line"><span style="color:#85E89D">      namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd</span></span></code></pre>
+<p>Optionally add the <a href="#ingress">ingress</a> and <a href="#sso-with-dex">SSO</a> pieces to <code>values.yaml</code> in the same PR.</p>
+<h3 id="manual-step-b-after-pr-2-syncs">Manual step B: after PR 2 syncs</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="sh"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> argocd</span><span style="color:#9ECBFF"> get</span><span style="color:#9ECBFF"> secret</span><span style="color:#9ECBFF"> repo-creds</span><span style="color:#6A737D">        # unsealed</span></span>
+<span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> argocd</span><span style="color:#9ECBFF"> get</span><span style="color:#9ECBFF"> applications</span><span style="color:#6A737D">             # still Synced, so repo access works</span></span>
+<span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> argocd</span><span style="color:#9ECBFF"> delete</span><span style="color:#9ECBFF"> secret</span><span style="color:#9ECBFF"> repo-creds-bootstrap</span></span>
+<span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> argocd</span><span style="color:#9ECBFF"> get</span><span style="color:#9ECBFF"> applications</span><span style="color:#6A737D">             # still Synced after the delete</span></span></code></pre>
+<hr>
+<h2 id="reference-optional-add-ons">Reference: optional add-ons</h2>
+<h3 id="github-app-repo-credentials">GitHub App repo credentials</h3>
+<p>GitHub App credentials are an alternative to a user token: they’re scoped to the org, rotate automatically and aren’t tied to a person. Use these keys in place of <code>username</code>/<code>password</code>, in both the temporary secret and the sealed one:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="sh"><code><span class="line"><span style="color:#E1E4E8">  --from-literal</span><span style="color:#F97583">=</span><span style="color:#E1E4E8">githubAppID</span><span style="color:#F97583">=&#x3C;</span><span style="color:#9ECBFF">app-id</span><span style="color:#F97583">></span><span style="color:#B392F0"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --from-literal=githubAppInstallationID=</span><span style="color:#F97583">&#x3C;</span><span style="color:#79B8FF">installation-id</span><span style="color:#F97583">></span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --from-file=githubAppPrivateKey=</span><span style="color:#F97583">&#x3C;</span><span style="color:#79B8FF">path-to-app-key.pem</span><span style="color:#F97583">></span></span></code></pre>
+<p>Set <code>url</code> to the org, for example <code>https://github.com/&#x3C;org></code>. Give the app read-only <strong>Contents</strong> and <strong>Metadata</strong> permissions on the repos Argo CD needs.</p>
+<h3 id="ingress">Ingress</h3>
+<p>Add this under <code>argo-cd.server</code> in <code>values.yaml</code>, and set the global domain. Pick any ingress controller. If cert-manager issues the TLS cert, add its issuer annotation.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">argo-cd</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  global</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    domain</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">&#x3C;ARGOCD_FQDN></span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">  server</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    ingress</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      enabled</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span>
+<span class="line"><span style="color:#85E89D">      ingressClassName</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">&#x3C;INGRESS_CLASS></span></span>
+<span class="line"><span style="color:#85E89D">      hostname</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">&#x3C;ARGOCD_FQDN></span></span>
+<span class="line"><span style="color:#85E89D">      tls</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span>
+<span class="line"><span style="color:#6A737D">      # annotations:</span></span>
+<span class="line"><span style="color:#6A737D">      #   cert-manager.io/cluster-issuer: &#x3C;ISSUER></span></span></code></pre>
+<p>Without an ingress, keep using <code>kubectl port-forward svc/argocd-server 8080:80</code>.</p>
+<h3 id="sso-with-dex">SSO with dex</h3>
+<p>SSO needs a reachable <code>https://&#x3C;ARGOCD_FQDN></code> because the identity provider redirects back to it. Set it up after the ingress works. Both options below follow the same pattern:</p>
+<ol>
+<li>Register an OAuth app with the provider, using the callback URL <code>https://&#x3C;ARGOCD_FQDN>/api/dex/callback</code>.</li>
+<li>Seal its client secret as <code>dex-&#x3C;provider>-secret</code> in <code>argocd</code>, with the label <code>app.kubernetes.io/part-of: argocd</code>. Argo CD only resolves <code>$secret:key</code> references from secrets that carry that label.</li>
+<li>Add the <code>cm</code>, <code>rbac</code> and <code>dex</code> blocks to <code>values.yaml</code>.</li>
+</ol>
+<p>Seal the client secret:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="sh"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#9ECBFF"> create</span><span style="color:#9ECBFF"> secret</span><span style="color:#9ECBFF"> generic</span><span style="color:#9ECBFF"> dex-</span><span style="color:#F97583">&#x3C;</span><span style="color:#9ECBFF">provide</span><span style="color:#E1E4E8">r</span><span style="color:#F97583">></span><span style="color:#9ECBFF">-secret</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> argocd</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --from-literal=clientSecret=</span><span style="color:#F97583">&#x3C;</span><span style="color:#79B8FF">client-secret</span><span style="color:#F97583">></span><span style="color:#79B8FF"> --dry-run=client</span><span style="color:#79B8FF"> -o</span><span style="color:#9ECBFF"> yaml</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#F97583">|</span><span style="color:#B392F0"> kubectl</span><span style="color:#9ECBFF"> label</span><span style="color:#79B8FF"> --local</span><span style="color:#79B8FF"> -f</span><span style="color:#9ECBFF"> -</span><span style="color:#9ECBFF"> app.kubernetes.io/part-of=argocd</span><span style="color:#79B8FF"> -o</span><span style="color:#9ECBFF"> yaml</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#F97583">|</span><span style="color:#B392F0"> kubeseal</span><span style="color:#79B8FF"> --cert</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">SEALING_CERT_PAT</span><span style="color:#E1E4E8">H</span><span style="color:#F97583">></span><span style="color:#79B8FF"> --format</span><span style="color:#9ECBFF"> yaml</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#F97583">  ></span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">CLUSTER_PAT</span><span style="color:#E1E4E8">H</span><span style="color:#F97583">></span><span style="color:#9ECBFF">/platform/argocd/templates/dex-</span><span style="color:#F97583">&#x3C;</span><span style="color:#9ECBFF">provide</span><span style="color:#E1E4E8">r</span><span style="color:#F97583">></span><span style="color:#9ECBFF">-secret.sealed-secret.yaml</span></span></code></pre>
+<p>The sealed file has this shape:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#B392F0">---</span></span>
+<span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">bitnami.com/v1alpha1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">SealedSecret</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  creationTimestamp</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">null</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">dex-&#x3C;provider>-secret</span></span>
+<span class="line"><span style="color:#85E89D">  namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd</span></span>
+<span class="line"><span style="color:#85E89D">spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  encryptedData</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    clientSecret</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">&#x3C;ENCRYPTED></span></span>
+<span class="line"><span style="color:#85E89D">  template</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      creationTimestamp</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">null</span></span>
+<span class="line"><span style="color:#85E89D">      labels</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">        app.kubernetes.io/part-of</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd</span></span>
+<span class="line"><span style="color:#85E89D">      name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">dex-&#x3C;provider>-secret</span></span>
+<span class="line"><span style="color:#85E89D">      namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">argocd</span></span>
+<span class="line"><span style="color:#85E89D">    type</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Opaque</span></span></code></pre>
+<h4 id="option-a-google">Option A: Google</h4>
+<p>Create an OAuth client (type “Web application”) in the Google Cloud console and add the callback URL as an authorized redirect URI. Google’s connector doesn’t return groups without extra setup, so the RBAC below maps individual emails.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">argo-cd</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  configs</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    cm</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      url</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">https://&#x3C;ARGOCD_FQDN></span></span>
+<span class="line"><span style="color:#85E89D">      dex.config</span><span style="color:#E1E4E8">: </span><span style="color:#F97583">|</span></span>
+<span class="line"><span style="color:#9ECBFF">        connectors:</span></span>
+<span class="line"><span style="color:#9ECBFF">          - type: google</span></span>
+<span class="line"><span style="color:#9ECBFF">            id: google</span></span>
+<span class="line"><span style="color:#9ECBFF">            name: Google</span></span>
+<span class="line"><span style="color:#9ECBFF">            config:</span></span>
+<span class="line"><span style="color:#9ECBFF">              clientID: &#x3C;GOOGLE_CLIENT_ID></span></span>
+<span class="line"><span style="color:#9ECBFF">              clientSecret: $dex-google-secret:clientSecret</span></span>
+<span class="line"><span style="color:#9ECBFF">              redirectURI: https://&#x3C;ARGOCD_FQDN>/api/dex/callback</span></span>
+<span class="line"><span style="color:#9ECBFF">              # hostedDomains:</span></span>
+<span class="line"><span style="color:#9ECBFF">              #   - &#x3C;EMAIL_DOMAIN>     # only allow accounts from your domain</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">    rbac</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      policy.default</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">role:readonly</span></span>
+<span class="line"><span style="color:#85E89D">      scopes</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">'[groups, email]'</span></span>
+<span class="line"><span style="color:#85E89D">      policy.csv</span><span style="color:#E1E4E8">: </span><span style="color:#F97583">|</span></span>
+<span class="line"><span style="color:#9ECBFF">        g, &#x3C;ADMIN_EMAIL_1>, role:admin</span></span>
+<span class="line"><span style="color:#9ECBFF">        g, &#x3C;ADMIN_EMAIL_2>, role:admin</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">  dex</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    enabled</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span></code></pre>
+<h4 id="option-b-github">Option B: GitHub</h4>
+<p>Create an OAuth App under the org’s settings (<strong>Developer settings → OAuth Apps</strong>) and set the callback URL. GitHub teams arrive as groups in the form <code>&#x3C;org>:&#x3C;team-slug></code>, so RBAC can map whole teams.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">argo-cd</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  configs</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    cm</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      url</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">https://&#x3C;ARGOCD_FQDN></span></span>
+<span class="line"><span style="color:#85E89D">      dex.config</span><span style="color:#E1E4E8">: </span><span style="color:#F97583">|</span></span>
+<span class="line"><span style="color:#9ECBFF">        connectors:</span></span>
+<span class="line"><span style="color:#9ECBFF">          - type: github</span></span>
+<span class="line"><span style="color:#9ECBFF">            id: github</span></span>
+<span class="line"><span style="color:#9ECBFF">            name: GitHub</span></span>
+<span class="line"><span style="color:#9ECBFF">            config:</span></span>
+<span class="line"><span style="color:#9ECBFF">              clientID: &#x3C;GITHUB_CLIENT_ID></span></span>
+<span class="line"><span style="color:#9ECBFF">              clientSecret: $dex-github-secret:clientSecret</span></span>
+<span class="line"><span style="color:#9ECBFF">              redirectURI: https://&#x3C;ARGOCD_FQDN>/api/dex/callback</span></span>
+<span class="line"><span style="color:#9ECBFF">              orgs:</span></span>
+<span class="line"><span style="color:#9ECBFF">                - name: &#x3C;GITHUB_ORG></span></span>
+<span class="line"><span style="color:#9ECBFF">                  # teams:            # optional: only members of these teams can log in</span></span>
+<span class="line"><span style="color:#9ECBFF">                  #   - &#x3C;TEAM_SLUG></span></span>
+<span class="line"><span style="color:#9ECBFF">              teamNameField: slug</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">    rbac</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      policy.default</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">role:readonly</span></span>
+<span class="line"><span style="color:#85E89D">      scopes</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">'[groups]'</span></span>
+<span class="line"><span style="color:#85E89D">      policy.csv</span><span style="color:#E1E4E8">: </span><span style="color:#F97583">|</span></span>
+<span class="line"><span style="color:#9ECBFF">        g, &#x3C;GITHUB_ORG>:&#x3C;ADMIN_TEAM_SLUG>, role:admin</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">  dex</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    enabled</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">true</span></span></code></pre>
+<h4 id="after-sso-works">After SSO works</h4>
+<ul>
+<li>Log in through SSO and confirm that admins get <code>role:admin</code>.</li>
+<li>Optional hardening: turn off the built-in admin account, and delete the initial admin secret.
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">argo-cd</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  configs</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    cm</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      admin.enabled</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">false</span></span></code></pre>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="sh"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> argocd</span><span style="color:#9ECBFF"> delete</span><span style="color:#9ECBFF"> secret</span><span style="color:#9ECBFF"> argocd-initial-admin-secret</span></span></code></pre>
+</li>
+</ul>
+<hr>
+<h2 id="adding-things-later">Adding things later</h2>
+<ul>
+<li><strong>Platform component:</strong> add <code>&#x3C;CLUSTER_PATH>/platform/&#x3C;component>/{Chart.yaml,values.yaml,application.yaml}</code>. Add its Helm repo to <code>sourceRepos</code> in <code>platform-project.yaml</code>, and its namespace to <code>destinations</code>.</li>
+<li><strong>New group:</strong> add a project, a group Application under <code>root/bootstrap/</code>, and a folder with components.</li>
+<li><strong>Secrets:</strong> seal them against <code>&#x3C;SEALING_CERT_PATH></code>, put them in the component’s <code>templates/</code>, and validate them with <code>kubeseal --validate</code> before merging. If a component’s chart installs CRDs that its own templates use, expect a retry or two on the first sync.</li>
+</ul>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<h3 id="argo-cd-cannot-read-the-control-repo">Argo CD cannot read the control repo</h3>
+<p>Check that the temporary secret is in <code>argocd</code>, has the <code>argocd.argoproj.io/secret-type=repo-creds</code> label and uses an HTTPS URL prefix that matches every <code>repoURL</code>.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="sh"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> argocd</span><span style="color:#9ECBFF"> get</span><span style="color:#9ECBFF"> secret</span><span style="color:#9ECBFF"> repo-creds-bootstrap</span><span style="color:#79B8FF"> --show-labels</span></span>
+<span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> argocd</span><span style="color:#9ECBFF"> logs</span><span style="color:#9ECBFF"> deployment/argocd-repo-server</span><span style="color:#79B8FF"> --tail=100</span></span></code></pre>
+<p>Do not delete the temporary secret until the sealed <code>repo-creds</code> secret exists and the Applications remain synced.</p>
+<h3 id="an-application-reports-that-its-project-does-not-exist">An Application reports that its project does not exist</h3>
+<p>The project and child Applications are discovered during the same recursive sync. Refresh the root Application after the <code>platform</code> AppProject exists. If this repeats, add Argo CD sync waves so projects are created before Applications.</p>
+<h3 id="a-sealedsecret-is-rejected">A SealedSecret is rejected</h3>
+<p>Confirm that the CRD and controller are ready, then validate the file against the target cluster. A secret sealed for another cluster, name or namespace will not decrypt when strict scope is used.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="sh"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#9ECBFF"> get</span><span style="color:#9ECBFF"> crd</span><span style="color:#9ECBFF"> sealedsecrets.bitnami.com</span></span>
+<span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> kube-system</span><span style="color:#9ECBFF"> rollout</span><span style="color:#9ECBFF"> status</span><span style="color:#9ECBFF"> deployment/sealed-secrets</span></span>
+<span class="line"><span style="color:#B392F0">kubeseal</span><span style="color:#79B8FF"> --controller-name</span><span style="color:#9ECBFF"> sealed-secrets</span><span style="color:#79B8FF"> --controller-namespace</span><span style="color:#9ECBFF"> kube-system</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --validate</span><span style="color:#F97583"> &#x3C;</span><span style="color:#F97583"> &#x3C;</span><span style="color:#9ECBFF">CLUSTER_PAT</span><span style="color:#E1E4E8">H</span><span style="color:#F97583">></span><span style="color:#9ECBFF">/platform/argocd/templates/repo-creds.sealed-secret.yaml</span></span></code></pre>
+<h3 id="argo-cd-does-not-adopt-the-helm-release">Argo CD does not adopt the Helm release</h3>
+<p>The manual install and the Argo CD Application must both use the release name <code>argocd</code>, namespace <code>argocd</code> and the same wrapper chart. Fix any mismatch before enabling self-management.</p>
+<h2 id="resetting-a-failed-bootstrap">Resetting a failed bootstrap</h2>
+<p>Prefer correcting Git and allowing Argo CD to reconcile. Use a full reset only on a new, otherwise empty cluster.</p>
+<p>If sealed-secrets has generated a private key, back it up before removing anything. Argo CD installed Sealed Secrets, so it is not a Helm release and <code>helm uninstall sealed-secrets</code> must not be used.</p>
+<p>Delete the parent Applications first so they cannot recreate the child Applications, and remove Argo CD’s self-management Application so it cannot heal the Helm release during removal. Then let Argo CD cascade-delete the Sealed Secrets resources while the Argo CD controller is still running. Finally, uninstall the only manually installed Helm release:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="sh"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> argocd</span><span style="color:#9ECBFF"> delete</span><span style="color:#9ECBFF"> application</span><span style="color:#9ECBFF"> bootstrap-argocd</span><span style="color:#9ECBFF"> platform</span><span style="color:#9ECBFF"> argocd</span><span style="color:#79B8FF"> --ignore-not-found</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">if</span><span style="color:#B392F0"> kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> argocd</span><span style="color:#9ECBFF"> get</span><span style="color:#9ECBFF"> application</span><span style="color:#9ECBFF"> sealed-secrets</span><span style="color:#F97583"> ></span><span style="color:#9ECBFF">/dev/null</span><span style="color:#F97583"> 2>&#x26;1</span><span style="color:#E1E4E8">; </span><span style="color:#F97583">then</span></span>
+<span class="line"><span style="color:#B392F0">  kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> argocd</span><span style="color:#9ECBFF"> patch</span><span style="color:#9ECBFF"> application</span><span style="color:#9ECBFF"> sealed-secrets</span><span style="color:#79B8FF"> --type</span><span style="color:#9ECBFF"> merge</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">    -p</span><span style="color:#9ECBFF"> '{"metadata":{"finalizers":["resources-finalizer.argocd.argoproj.io"]}}'</span></span>
+<span class="line"><span style="color:#B392F0">  kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> argocd</span><span style="color:#9ECBFF"> delete</span><span style="color:#9ECBFF"> application</span><span style="color:#9ECBFF"> sealed-secrets</span><span style="color:#79B8FF"> --wait=false</span></span>
+<span class="line"><span style="color:#B392F0">  kubectl</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> argocd</span><span style="color:#9ECBFF"> wait</span><span style="color:#79B8FF"> --for=delete</span><span style="color:#9ECBFF"> application/sealed-secrets</span><span style="color:#79B8FF"> --timeout=2m</span></span>
+<span class="line"><span style="color:#F97583">fi</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">helm</span><span style="color:#9ECBFF"> uninstall</span><span style="color:#9ECBFF"> argocd</span><span style="color:#79B8FF"> -n</span><span style="color:#9ECBFF"> argocd</span><span style="color:#F97583"> ||</span><span style="color:#79B8FF"> true</span></span>
+<span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#9ECBFF"> delete</span><span style="color:#9ECBFF"> namespace</span><span style="color:#9ECBFF"> argocd</span><span style="color:#79B8FF"> --ignore-not-found</span></span></code></pre>
+<p>Review any remaining cluster-scoped resources before retrying:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="sh"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#9ECBFF"> get</span><span style="color:#9ECBFF"> crd</span><span style="color:#F97583"> |</span><span style="color:#B392F0"> grep</span><span style="color:#79B8FF"> -E</span><span style="color:#9ECBFF"> 'argoproj|sealedsecrets'</span></span>
+<span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#9ECBFF"> get</span><span style="color:#9ECBFF"> clusterrole,clusterrolebinding</span><span style="color:#F97583"> |</span><span style="color:#B392F0"> grep</span><span style="color:#79B8FF"> -E</span><span style="color:#9ECBFF"> 'argocd|sealed-secrets'</span></span></code></pre>
+<p>Do not delete CRDs blindly: doing so can delete their custom resources. Remove them only when the cluster is dedicated to this failed bootstrap and you have confirmed nothing else uses them.</p>
+<h2 id="rebuilding-the-cluster-disaster-recovery">Rebuilding the cluster (disaster recovery)</h2>
+<ol>
+<li>Restore the sealed-secrets key into <code>kube-system</code> <strong>before</strong> you apply the root app, so the existing SealedSecrets still decrypt.</li>
+<li>Rerun Phase 1, manual step A (steps 1–4). You still need the temporary repo secret, because Argo CD can’t pull a private repo until sealed-secrets has synced and unsealed <code>repo-creds</code>. Delete the temporary secret once it has.</li>
+<li>Skip the sealing steps: because the key was restored, the SealedSecrets already in Git decrypt as-is.</li>
+</ol> </div> <nav class="blog-post-navigation"> <a href="/blog/automate-the-tedious-with-ai" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">Automate the Tedious: Supercharging Everyday Routines With AI</div> </a>  </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Posts</h2> <div class="related-posts-grid"> <a href="/blog/gke-migrating-pvc-data-between-clusters" class="blog-card card-link"> <img src="/assets/blog/gke-migrating-pvc-data-between-clusters/banner.webp" alt="GKE Part 8: Move the Volume, Not the Container" class="blog-card-image"> <h3 class="blog-card-title">GKE Part 8: Move the Volume, Not the Container</h3> <p class="blog-card-description"> A reusable helper-pod pattern for moving PVC data between Kubernetes clusters. </p> </a><a href="/blog/gke-kargo" class="blog-card card-link"> <img src="/assets/blog/gke-kargo/banner.webp" alt="GKE - Part 7: Build Once, Promote Forward with Kargo" class="blog-card-image"> <h3 class="blog-card-title">GKE - Part 7: Build Once, Promote Forward with Kargo</h3> <p class="blog-card-description"> How Kargo fits into a GitOps platform built around immutable artifacts, Argo CD, and environment promotion. </p> </a><a href="/blog/gke-multicloud-service-connectivity" class="blog-card card-link"> <img src="/assets/blog/gke-multicloud-service-connectivity/banner.webp" alt="GKE - Part 6: Multi-Cloud Service Connectivity Between GKE and EKS" class="blog-card-image"> <h3 class="blog-card-title">GKE - Part 6: Multi-Cloud Service Connectivity Between GKE and EKS</h3> <p class="blog-card-description"> Connecting workloads across GKE and EKS with the Tailscale Kubernetes operator, so a workload moved to GKE can still reach a private service in EKS. </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container text-primary"> <p>© 2026 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer>  </body></html>
