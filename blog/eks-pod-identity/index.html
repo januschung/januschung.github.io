@@ -1,0 +1,180 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="How we simplified AWS credentials for EKS workloads with Pod Identity, Terraform associations, safer migration ordering, and a least-privilege review."><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v5.17.2"><link rel="canonical" href="https://januschung.github.io/blog/eks-pod-identity/"><title>From IRSA to EKS Pod Identity: What We Learned - Janus</title><link rel="stylesheet" href="/_astro/about.DL9ssrXg.css">
+<link rel="stylesheet" href="/_astro/index.BbkaQQSy.css"></head> <body class="min-h-screen flex flex-col"> <span data-pagefind-filter="locale:en" class="hidden" aria-hidden="true"></span> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <ul class="nav-links" id="nav-links"> <li> <a href="/">Home</a> </li><li> <a href="/devops-odyssey">DevOps Odyssey</a> </li><li> <a href="/homelab-arena">Homelab Arena</a> </li><li> <a href="/projects">Projects</a> </li><li> <a href="/blog">Writing</a> </li><li> <a href="/cv">CV</a> </li> </ul>  <div class="mobile-controls"> <button class="search-icon-button" aria-label="Toggle search" id="search-toggle"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"> <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round"></path> </svg> </button> <button class="mobile-menu-toggle" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> </div> <div class="header-search" id="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false,&#34;translations&#34;:{&#34;placeholder&#34;:&#34;Search…&#34;}}"></div> <script type="module" src="/_astro/Search.astro_astro_type_script_index_0_lang.tZYucdM2.js"></script> </div>  </div> </nav> </header> <script type="module">(function(){const n=document.getElementById("mobile-menu-toggle"),s=document.getElementById("nav-links"),c=document.querySelector("header"),a=document.getElementById("search-toggle"),e=document.getElementById("header-search");n&&s&&(n.addEventListener("click",()=>{const t=s.classList.toggle("nav-open");n.classList.toggle("active"),c.classList.toggle("menu-open"),t?document.body.style.overflow="hidden":document.body.style.overflow="",e&&e.classList.remove("search-open")}),s.querySelectorAll("a").forEach(t=>{t.addEventListener("click",()=>{s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow=""})}),document.addEventListener("click",t=>{!c.contains(t.target)&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n.classList.remove("active"),c.classList.remove("menu-open"),document.body.style.overflow="")})),a&&e&&(a.addEventListener("click",o=>{o.stopPropagation(),e.classList.toggle("search-open"),s&&s.classList.contains("nav-open")&&(s.classList.remove("nav-open"),n&&n.classList.remove("active"),c&&c.classList.remove("menu-open")),e.classList.contains("search-open")&&setTimeout(()=>{const t=e.querySelector('input[type="search"]');t&&(t.focus(),t.dispatchEvent(new Event("input",{bubbles:!0})));const i=e.querySelector(".pagefind-ui__results-area");i&&(i.style.display="block")},150)}),document.addEventListener("click",o=>{e&&!e.contains(o.target)&&!a.contains(o.target)&&e.classList.contains("search-open")&&e.classList.remove("search-open")}),document.addEventListener("keydown",o=>{o.key==="Escape"&&e&&e.classList.contains("search-open")&&e.classList.remove("search-open")}))})();</script> <main class="flex-1" data-locale-prefix>  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">From IRSA to EKS Pod Identity: What We Learned</h1> <div class="blog-post-meta"> <time>October 11, 2026</time> <span class="blog-post-meta-separator">•</span> <span>10 min read</span>  </div> <div class="pill-group pill-group--top"> <span class="pill">aws</span><span class="pill">eks</span><span class="pill">kubernetes</span><span class="pill">terraform</span><span class="pill">iam</span><span class="pill">gitops</span><span class="pill">security</span> </div> </header> <div class="blog-post-content prose"> <h1 id="from-irsa-to-eks-pod-identity-what-we-learned">From IRSA to EKS Pod Identity: What We Learned</h1>
+<p><img src="/assets/blog/eks-pod-identity/banner.webp" alt="An EKS workload moving from an OIDC credential path to Pod Identity"></p>
+<p>When we built a fresh multi-environment EKS platform, we had to decide how workloads would receive AWS credentials.</p>
+<p>IAM Roles for Service Accounts (IRSA) had been the standard answer for years. It works, it is well understood, and our existing cluster already used it. But a new cluster was an opportunity to reconsider how much identity configuration needed to live in IAM trust policies, Terraform, Helm values, and Kubernetes ServiceAccount annotations at the same time.</p>
+<p>We chose EKS Pod Identity for the new workload integrations and migrated several existing controllers and applications to the same pattern.</p>
+<p>The result was less cluster-specific IAM, fewer AWS details in GitOps configuration, and a cleaner boundary between the platform and its workloads. The migration also corrected some assumptions we had made about credential precedence and exposed stale permissions that were easier to remove than carry forward.</p>
+<p>This is the pattern we ended up using and the parts that deserved more attention than the happy-path documentation suggests.</p>
+<!-- more -->
+<h2 id="irsa-and-pod-identity-solve-the-same-problem-differently">IRSA and Pod Identity Solve the Same Problem Differently</h2>
+<p>Both mechanisms give a pod temporary AWS credentials based on its Kubernetes ServiceAccount. The difference is where the trust relationship and binding live.</p>
+<p>With IRSA, each EKS cluster has an IAM OIDC provider. The workload role trusts that provider and normally restricts access with conditions for the token audience and the exact <code>system:serviceaccount:&#x3C;namespace>:&#x3C;name></code> subject. The ServiceAccount then carries the role ARN:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">v1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">ServiceAccount</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">external-dns</span></span>
+<span class="line"><span style="color:#85E89D">  namespace</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">platform</span></span>
+<span class="line"><span style="color:#85E89D">  annotations</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    eks.amazonaws.com/role-arn</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">arn:aws:iam::&#x3C;account-id>:role/external-dns</span></span></code></pre>
+<p>The role trust policy contains the cluster’s OIDC issuer URL. Recreating the cluster or adding another cluster means adding another federated trust relationship or creating another role.</p>
+<p>Pod Identity changes that path. The role trusts the EKS Pod Identity service principal, while an association in the EKS API binds a cluster, namespace, and ServiceAccount to that role. The Kubernetes ServiceAccount needs no AWS annotation.</p>
+<p><img src="/assets/blog/eks-pod-identity/credential-paths.webp" alt="IRSA and EKS Pod Identity credential paths side by side"></p>
+<p>The two paths can be summarized as:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>IRSA</span></span>
+<span class="line"><span>Pod -> projected OIDC token -> STS web identity -> IAM role</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>Pod Identity</span></span>
+<span class="line"><span>Pod -> Pod Identity Agent -> EKS Auth API -> IAM role</span></span></code></pre>
+<p>The agent runs on each supported node. For a new pod using an associated ServiceAccount, EKS injects the environment and token data used by the AWS SDK’s container credential provider. The agent exchanges that token through the EKS Auth API and returns temporary role credentials.</p>
+<p>AWS documents the full flow in <a href="https://docs.aws.amazon.com/eks/latest/userguide/pod-id-how-it-works.html">Understand how EKS Pod Identity works</a>.</p>
+<h2 id="why-the-new-model-fit-better">Why the New Model Fit Better</h2>
+<p>The first improvement was reusable role trust.</p>
+<p>An IRSA role names a specific cluster issuer in its trust policy. A Pod Identity role instead trusts <code>pods.eks.amazonaws.com</code>. The role trust is no longer coupled to an OIDC issuer URL, although the association itself remains specific to a cluster, namespace, and ServiceAccount.</p>
+<p>The second improvement was keeping the binding out of Helm values. Under IRSA, a chart often needs a role ARN so it can annotate the ServiceAccount. That pushes an AWS infrastructure detail through the GitOps configuration even though Terraform created the role.</p>
+<p>With Pod Identity, Terraform manages the association through the EKS API. The chart only needs to create or reference the correctly named ServiceAccount.</p>
+<p>We also no longer needed to create and maintain an IAM OIDC provider for Pod Identity consumers. That removed the issuer and certificate-thumbprint plumbing we had previously built around a <code>tls_certificate</code> data source.</p>
+<p>Finally, EKS managed add-ons can expose Pod Identity as part of the add-on configuration. The EBS CSI driver was a good example: its identity association could be managed next to the add-on instead of passed through a Kubernetes annotation.</p>
+<h2 id="the-terraform-pattern">The Terraform Pattern</h2>
+<p>Each workload received a small Terraform module containing its trust policy, IAM role, scoped permissions, and Pod Identity association.</p>
+<p>The core trust and association are intentionally plain:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="hcl"><code><span class="line"><span style="color:#B392F0">data</span><span style="color:#79B8FF"> "aws_iam_policy_document"</span><span style="color:#79B8FF"> "pod_identity"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#B392F0">  statement</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    actions</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> [</span></span>
+<span class="line"><span style="color:#9ECBFF">      "sts:AssumeRole"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#9ECBFF">      "sts:TagSession"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">    ]</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">    principals</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">      type</span><span style="color:#F97583">        =</span><span style="color:#9ECBFF"> "Service"</span></span>
+<span class="line"><span style="color:#E1E4E8">      identifiers</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> [</span><span style="color:#9ECBFF">"pods.eks.amazonaws.com"</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "aws_iam_role"</span><span style="color:#79B8FF"> "workload"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  name</span><span style="color:#F97583">               =</span><span style="color:#9ECBFF"> "example-workload"</span></span>
+<span class="line"><span style="color:#E1E4E8">  assume_role_policy</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> data</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">aws_iam_policy_document</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">pod_identity</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">json</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "aws_eks_pod_identity_association"</span><span style="color:#79B8FF"> "workload"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  cluster_name</span><span style="color:#F97583">    =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">cluster_name</span></span>
+<span class="line"><span style="color:#E1E4E8">  namespace</span><span style="color:#F97583">       =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">namespace</span></span>
+<span class="line"><span style="color:#E1E4E8">  service_account</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">service_account</span></span>
+<span class="line"><span style="color:#E1E4E8">  role_arn</span><span style="color:#F97583">        =</span><span style="color:#E1E4E8"> aws_iam_role</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">workload</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">arn</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">  depends_on</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> [</span></span>
+<span class="line"><span style="color:#E1E4E8">    aws_eks_addon</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">pod_identity_agent,</span></span>
+<span class="line"><span style="color:#E1E4E8">    aws_iam_role_policy_attachment</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">workload,</span></span>
+<span class="line"><span style="color:#E1E4E8">  ]</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>The trust policy is generic. The association carries the Kubernetes identity.</p>
+<p>For application workloads deployed into several namespaces, one role can have several exact associations:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="hcl"><code><span class="line"><span style="color:#B392F0">locals</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  workload_associations</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    development </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">      namespace       </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> "app-development"</span></span>
+<span class="line"><span style="color:#E1E4E8">      service_account </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> "app-development"</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">    staging </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">      namespace       </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> "app-staging"</span></span>
+<span class="line"><span style="color:#E1E4E8">      service_account </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> "app-staging"</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "aws_eks_pod_identity_association"</span><span style="color:#79B8FF"> "workload"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  for_each</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> local</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">workload_associations</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">  cluster_name</span><span style="color:#F97583">    =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">cluster_name</span></span>
+<span class="line"><span style="color:#E1E4E8">  namespace</span><span style="color:#F97583">       =</span><span style="color:#E1E4E8"> each</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">value</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">namespace</span></span>
+<span class="line"><span style="color:#E1E4E8">  service_account</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> each</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">value</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">service_account</span></span>
+<span class="line"><span style="color:#E1E4E8">  role_arn</span><span style="color:#F97583">        =</span><span style="color:#E1E4E8"> aws_iam_role</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">workload</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">arn</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>This worked well for charts whose ServiceAccount names included the environment. It also made name mismatches visible in Terraform review instead of hiding them in a templated annotation.</p>
+<p>For the EBS CSI managed add-on, the association sits directly on the add-on resource:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="hcl"><code><span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "aws_eks_addon"</span><span style="color:#79B8FF"> "pod_identity_agent"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  cluster_name</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">cluster_name</span></span>
+<span class="line"><span style="color:#E1E4E8">  addon_name</span><span style="color:#F97583">   =</span><span style="color:#9ECBFF"> "eks-pod-identity-agent"</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">resource</span><span style="color:#79B8FF"> "aws_eks_addon"</span><span style="color:#79B8FF"> "ebs_csi"</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">  cluster_name</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> var</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">cluster_name</span></span>
+<span class="line"><span style="color:#E1E4E8">  addon_name</span><span style="color:#F97583">   =</span><span style="color:#9ECBFF"> "aws-ebs-csi-driver"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">  pod_identity_association</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    role_arn</span><span style="color:#F97583">       =</span><span style="color:#E1E4E8"> aws_iam_role</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">ebs_csi</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">arn</span></span>
+<span class="line"><span style="color:#E1E4E8">    service_account</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> "ebs-csi-controller-sa"</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">  depends_on</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> [</span></span>
+<span class="line"><span style="color:#E1E4E8">    aws_eks_addon</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">pod_identity_agent,</span></span>
+<span class="line"><span style="color:#E1E4E8">    aws_iam_role_policy_attachment</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">ebs_csi,</span></span>
+<span class="line"><span style="color:#E1E4E8">  ]</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>The exact add-on support and recommended ServiceAccount can be inspected through the EKS API. Terraform’s <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/eks_addon"><code>aws_eks_addon</code></a> resource supports the same association block.</p>
+<h2 id="migration-was-also-a-permission-audit">Migration Was Also a Permission Audit</h2>
+<p>We migrated platform controllers that needed access to services such as Route53, ACM, ECR, ELB, S3, and KMS. We also moved application workloads away from a legacy shared IRSA role.</p>
+<p>The tempting migration would have been to copy each existing policy, change the trust relationship, and declare success. We instead treated the move as a least-privilege review.</p>
+<p>One application role included broad Secrets Manager access because its SDK configuration declared a Secrets Manager client. Reviewing the real call paths and AWS activity showed that the application never used it. The new Pod Identity role omitted that permission.</p>
+<p>Identity migrations are useful cleanup points because every retained action has to be justified. A working legacy policy is evidence that the application can run with those permissions; it is not evidence that every permission is necessary.</p>
+<h2 id="credential-precedence-was-the-important-surprise">Credential Precedence Was the Important Surprise</h2>
+<p>Our initial assumption was that adding a Pod Identity association would make new pods prefer Pod Identity, even while the IRSA annotation remained.</p>
+<p>That assumption was wrong.</p>
+<p>Pod Identity is part of the AWS SDK container credential provider. IRSA uses the web identity provider, which appears earlier in the default credential chain. AWS explicitly states that credentials earlier in the chain continue to be used after a Pod Identity association is added.</p>
+<p>That behavior is useful because it creates a safe overlap:</p>
+<ol>
+<li>Install the Pod Identity Agent.</li>
+<li>Confirm the workload uses an <a href="https://docs.aws.amazon.com/eks/latest/userguide/pod-id-minimum-sdk.html">SDK version that supports Pod Identity</a>.</li>
+<li>Create the Pod Identity role and association.</li>
+<li>Leave the IRSA annotation in place while reviewing the infrastructure.</li>
+<li>Remove the annotation.</li>
+<li>Recreate the pods.</li>
+<li>Verify the role used by the new pods.</li>
+</ol>
+<p>Existing pods do not switch credential providers in place. They retain the environment, projected tokens, and credential behavior injected when they were created. Removing an annotation from a ServiceAccount is therefore not enough; the workload must roll.</p>
+<p>A practical verification sequence looks like:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="sh"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#9ECBFF"> annotate</span><span style="color:#9ECBFF"> serviceaccount</span><span style="color:#9ECBFF"> example</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --namespace</span><span style="color:#9ECBFF"> app-development</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#9ECBFF">  eks.amazonaws.com/role-arn-</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#9ECBFF"> rollout</span><span style="color:#9ECBFF"> restart</span><span style="color:#9ECBFF"> deployment</span><span style="color:#9ECBFF"> example</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --namespace</span><span style="color:#9ECBFF"> app-development</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#9ECBFF"> exec</span><span style="color:#9ECBFF"> deployment/example</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --namespace</span><span style="color:#9ECBFF"> app-development</span><span style="color:#79B8FF"> \</span></span>
+<span class="line"><span style="color:#79B8FF">  --</span><span style="color:#9ECBFF"> aws</span><span style="color:#9ECBFF"> sts</span><span style="color:#9ECBFF"> get-caller-identity</span></span></code></pre>
+<p>The last command assumes the application image contains the AWS CLI. Otherwise, use a temporary diagnostic pod with the same ServiceAccount and a supported AWS CLI or SDK.</p>
+<p>Only after the returned ARN matches the Pod Identity role should the legacy IRSA role or trust statement be removed. The cluster OIDC provider can be removed only after an inventory confirms that nothing still relies on IRSA.</p>
+<h2 id="exact-names-and-deployment-ordering-matter">Exact Names and Deployment Ordering Matter</h2>
+<p>An association matches one exact namespace and ServiceAccount name. <code>app-staging/app-staging</code> and <code>app-staging/app</code> are different identities.</p>
+<p>If the names do not match, EKS does not inject Pod Identity credentials. The SDK may then reach the node role if access to the instance metadata service is available; otherwise AWS authentication fails. Restricting pod access to node credentials remains an important defense against this kind of configuration error.</p>
+<p>Terraform dependencies help order the agent, IAM policy attachments, and associations. They do not automatically coordinate an independent GitOps controller. Our operational rule was to apply and verify the identity infrastructure before allowing GitOps to roll the workload.</p>
+<p>Terminology also drifted during the migration. Outputs and variable descriptions that still said “IRSA role ARN” made the new model harder to understand even when the resources were correct. Names and comments should describe the current behavior, not preserve the history of how it was implemented.</p>
+<h2 id="pod-identity-does-not-replace-every-oidc-use">Pod Identity Does Not Replace Every OIDC Use</h2>
+<p>This change applies to workloads running inside EKS. It does not replace GitHub Actions federation into AWS.</p>
+<p>GitHub Actions still uses its own OIDC issuer and IAM trust conditions. That is a separate boundary: an external CI system requesting AWS credentials, not an EKS pod receiving credentials through the EKS Auth API.</p>
+<p>Calling both mechanisms “OIDC” without naming the caller makes migration discussions unnecessarily confusing. We now distinguish between workload identity inside EKS and CI federation from GitHub.</p>
+<h2 id="current-limits">Current Limits</h2>
+<p>Pod Identity is not universal. According to AWS’s current <a href="https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html">Pod Identity restrictions</a>, it supports pods on Linux EC2 worker nodes. It does not support Fargate pods, Windows pods, Outposts, EKS Anywhere, or Kubernetes clusters running outside EKS.</p>
+<p>Each ServiceAccount can have one association, and a cluster supports up to 5,000 associations. The associated Pod Identity role must be in the same AWS account as the EKS cluster.</p>
+<p>Cross-account access is still possible. AWS supports an optional target role in another account, with the same-account Pod Identity role acting as the first role in the chain. The <a href="https://docs.aws.amazon.com/eks/latest/userguide/pod-id-assign-target-role.html">target IAM role documentation</a> covers that flow.</p>
+<p>IRSA therefore remains relevant for unsupported compute types, older SDKs, and environments outside the Pod Identity support boundary. Existing IRSA installations also do not need to migrate only for novelty; the operational simplification should justify the change.</p>
+<h2 id="migration-checklist">Migration Checklist</h2>
+<ul>
+<li>Install the <code>eks-pod-identity-agent</code> add-on.</li>
+<li>Confirm the workload’s AWS SDK supports Pod Identity.</li>
+<li>Create a least-privilege role trusted by <code>pods.eks.amazonaws.com</code>.</li>
+<li>Create the exact cluster, namespace, and ServiceAccount association.</li>
+<li>Keep the IRSA annotation during the overlap period.</li>
+<li>Remove the annotation and recreate the pods.</li>
+<li>Verify the caller with <code>aws sts get-caller-identity</code>.</li>
+<li>Monitor the workload’s real AWS API calls.</li>
+<li>Delete unused IRSA roles and policies only after verification.</li>
+<li>Remove the cluster OIDC provider only when no IRSA consumers remain.</li>
+</ul>
+<h2 id="the-takeaway">The Takeaway</h2>
+<p>Pod Identity did not change what our workloads were allowed to do. It changed how that permission was connected to Kubernetes.</p>
+<p>The reusable service-principal trust policy reduced cluster-specific IAM. Terraform associations kept role ARNs out of Helm values. Managed add-ons fit into the same model. Most importantly, the migration created a reason to re-check permissions instead of reproducing old access automatically.</p>
+<p>The safest migration path also turned out to be the opposite of our first assumption: create the association while IRSA still wins, then remove the annotation and recreate the pods when ready to switch.</p>
+<p>That detail is small, but it is the difference between a controlled identity migration and merely hoping the SDK chooses the credential source you intended.</p> </div> <nav class="blog-post-navigation"> <a href="/blog/library-card-platform-engineer" class="blog-post-nav-link"> <div class="blog-post-nav-label">Previous Post</div> <div class="blog-post-nav-title">Late-Night Learning, a Library Card, and the Path to Platform Engineering</div> </a>  </nav> <section class="related-posts"> <h2 class="related-posts-title">Related Posts</h2> <div class="related-posts-grid"> <a href="/blog/kargo-warehouse-poc" class="blog-card card-link"> <img src="/assets/blog/kargo-warehouse-poc/banner.webp" alt="A Small Kargo Warehouse POC with GHCR" class="blog-card-image"> <h3 class="blog-card-title">A Small Kargo Warehouse POC with GHCR</h3> <p class="blog-card-description"> Build a tiny version endpoint, publish SemVer images to GHCR, and verify that a Kargo Warehouse discovers each release as new Freight. </p> </a><a href="/blog/argocd-gitops-bootstrap-runbook" class="blog-card card-link"> <img src="/assets/blog/argocd-gitops-bootstrap-runbook/banner.webp" alt="Runbook: Bootstrap Argo CD on a New Cluster with GitOps" class="blog-card-image"> <h3 class="blog-card-title">Runbook: Bootstrap Argo CD on a New Cluster with GitOps</h3> <p class="blog-card-description"> A phased, repeatable runbook for bootstrapping Argo CD, Sealed Secrets, and an app-of-apps control repository on a new Kubernetes cluster. </p> </a><a href="/blog/gke-migrating-pvc-data-between-clusters" class="blog-card card-link"> <img src="/assets/blog/gke-migrating-pvc-data-between-clusters/banner.webp" alt="GKE Part 8: Move the Volume, Not the Container" class="blog-card-image"> <h3 class="blog-card-title">GKE Part 8: Move the Volume, Not the Container</h3> <p class="blog-card-description"> A reusable helper-pod pattern for moving PVC data between Kubernetes clusters. </p> </a> </div> </section> </div> </article>  </main> <footer class="footer"> <div class="container text-primary"> <p>© 2026 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer>  </body></html>
