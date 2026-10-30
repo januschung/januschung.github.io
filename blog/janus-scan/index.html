@@ -1,0 +1,108 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="My Brother ADS-1000W still works fine after more than ten years. The software around it didn't age as well, so I vibe-coded my own scanning app in Rust, then found a way around a problem with no driver to fix it: scanning from any phone in the house."><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v5.18.2"><link rel="canonical" href="https://januschung.github.io/blog/janus-scan/"><title>Janus Scan: Freeing My Ten-Year-Old Scanner from Windows - Janus</title><link rel="stylesheet" href="/_astro/about.DkugsWgF.css"></head> <body class="min-h-screen flex flex-col"> <span data-pagefind-filter="locale:en" class="hidden" aria-hidden="true"></span> <div class="scanline"></div> <header> <nav> <div class="logo"> <a href="/">JANUS</a> </div> <ul class="nav-links" id="nav-links"> <li><a href="/">Home</a></li><li><a href="/devops-odyssey">DevOps Odyssey</a></li><li><a href="/homelab-arena">Homelab Arena</a></li><li><a href="/projects">Projects</a></li><li><a href="/blog">Writing</a></li><li><a href="/cv">CV</a></li> </ul>  <div class="mobile-controls"> <button class="search-icon-button" aria-label="Toggle search" id="search-toggle"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"> <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round"></path> </svg> </button> <button class="mobile-menu-toggle" aria-expanded="false" aria-label="Toggle menu" id="mobile-menu-toggle"> <span class="hamburger-line"></span> <span class="hamburger-line"></span> <span class="hamburger-line"></span> </button> </div> <div class="header-search" id="header-search"> <div class="search-container header-search-wrapper"> <div id="pagefind-search" class="pagefind-ui pagefind-init" data-pagefind-ui data-bundle-path="/pagefind/" data-ui-options="{&#34;showImages&#34;:false,&#34;excerptLength&#34;:15,&#34;resetStyles&#34;:false,&#34;translations&#34;:{&#34;placeholder&#34;:&#34;Search…&#34;}}"></div> <script type="module" src="/_astro/Search.astro_astro_type_script_index_0_lang.DExfVQkA.js"></script> </div>  </div> </nav> </header> <script type="module">function u(s){if(s.dataset.controlsInitialized==="true")return;s.dataset.controlsInitialized="true";const i=s.querySelector("#mobile-menu-toggle"),o=s.querySelector("#nav-links"),a=s.querySelector("#search-toggle"),t=s.querySelector("#header-search"),c=e=>{!i||!o||(o.classList.toggle("nav-open",e),i.classList.toggle("active",e),i.setAttribute("aria-expanded",String(e)),s.classList.toggle("menu-open",e),document.body.style.overflow=e?"hidden":"",e&&t?.classList.remove("search-open"))};i?.addEventListener("click",()=>{c(!o?.classList.contains("nav-open"))}),o?.querySelectorAll("a").forEach(e=>{e.addEventListener("click",()=>c(!1))}),a?.addEventListener("click",e=>{if(e.stopPropagation(),!t)return;const n=!t.classList.contains("search-open");n&&c(!1),t.classList.toggle("search-open",n),n&&window.setTimeout(()=>{const r=t.querySelector('input[type="search"]');r?.focus(),r?.dispatchEvent(new Event("input",{bubbles:!0}));const l=t.querySelector(".pagefind-ui__results-area");l&&(l.style.display="block")},150)}),document.addEventListener("click",e=>{const n=e.target;s.contains(n)||c(!1),t?.classList.contains("search-open")&&!t.contains(n)&&!a?.contains(n)&&t.classList.remove("search-open")}),document.addEventListener("keydown",e=>{e.key==="Escape"&&(c(!1),t?.classList.remove("search-open"))})}document.querySelectorAll("header:has(#mobile-menu-toggle)").forEach(u);</script> <main class="flex-1" data-locale-prefix>  <article class="section-padding-large"> <div class="container"> <header class="blog-post-header"> <h1 class="blog-post-title">Janus Scan: Freeing My Ten-Year-Old Scanner from Windows</h1> <div class="blog-post-meta"> <time>November 1, 2026</time> <span class="blog-post-meta-separator">•</span> <span>12 min read</span>  <span class="blog-post-meta-separator">•</span> <a href="https://github.com/januschung/janus-scan" target="_blank" rel="noopener noreferrer" class="blog-post-github-link"> View on GitHub → </a>  </div> <div class="pill-group pill-group--top"> <span class="pill">rust</span><span class="pill">tauri</span><span class="pill">svelte</span><span class="pill">ai</span><span class="pill">linux</span><span class="pill">macos</span><span class="pill">scanner</span><span class="pill">homelab</span><span class="pill">kubernetes</span> </div> </header> <div class="blog-post-content prose"> <h1 id="janus-scan-freeing-my-ten-year-old-scanner-from-windows">Janus Scan: Freeing My Ten-Year-Old Scanner from Windows</h1>
+<p>I bought a Brother ADS-1000W more than ten years ago. It’s a small sheet-fed scanner: drop in a stack of paper, press a button, and it pulls the pages through and scans both sides at once. It has worked well the whole time.</p>
+<p>The hardware was never the problem. Everything around it was.</p>
+<p><img src="/assets/blog/janus-scan/scanned.webp" alt="Janus Scan with six scanned pages and a page preview"></p>
+<!-- more -->
+<h2 id="the-annual-chore">The annual chore</h2>
+<p>The scanner lived on Windows, and I don’t use Windows anymore. So once or twice a year, when a pile of paper needed scanning, I dug out the old laptop and relearned Brother’s app. Where is the duplex setting again? Why did it save a JPG when I wanted a PDF? Every time, the same chore.</p>
+<p>That laptop came with Windows 7, and when it was forced up to Windows 10, I held my breath. The Brother software survived the upgrade. But that’s luck, not a plan. One day an update will break it, and I’ll be reinstalling Windows 7 or 10 just to scan a few receipts.</p>
+<h2 id="linux-almost-worked">Linux almost worked</h2>
+<p>Brother does publish Linux drivers, so I tried the native route with XSane. It scanned, but I’m not a fan of the interface. It lacked a straightforward way to do the two things I want every time: pick JPG or PDF, and pick one side or both.</p>
+<p>Two other things I never solved:</p>
+<ul>
+<li><strong>Multi-page batches.</strong> The feeder holds a limited stack. I wanted the app to pause when the feeder runs empty and ask whether I have more pages, then keep adding to the same document. I couldn’t make XSane do that, and I’m still not sure it can.</li>
+<li><strong>Wi-Fi.</strong> The scanner has Wi-Fi, but I never got wireless scanning to work on Linux, so I never found out whether it was possible.</li>
+</ul>
+<h2 id="vibe-coding-with-my-eyes-open">Vibe coding, with my eyes open</h2>
+<p>I wanted an excuse to hop on the Rust train anyway. So one weekend, I built my own scanning app, with an AI coding assistant writing most of the code.</p>
+<p>Call it vibe coding, but I didn’t just wait for the result. I watched it being built, asked why it did things one way and not another, and tested every step on the real scanner. I also asked for every build to be tested in Docker: Ubuntu 24.04, Linux Mint 22 and CachyOS, plus one container that does a real scan over Wi-Fi. I learned more about scanners, drivers and Linux packaging in that one weekend than in ten years of owning the thing. That habit of watching paid off later, in a way I didn’t expect.</p>
+<p>It’s called <strong>Janus Scan</strong>. Naming it after myself felt a little vain, until I remembered the other Janus: the Roman god with two faces, one looking forward and one looking back. For a scanner that reads both sides of every sheet, that’s too good to pass up. So the name stayed, and the logo became his two faces, back to back.</p>
+<p>The code is on GitHub: <a href="https://github.com/januschung/janus-scan">januschung/janus-scan</a>. It’s MIT licensed.</p>
+<p>Here’s the desktop app doing a typical run: both sides at once with the blank backs skipped, a second batch after the feeder runs empty, an upside-down page fixed, pages dragged into order, and the PDF saved to a folder on my NAS.</p>
+<p><img src="/assets/blog/janus-scan/showcase-desktop.webp" alt="Janus Scan on a computer: scanning both sides, adding more pages, rotating a page, dragging pages into order and saving to a NAS folder"></p>
+<p>Everything I want is on one screen:</p>
+<ul>
+<li><strong>One side or both sides</strong>, color, gray or black and white, resolution and paper size</li>
+<li><strong>Multi-page mode</strong>, which does exactly what I couldn’t get XSane to do: when the feeder runs empty, it asks whether there are more pages and adds them to the same document</li>
+</ul>
+<p><img src="/assets/blog/janus-scan/more-pages.webp" alt="The &#x22;More pages to feed?&#x22; prompt after the feeder runs empty"></p>
+<ul>
+<li><strong>Live thumbnails</strong> as pages come in, and a large preview of any page</li>
+<li><strong>Page clean-up:</strong> reorder by dragging, rotate any page on its own, remove pages (one, several or all), skip blank backs of one-sided pages, and straighten crooked ones</li>
+<li><strong>Save as PDF, JPEG, PNG or TIFF</strong>, never overwriting an existing file</li>
+<li><strong>A file name preset, like Brother’s app has.</strong> Set it once with any text plus <code>{date}</code>, <code>{time}</code> and a counter <code>{n}</code>: <code>Receipts {date} {n}</code> becomes <code>Receipts 2026-10-17 001.pdf</code>, then <code>002</code>, and so on. The default is <code>Scan {date} {time}</code>.</li>
+<li><strong>USB and Wi-Fi</strong> on both macOS and Linux</li>
+<li><strong>Light and dark mode</strong>, plus keyboard shortcuts: Space scans, Enter means “more pages”, Esc means “finish”</li>
+</ul>
+<p>It’s small, too. The app uses the system’s own web view instead of bundling a browser, so the macOS disk image and the Linux <code>.deb</code> are each under 3 MB.</p>
+<h2 id="the-android-wall">The Android wall</h2>
+<p>Once the desktop app worked, the next annoyance was obvious: the scanner sits in one corner of the house, and my laptop usually doesn’t. What I really wanted was to load the feeder, tap a button on my phone, and have the PDF land on my NAS.</p>
+<p>So I asked the obvious question: can it run on Android too?</p>
+<p>The screens would have been easy, since Tauri builds Android apps as well. Scanning was another story. The desktop app talks to the scanner through the system’s scanning layer: Apple’s ImageCaptureCore on the Mac, SANE on Linux, each with Brother’s driver underneath. Android has neither, and Brother has no Android driver for other apps to use. Plenty of newer scanners skip drivers altogether with driverless scanning (AirScan), so we checked the scanner for that. It answered “not found”. It only speaks Brother’s own protocol, on its own network port.</p>
+<p>That left one route: reverse-engineer Brother’s protocol and write a driver from scratch, for one discontinued scanner. The whole app had taken a weekend; cracking the protocol alone could take months. I parked Android under “later, not committed”, which usually means never.</p>
+<h2 id="the-answer-was-in-the-test-logs">The answer was in the test logs</h2>
+<p>The way out was already running on my laptop.</p>
+<p>Remember those Docker containers testing the Linux build? One of them scanned over Wi-Fi on every run. A small Linux box, with no screen and nobody at the keyboard, driving my scanner across the network without complaint.</p>
+<p>That changed the question. My phone doesn’t need a driver if something else on the network has one. Put Brother’s Linux driver in a tiny Debian container next to the scanner, give it a web page, and every phone in the house can scan without installing anything. The scan can go straight to the NAS or back to whoever asked for it.</p>
+<p>No reverse engineering, no Android app, and the problem that had no driver just went away. I wouldn’t have seen that if I had only waited for the finished app instead of watching how it was tested.</p>
+<h2 id="janus-scan-server">Janus Scan Server</h2>
+<p>So Janus Scan got a second half: <strong>Janus Scan Server</strong>. It’s a small container that sits on the network next to the scanner and talks to it over Wi-Fi. Any phone, tablet or computer scans by opening a web page. There’s nothing to install on the phone, and no Brother driver on any device but the server.</p>
+<p><img src="/assets/blog/janus-scan/showcase-phone.webp" alt="Janus Scan on a phone: one big Scan button, long-press to drag pages into order, rotate a page full screen and save to a NAS folder"></p>
+<p>The web page is the same Svelte UI as the desktop app, built a second time and reshaped for small screens: a big Scan button, two columns of pages, settings in a bottom sheet, and pages that open full screen when you tap them. Reordering is long-press and drag, since phones don’t do the mouse-style drag and drop the desktop uses.</p>
+<p><strong>The bonus I didn’t plan for:</strong> I set out to fix Android and fixed everything else along the way. An iPhone works the same way, and so does an iPad, a Chromebook, or a laptop I never installed the desktop app on. The web page is just one client of a plain HTTP API, so anything in the house that can make a web request can start a scan, check the pages and save the result. A script, a home automation button, whatever comes next.</p>
+<p>A few more things I like about how it turned out:</p>
+<ul>
+<li><strong>One document, every device.</strong> Everyone sees the same pages, live. I can start a batch from my phone and finish it at my desk.</li>
+<li><strong>NAS folders with their own names.</strong> A small config file maps names like “Receipts” or “Taxes 2026” to folders on the NAS, each with its own file name preset. The page only ever shows the names.</li>
+<li><strong>It installs like an app.</strong> Over HTTPS, “Add to Home screen” gives it an icon that opens full screen, no app store involved.</li>
+<li><strong>It cleans up after itself.</strong> Scans can be sensitive, so unsaved pages disappear after an hour without activity, and everything goes when the server stops.</li>
+</ul>
+<p>I run it on my homelab k3s cluster, behind Traefik with the same <code>*.c.home</code> certificate my other apps use. It also comes with a Docker Compose file and LXC install files for Proxmox, so it runs wherever your homelab does. The container image is 31 MB.</p>
+<h2 id="how-it-fits-together">How it fits together</h2>
+<p>The core is Rust. On top sits a desktop UI built with Tauri and Svelte. Underneath, each system talks to the scanner its own way:</p>
+<ul>
+<li><strong>macOS:</strong> Apple’s ImageCaptureCore, with Brother’s Mac driver</li>
+<li><strong>Linux and the server:</strong> SANE, with Brother’s <code>brscan4</code> driver</li>
+</ul>
+<p>The rest of the app doesn’t care which one is in use. The server is one more Rust crate on top of the same scanning, image and PDF code, and a small command-line tool shares it too.</p>
+<p>On real hardware, the desktop app scans over both USB and Wi-Fi on my Linux Mint and Linux Lite machines, on top of the Docker test runs. There’s also an install script: one command builds the app and installs it, into Applications on a Mac or the app menu on Linux.</p>
+<h2 id="things-i-learned-along-the-way">Things I learned along the way</h2>
+<p><strong>Wi-Fi on Linux works.</strong> Brother’s Linux driver just needs to be told the scanner’s IP address once. Then it scans over Wi-Fi like any other scanner.</p>
+<p><strong>Wi-Fi on the Mac is slow, and it’s not the Wi-Fi.</strong> I timed the same kind of scan, both sides, color, 300 dpi:</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Setup</th><th>Time per page side</th></tr></thead><tbody><tr><td>Mac over USB</td><td>2.0 s</td></tr><tr><td>Mac over Wi-Fi</td><td>10.1 s</td></tr><tr><td>Linux over the same Wi-Fi</td><td>3.2 s</td></tr><tr><td>Janus Scan Server over the same Wi-Fi</td><td>2.2 s</td></tr></tbody></table>
+<p>My first guess was that the network was the bottleneck. The Linux numbers proved me wrong. Brother’s Mac driver is simply slow over the network. Over Wi-Fi, the server is now as quick as the Mac over a cable.</p>
+<p><strong>You don’t need Windows to set up Wi-Fi.</strong> The worst part of owning this scanner was that putting it on Wi-Fi seemed to require Brother’s Windows tool. It turns out the scanner has a built-in web page where you can change its network name and password from any browser, as long as it’s already on a network. I wrote that up in the project’s Wi-Fi guide.</p>
+<p><strong>Brother’s driver crashes in a slim container, for a silly reason.</strong> The first time the server tried to open the scanner, it segfaulted. Plain <code>scanimage</code> crashed too, and the exact same driver worked fine in my bigger test image. After a lot of comparing, the culprit was a missing <code>netbase</code> package: the tiny one that provides <code>/etc/services</code>. Every desktop Linux has it, so Brother never noticed. One line in the Dockerfile fixed it.</p>
+<p><strong>An empty feeder looks like a broken connection.</strong> Over Wi-Fi, when you start a scan with no paper loaded, Brother’s driver starts happily and then reports an I/O error on the first read. The app used to say “the scanner was disconnected”, which sent me looking for network problems. Now it says the scanner didn’t start, and to check the paper.</p>
+<p><strong>The container didn’t need most of SANE.</strong> Debian’s SANE package drags in about 300 MB of support for cameras, PDFs and every other scanner. Brother’s driver can stand in for SANE’s front end on its own, so the server loads it directly. That’s how the image got down to 31 MB.</p>
+<h2 id="goodbye-last-windows-machine">Goodbye, last Windows machine</h2>
+<p>The old laptop has one job left, and Janus Scan just took it over. It was my last Windows machine, and it can finally retire from scanning duty. I’ll repurpose it with Linux, or maybe use it as an excuse to try out BSD.</p>
+<h2 id="whats-next">What’s next</h2>
+<p>Nothing, really, and that’s the point. I had wanted the scanner’s own Scan button to work on Linux, but Brother doesn’t publish its “scan key” tool for this model, and scanning from my phone covers it anyway. Press the button on the scanner and it beeps three times at you; tap Scan on the phone instead.</p>
+<p>A note if you try it on a Mac: I’m not paying Apple for a developer ID, so the app isn’t signed. macOS asks you to approve it once under Privacy &#x26; Security, or you can build it yourself.</p>
+<p>Janus Scan is built and tested on exactly one scanner, the ADS-1000W, because that’s the one I own. Nothing in the code is tied to it, though, so other scanners may well work. If you get it running on yours, contributions are welcome, and if you have a scanner you’d like supported and can donate or lend one, open an issue on GitHub. And if you have an ADS-1000W sitting in a drawer because the software got painful, it might be time to dust it off.</p> </div> <nav class="blog-post-navigation"><a href="/blog/eks-api-dns-cutover" class="blog-post-nav-link"><div class="blog-post-nav-label">Previous Post</div><div class="blog-post-nav-title">Migrating API Traffic Between EKS Clusters with a DNS Hostname Swap</div></a></nav> <section class="related-posts"><h2 class="related-posts-title">Related Posts</h2><div class="related-posts-grid"><a href="/blog/eks-api-dns-cutover" class="blog-card card-link"><img src="/assets/blog/eks-api-dns-cutover/banner.webp" alt="Migrating API Traffic Between EKS Clusters with a DNS Hostname Swap" class="blog-card-image"><h3 class="blog-card-title">Migrating API Traffic Between EKS Clusters with a DNS Hostname Swap</h3><p class="blog-card-description">Moving public API traffic between two independent EKS ingress stacks: build the new edge first, issue TLS early, test through a parallel hostname, keep both backends live, and hand over Route53 record ownership without a gap.</p></a><a href="/blog/eks-pod-identity" class="blog-card card-link"><img src="/assets/blog/eks-pod-identity/banner.webp" alt="From IRSA to EKS Pod Identity: What We Learned" class="blog-card-image"><h3 class="blog-card-title">From IRSA to EKS Pod Identity: What We Learned</h3><p class="blog-card-description">How we simplified AWS credentials for EKS workloads with Pod Identity, Terraform associations, safer migration ordering, and a least-privilege review.</p></a><a href="/blog/kargo-warehouse-poc" class="blog-card card-link"><img src="/assets/blog/kargo-warehouse-poc/banner.webp" alt="A Small Kargo Warehouse POC with GHCR" class="blog-card-image"><h3 class="blog-card-title">A Small Kargo Warehouse POC with GHCR</h3><p class="blog-card-description">Build a tiny version endpoint, publish SemVer images to GHCR, and verify that a Kargo Warehouse discovers each release as new Freight.</p></a></div></section> </div> </article>  </main> <footer class="footer"> <div class="container text-primary"> <p>© 2026 JANUS CHUNG. ALL RIGHTS RESERVED.</p> </div> </footer>  </body></html>
